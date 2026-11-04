@@ -9,6 +9,7 @@ from datetime import date
 from random import Random
 
 import numpy as np
+from baseball_lab.data.retrosheet_releases import RELEASES
 from baseball_lab.agents.neural import NeuralPolicy
 from baseball_lab.data.lineage import content_hash
 from .data import walk
@@ -148,8 +149,8 @@ def diagnostic(train, rows):
 
 def fit(dataset, start, end):
     first, last = date.fromisoformat(start), date.fromisoformat(end)
-    if first.year != 2024 or last.year != 2024 or first > last:
-        raise ValueError('현재 실제 연결은 2024년 정규시즌입니다. 시작·종료 날짜를 확인하세요.')
+    if first.year not in RELEASES or last.year != first.year or first > last:
+        raise ValueError('개별 검증한 2023·2024년 중 한 시즌의 날짜 범위를 선택하세요.')
     rows = [r for r in dataset['records'] if start <= r['date'] <= end]
     dates = sorted({r['date'] for r in rows})
     if len(dates) < 3:

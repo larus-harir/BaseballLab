@@ -8,7 +8,7 @@ CREDIT='The information used here was obtained free of charge from and is copyri
 SCHEMA='retrosheet-turn-segments-v1'
 
 
-def official_rows(path, stats):
+def official_rows(path, stats, excluded=None, *, skip_empty_no_play=False):
     """Map documented official fields; retain raw play text, never infer a pitch type."""
     required={'gid','event','inning','vis_home','score_v','score_h','pitches','pa','bunt','iw',
               'outs_pre','outs_post','runs','pn','gametype','pbp',
@@ -26,6 +26,22 @@ def official_rows(path, stats):
             ids.add(identity)
             if not row['event'] or any(row[name] not in ('0','1') for name in ('pa','iw','bunt')):
                 raise ValueError(f'Unsupported official field at CSV line {line}')
+            # A redundant post-inning NP is not a playable transition from 3 outs.
+            # Keep the original, and record this exact exclusion; never clamp outs.
+            if (row['event']=='NP' and row['outs_pre']==row['outs_post']=='3'
+                    and row['pa']==row['runs']=='0'
+                    and not any(row[f'br{i}_{s}'] for i in (1,2,3) for s in ('pre','post'))):
+                stats['excluded_post_inning_no_play']+=1
+                if excluded is not None:excluded.append({'source_row_id':f'{row["gid"]}:play{row["pn"]}:csvline{line}',
+                                                        'reason':'NP after third out, no PA/runs/runners; not a play'})
+                continue
+            if (skip_empty_no_play and row['event']=='NP' and not row['pitches']
+                    and row['pa']==row['runs']=='0' and row['outs_pre']==row['outs_post']
+                    and all(row[f'br{i}_pre']==row[f'br{i}_post'] for i in (1,2,3))):
+                stats['excluded_administrative_no_play']+=1
+                if excluded is not None:excluded.append({'source_row_id':f'{row["gid"]}:play{row["pn"]}:csvline{line}',
+                                                        'reason':'2023 administrative NP, no pitch or state transition'})
+                continue
             before,after=int(row['outs_pre']),int(row['outs_post'])
             mapped={'GAME_ID':row['gid'],'INN_CT':row['inning'],'BAT_HOME_ID':row['vis_home'],
                    'OUTS_CT':str(before),'PITCH_SEQ_TX':row['pitches'],
@@ -50,12 +66,12 @@ def walk(bases):
     return int(True)+2*int(first or second)+4*int(third or(first and second)),int(first and second and third)
 
 
-def normalize(csv_path,output,source,*,test_only=False,official=False):
+def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty_no_play=False):
     csv_path=Path(csv_path);output=Path(output)
     records=[];pending=[];last_half=None;seen=set();errors=Counter();total=0;sequence_bad=0
-    previous=None;score_mismatches=0;official_stats=Counter()
+    previous=None;score_mismatches=0;official_stats=Counter();source_exclusions=[]
     with csv_path.open(newline='',encoding='utf-8') as file:
-        reader=official_rows(csv_path,official_stats) if official else csv.DictReader(file)
+        reader=official_rows(csv_path,official_stats,source_exclusions,skip_empty_no_play=skip_empty_no_play) if official else csv.DictReader(file)
         for ordinal,row in enumerate(reader,1):
             total+=1
             half=(row['GAME_ID'],int(row['INN_CT']),int(row['BAT_HOME_ID']))
@@ -107,6 +123,7 @@ def normalize(csv_path,output,source,*,test_only=False,official=False):
               'dates':[min(r['date'] for r in records),max(r['date'] for r in records)],'exclusions':dict(errors),
               'sequence_mismatches':sequence_bad,'intentional_walks':len(iw),'intentional_walk_rule_matches':iw_matches,
               'download_filter_counts':dict(official_stats),
+              'source_exclusions':source_exclusions,
               'score_sequence_mismatches':score_mismatches,'isolated_intentional_walks':len(isolated),
               'isolated_intentional_walk_rule_matches':isolated_matches,
               'missing_features':['pitch type','pitch location','velocity','swing intention','player ability','fatigue'],

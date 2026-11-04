@@ -35,3 +35,9 @@ The information used here was obtained free of charge from and is copyrighted by
 - https://www.koreabaseball.com/Record/Player/PitcherBasic/Basic1.aspx
 
 이번 작업에서 해당 자료의 자동 수집·재이용 조건이나 세부 피치 데이터의 가용성을 확인하지 않았다. E02는 미구현이며, Statcast 수준의 좌표·센서·정책 의도를 확보했다고 가정하지 않는다. MLB 데이터로 결측을 채워 실제 KBO 학습 AI로 표시하지 않는다.
+
+## 추가 확인: 2023년 공식 배포
+
+공식 `https://www.retrosheet.org/downloads/plays/2023plays.zip`의 SHA256 `0129befd7944f60a858e5fdc265a44ed20afaa568679b37fca1083e3c083b20e`를 개별 등록했습니다. 2,430경기·184,506개 턴을 정규화하고 2024년 고정 정책의 외부 시즌 평가를 실제 수행했습니다. 원본의 행정용 NP 567행과 이닝 종료 후 NP 1행은 실제 플레이가 아니므로 원천 ID·사유를 보존해 제외했습니다. 아웃/주자를 임의 보정하지 않았습니다. 기존 2024년 원천·저장 정책은 유지했습니다.
+
+배포별 메타데이터는 `data.retrosheet_releases`에 있고, 자동 해시 변경이나 미검토 연도 추측은 하지 않습니다. 다른 시즌 성능은 [실제 검증](match/validation.md)을 참고하세요. 같은 시즌을 외부 평가라고 부르거나, 미검증 KBO 기록을 섞지 않습니다.

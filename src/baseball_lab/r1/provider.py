@@ -3,6 +3,7 @@ from pathlib import Path
 import urllib.request
 import zipfile
 
+from baseball_lab.data.retrosheet_releases import RELEASES
 from baseball_lab.data.lineage import checksum
 from .data import normalize, load
 
@@ -30,33 +31,35 @@ def download(url, destination, limit):
 
 def acquire(root, year=2024):
     destination = Path(root).resolve()/f'official-{year}'
-    if year != 2024:
-        raise ValueError('현재 검증한 제공 버전은 2024년 정규시즌입니다. 다른 시즌은 추가 확인이 필요합니다.')
+    if year not in RELEASES:
+        raise ValueError('개별 확인한 2023·2024년 공식 배포만 지원합니다.')
+    release=RELEASES[year]
     if (destination/'dataset.json').exists():
         print('단계 1 · 보관한 실제 Retrosheet 기록의 체크섬을 확인합니다.', flush=True)
         return load(destination/'dataset.json')
-    print('단계 1 · Retrosheet 공식 배포에서 2024년 실제 플레이 기록을 준비합니다.', flush=True)
+    print(f'단계 1 · Retrosheet 공식 배포에서 {year}년 실제 플레이 기록을 준비합니다.', flush=True)
     destination.mkdir(parents=True, exist_ok=True)
     terms = destination/'source-notice.html'
     download(TERMS_URL, terms, 2*1024*1024)
     notice = terms.read_text(encoding='utf-8', errors='replace')
     if 'free to make any desired use' not in notice or 'copyrighted by Retrosheet' not in notice:
         raise ValueError('공식 이용 고지가 변경됐거나 확인되지 않습니다. 제공 조건을 다시 검토해야 합니다.')
-    archive = destination/'2024plays.zip'
-    if not archive.exists():download(DATA_URL, archive, 32*1024*1024)
-    if checksum(archive) != ARCHIVE_SHA:
+    archive = destination/f'{year}plays.zip'
+    if not archive.exists():download(release['url'], archive, 32*1024*1024)
+    if checksum(archive) != release['sha256']:
         raise ValueError('공식 배포 버전의 체크섬이 변경됐습니다. 수정 자료인지 확인하기 전에는 학습하지 않습니다.')
-    csv_path = destination/'2024plays.csv'
+    csv_path = destination/f'{year}plays.csv'
     with zipfile.ZipFile(archive) as z:
-        info = z.getinfo('2024plays.csv')
+        info = z.getinfo(f'{year}plays.csv')
         if info.file_size > 256*1024*1024:raise ValueError('압축 해제 CSV 크기 한도 초과')
         with z.open(info) as src, csv_path.open('wb') as out:
             import shutil
             shutil.copyfileobj(src, out)
     return normalize(csv_path, destination, {
         'provider': 'Retrosheet official parsed play-by-play CSV',
-        'source_url': DATA_URL, 'source_version': ARCHIVE_SHA,
+        'source_url': release['url'], 'source_version': release['sha256'], 'season':year,
         'usage_basis': 'Official plays.html NOTICES verified: recipients free to make any desired use; prominent required copyright credit retained.',
         'terms_path': str(terms), 'terms_url': TERMS_URL, 'terms_sha256': checksum(terms),
         'raw_files': [{'path': str(archive), 'sha256': checksum(archive)},
-                      {'path': str(csv_path), 'sha256': checksum(csv_path)}]}, official=True)
+                      {'path': str(csv_path), 'sha256': checksum(csv_path)}]}, official=True,
+                     skip_empty_no_play=release.get('skip_empty_no_play',False))

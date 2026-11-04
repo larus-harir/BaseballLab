@@ -9,7 +9,7 @@ from baseball_lab.experiments.registry import REPOSITORY_ROOT
 
 def main():
     parser=argparse.ArgumentParser(description='야구 AI 연구실 · 실제 데이터와 실행 근거로 관찰하는 E01')
-    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run','scoring'),default='web')
+    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run','scoring','simulate'),default='web')
     parser.add_argument('--port',type=int,default=8765,help='웹 연구실 포트')
     parser.add_argument('--authorization-reference',help='자동 수집에 별도로 허용받은 근거 (기본은 수동 내보내기)')
     parser.add_argument('--data-dir',type=Path,default=REPOSITORY_ROOT/'data/local/statcast')
@@ -30,9 +30,13 @@ def main():
     parser.add_argument('--output',type=Path)
     parser.add_argument('--open',action='store_true',help='한국어 관찰실을 브라우저로 열기')
     parser.add_argument('--list',action='store_true')
+    parser.add_argument('--observation-source',choices=('model','observed'),default='model')
+    parser.add_argument('--outs',type=int,default=0)
+    parser.add_argument('--bases',type=int,default=1)
+    parser.add_argument('--policy-style',choices=('basic','random'),default='basic')
     args=parser.parse_args()
-    args.start=args.start or ('2024-03-20' if args.mode=='scoring' else '2024-05-01')
-    args.end=args.end or ('2024-09-30' if args.mode=='scoring' else '2024-05-06')
+    args.start=args.start or ('2024-03-20' if args.mode in ('scoring','simulate') else '2024-05-01')
+    args.end=args.end or ('2024-09-30' if args.mode in ('scoring','simulate') else '2024-05-06')
     args.evaluate_every=args.evaluate_every or (max(200,args.episodes//3) if args.mode=='scoring' else 200)
     if args.list:
         print('E01 · 실제 경기 기록으로 득점·실점 방어를 배우는 상황 실험. 웹에서 AI 학습 시작을 누르세요. 전체 경기 승리는 아직 미지원입니다.')
@@ -49,13 +53,19 @@ def main():
         from baseball_lab.data.statcast import acquire,audit,manual_source,load_dataset
         from baseball_lab.outcome.empirical import fit,load_model
         from baseball_lab.tracking.evidence_report import write_report
-        if args.mode=='scoring':
+        if args.mode=='simulate':
+            from baseball_lab.r1.provider import acquire
+            from baseball_lab.simulation.scoring import observe
+            dataset=acquire(REPOSITORY_ROOT/'data/local/retrosheet',year=datetime.fromisoformat(args.start).year)
+            observe(dataset,args.start,args.end,output,seed=args.seed,outs=args.outs,bases=args.bases,source=args.observation_source,style=args.policy_style)
+            print('관찰 완료 · 정책 학습 없이 실제 기록 또는 모델 전이를 재생합니다.',flush=True)
+        elif args.mode=='scoring':
             from baseball_lab.r1.provider import acquire
             from baseball_lab.r1.training import train,Config
             seeds=tuple(int(s.strip()) for s in args.seeds.split(',')) if args.seeds else (args.seed,args.seed+1,args.seed+2)
             config=Config(args.episodes,seeds,args.evaluate_every,args.evaluation_n)
             config.validate()
-            dataset=acquire(REPOSITORY_ROOT/'data/local/retrosheet')
+            dataset=acquire(REPOSITORY_ROOT/'data/local/retrosheet',year=datetime.fromisoformat(args.start).year)
             print('단계 2 · 경기와 날짜를 나눠 실제 전이 분포를 검사합니다.',flush=True)
             print('단계 3 · 출루가 아닌 한 점 득점·실점 방어를 학습합니다. 전체 경기 승리는 아닙니다.',flush=True)
             train(dataset,args.start,args.end,output,config)

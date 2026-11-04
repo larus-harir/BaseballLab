@@ -69,6 +69,13 @@ class Workbench:
                 if run['status'] in ('queued','running') and (not current or run['id']!=current['id']):
                     run['status']='interrupted'
                 run.pop('logs',None);runs.append(run)
+                evidence=p.parent/'result/research.json'
+                if evidence.exists():
+                    data=json.loads(evidence.read_text(encoding='utf-8'))
+                    if data.get('schema')=='E01-R1-research-v1':
+                        from baseball_lab.experiments.match.reporting.summary import build_summary
+                        reading=build_summary(data)
+                        run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
             except (OSError,ValueError,KeyError):continue
         return {'readiness':self.readiness(),'job':current,'runs':runs}
 
@@ -100,13 +107,14 @@ class Workbench:
             self._idle()
             from datetime import date
             if not isinstance(options,dict):raise ValueError('작업 설정은 객체여야 합니다.')
-            if kind not in ('fit','train','run'):raise ValueError('지원하지 않는 작업')
-            if kind=='run':
-                source=options.get('source','statcast')
+            if kind not in ('fit','train','run','simulate'):raise ValueError('지원하지 않는 작업')
+            if kind in ('run','simulate'):
+                source='retrosheet' if kind=='simulate' else options.get('source','statcast')
                 if source not in ('statcast','retrosheet'):raise ValueError('지원하지 않는 자료 연결입니다.')
                 if source=='retrosheet':
                     first=date.fromisoformat(str(options.get('start','')));last=date.fromisoformat(str(options.get('end','')))
-                    if first.year!=2024 or last.year!=2024 or first>last:raise ValueError('2024년 정규시즌 날짜 범위를 선택하세요.')
+                    from baseball_lab.data.retrosheet_releases import RELEASES
+                    if first.year not in RELEASES or last.year!=first.year or first>last:raise ValueError('2023·2024년 중 한 시즌의 날짜 범위를 선택하세요.')
                     start,end=str(first),str(last)
                 else:
                     from baseball_lab.research.pipeline import Plan
@@ -116,12 +124,21 @@ class Workbench:
                 if type(episodes) is not int or not 20<=episodes<=100000:raise ValueError('학습 타석 수는 20~100,000 사이의 정수입니다.')
                 if type(seed) is not int or not 0<=seed<=2**31-1:raise ValueError('재현 번호 범위를 확인하세요.')
                 extra=['--mode','scoring' if source=='retrosheet' else 'run','--start',start,'--end',end,'--episodes',str(episodes),'--seed',str(seed)]
-                if source=='retrosheet':
+                if source=='retrosheet' and kind=='run':
                     if seed>2**31-3:raise ValueError('여러 재현 번호를 만들기 위해 seed는 2,147,483,645 이하여야 합니다.')
                     extra.extend(['--evaluation-n','500'])
                 reference=options.get('authorization_reference','')
                 if not isinstance(reference,str) or len(reference)>2000:raise ValueError('자료 연결 설정을 확인하세요.')
                 if reference.strip():extra.extend(['--authorization-reference',reference.strip()])
+                if kind=='simulate':
+                    outs,bases=options.get('outs',0),options.get('bases',1)
+                    observation=options.get('observation_source','model');style=options.get('policy_style','basic')
+                    if type(outs) is not int or not 0<=outs<=2 or type(bases) is not int or not 0<=bases<=7:
+                        raise ValueError('시작 아웃·주자 상태를 확인하세요.')
+                    if observation not in ('model','observed') or style not in ('basic','random'):
+                        raise ValueError('지원하는 관찰 방식을 선택하세요.')
+                    extra=['--mode','simulate','--start',start,'--end',end,'--seed',str(seed),
+                           '--outs',str(outs),'--bases',str(bases),'--observation-source',observation,'--policy-style',style]
             elif kind=='fit':
                 before=date.fromisoformat(str(options.get('train_before','')))
                 after=date.fromisoformat(str(options.get('test_from','')))
@@ -158,7 +175,7 @@ class Workbench:
                 process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
                                          cwd=self.root,env=env,text=True,encoding='utf-8',errors='replace')
                 self.process=process
-                self.job.update(status='running',message='자료 준비부터 순서대로 진행하고 있어요.' if self.job['kind']=='run' else '기록을 검사하고 있어요.' if self.job['kind']=='fit' else '두 AI가 타석 대결을 학습하고 있어요.')
+                self.job.update(status='running',message='학습 없이 상황을 준비하고 있어요.' if self.job['kind']=='simulate' else '자료 준비부터 순서대로 진행하고 있어요.' if self.job['kind']=='run' else '기록을 검사하고 있어요.' if self.job['kind']=='fit' else '두 AI가 타석 대결을 학습하고 있어요.')
                 self._persist()
             with (output/'output.log').open('w',encoding='utf-8') as log:
                 for line in process.stdout:
@@ -222,19 +239,35 @@ def make_handler(workbench):
             self.send_response(200);self.send_header('Content-Type',mimetypes.guess_type(str(path))[0] or 'application/octet-stream')
             self.send_header('Content-Length',str(len(body)));self.send_header('X-Content-Type-Options','nosniff')
             self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(body)
+        def _html(self,body):
+            data=body.encode('utf-8')
+            self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8')
+            self.send_header('Content-Length',str(len(data)));self.send_header('Cache-Control','no-store')
+            self.end_headers();self.wfile.write(data)
         def do_GET(self):
             if not self._host_ok():return self._json({'error':'로컬 주소로 접속하세요.'},403)
             path=urlparse(self.path).path
-            if path=='/':
-                body=Path(__file__).with_name('workbench.html').read_text(encoding='utf-8').replace('__SESSION_TOKEN__',workbench.token).encode()
-                self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Content-Length',str(len(body)))
-                self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(body)
+            pages={'/':'portal.html','/lab':'portal.html','/match':'match.html','/match/team':'workbench.html',
+                   '/match/at-bat':'workbench.html','/simulation':'simulation.html','/lab/data':'data.html'}
+            if path in pages:
+                body=Path(__file__).with_name(pages[path]).read_text(encoding='utf-8').replace('__SESSION_TOKEN__',workbench.token)
+                self._html(body)
             elif path=='/api/state':self._json(workbench.state())
             elif path.startswith('/reports/'):
                 from urllib.parse import unquote
                 resolved=(workbench.outputs/unquote(path[len('/reports/'):])).resolve()
                 if not resolved.is_relative_to(workbench.outputs.resolve()) or resolved.name not in ('report.html','summary.md','output.log'):
                     return self._json({'error':'허용하지 않는 경로'},403)
+                if resolved.name=='report.html' and (resolved.parent/'research.json').is_file():
+                    try:
+                        evidence=json.loads((resolved.parent/'research.json').read_text(encoding='utf-8'))
+                        if evidence.get('schema')=='E01-R1-research-v1':
+                            external=[json.loads(p.read_text(encoding='utf-8')) for p in sorted(resolved.parent.glob('external-*.json'))]
+                            evidence['external_evaluation']=[r for r in external if r.get('run_id')==evidence['run_id']]
+                            from baseball_lab.experiments.match.reporting.report import render
+                            return self._html(render(evidence))
+                    except (OSError,ValueError,KeyError,TypeError) as exc:
+                        return self._json({'error':f'결과 근거를 읽을 수 없습니다: {exc}'},409)
                 self._file(resolved)
             else:self._json({'error':'페이지가 없어요.'},404)
         def do_POST(self):

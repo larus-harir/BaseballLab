@@ -113,3 +113,23 @@ def test_real_process_cancel_and_progress_are_recorded(tmp_path):
             time.sleep(.02)
         assert state['status']=='cancelled'
         assert 'MOCK_TEST_ONLY' in state['logs'][0]
+
+
+def test_platform_match_and_observer_are_separate_pages(web):
+    wb,s=web
+    for path,label in [('/','무엇을 해볼까요?'),('/match','BaseballLab-Match'),('/match/team','한 점을 만들고 막는'),('/match/at-bat','researchSource'),('/simulation','학습 없이 관찰'),('/lab/data','어떤 자료')]:
+        code,body=call(s,path)
+        assert code==200 and label in body.decode()
+    with pytest.raises(ValueError):wb.start('simulate',{'start':'2024-03-20','end':'2024-09-30','outs':3})
+
+
+def test_old_r1_result_is_summarized_without_overwriting_original(web):
+    wb,s=web
+    data=json.loads((Path(__file__).parents[1]/'docs/results/e01-r1-2024.json').read_text())
+    output=wb.outputs/'old/result';output.mkdir(parents=True)
+    source=json.dumps(data);(output/'research.json').write_text(source)
+    (output/'report.html').write_text('LEGACY_UNCHANGED')
+    code,body=call(s,'/reports/old/result/report.html')
+    assert code==200 and '이번 조건에서는 수비 쪽 우세' in body.decode()
+    assert (output/'report.html').read_text()=='LEGACY_UNCHANGED'
+    assert (output/'research.json').read_text()==source

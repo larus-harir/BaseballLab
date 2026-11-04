@@ -134,17 +134,35 @@ def test_official_csv_preserves_non_pa_walkoff_and_excludes_postseason(tmp_path)
     required=['gid','event','inning','vis_home','score_v','score_h','pitches','pa','bunt','iw','outs_pre','outs_post','runs','pn','gametype','pbp',*[f'br{i}_{s}' for i in (1,2,3) for s in ('pre','post')]]
     def play(**updates):
         return dict.fromkeys(required,'')|dict(gid='TST202405010',event='WP.3-H',inning='9',vis_home='1',score_v='0',score_h='0',pa='0',bunt='0',iw='0',outs_pre='1',outs_post='1',runs='1',pn='1',gametype='regular',pbp='full',br3_pre='MOCKRUNNER')|updates
-    rows=[play(),play(gid='TST202405020',event='IW',iw='1',pa='1',br1_post='MOCKBATTER',runs='0'),play(gametype='worldseries')]
+    rows=[play(),play(gid='TST202405020',event='IW',iw='1',pa='1',br1_post='MOCKBATTER',runs='0'),play(gametype='worldseries'),play(gid='TST202405030',event='NP',outs_pre='3',outs_post='3',pa='0',runs='0',br3_pre='')]
     path=tmp_path/'official-schema-mock.csv'
     with path.open('w',newline='') as f:
         writer=csv.DictWriter(f,required);writer.writeheader();writer.writerows(rows)
     stats=Counter();mapped=list(official_rows(path,stats))
     assert len(mapped)==2 and mapped[0]['GAME_END_FL']=='T'
-    assert stats=={'all_download_rows':3,'excluded_non_regular_or_non_full':1}
+    assert stats=={'all_download_rows':4,'excluded_non_regular_or_non_full':1,'excluded_post_inning_no_play':1}
     dataset=normalize(path,tmp_path/'out',{},official=True,test_only=True)
     assert len(dataset['records'])==2
     assert dataset['records'][0]['truncated'] and dataset['records'][0]['runs']==1
     assert dataset['records'][0]['source_row_ids']==['TST202405010:play1:csvline2']
+    assert dataset['manifest']['source_exclusions'][0]['source_row_id']=='TST202405030:play1:csvline5'
+    # A 2023 administrative NP before the automatic extra-inning runner is
+    # not a transition from empty bases. The next actual row supplies its state.
+    admin=[play(gid='TST202305010',inning='10',event='NP',outs_pre='0',outs_post='0',pa='0',runs='0',br3_pre=''),
+           play(gid='TST202305010',inning='10',event='K',pn='2',pitches='BFS',outs_pre='0',outs_post='1',pa='1',runs='0',br3_pre='',br2_pre='MOCKRUNNER',br2_post='MOCKRUNNER')]
+    admin_path=tmp_path/'administrative.csv'
+    with admin_path.open('w',newline='') as f:
+        writer=csv.DictWriter(f,required);writer.writeheader();writer.writerows(admin)
+    with pytest.raises(ValueError,match='sequence mismatch'):
+        normalize(admin_path,tmp_path/'unmapped',{},official=True,test_only=True)
+    cleaned=normalize(admin_path,tmp_path/'mapped',{},official=True,test_only=True,skip_empty_no_play=True)
+    assert len(cleaned['records'])==1 and cleaned['records'][0]['bases']==2
+    assert cleaned['manifest']['download_filter_counts']['excluded_administrative_no_play']==1
+    rows[-1]['runs']='1'
+    with path.open('w',newline='') as f:
+        writer=csv.DictWriter(f,required);writer.writeheader();writer.writerows(rows)
+    with pytest.raises(ValueError,match='Invalid observed transition'):
+        normalize(path,tmp_path/'invalid',{},official=True,test_only=True)
 
 
 def test_bunt_effect_ablation_changes_only_bunt_donors():

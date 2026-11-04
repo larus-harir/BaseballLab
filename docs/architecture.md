@@ -1,3 +1,13 @@
+# 현재 부모와 Match 경계
+
+부모 `/`·`/simulation`·`/lab/data`와 자식 `/match`·`/match/team`·`/match/at-bat`를 한 서버에서 제공합니다. 공통 신경망과 전이 어댑터는 재사용하며 Match 학습/보고는 `experiments/match/`가 소유합니다. `r1.training/report`는 기존 호출을 보존하는 호환 경로입니다.
+
+[책임·실제 구현 범위](platform/README.md) · [Match 해석과 호환](match/README.md) · [실행 검증](match/validation.md)
+
+이하 이전 구현 설명을 보존합니다. 과거의 `r1.training` 구현 본문은 현재 Match 모듈로 이관됐습니다.
+
+---
+
 # 현재 기본 E01-R1 경로
 
 `r1.provider`(공식 ZIP·고지·해시·캐시) → `r1.data`(관측 턴 정규화·연속성) → `r1.environment`(기간 분리·지원 행동·경험 전이·득점 상황 종료) → `r1.training`(공통 신경망·과거 상대·독립 환경 평가) → `r1.report`(한국어 기록·그래프·턴 재생).
