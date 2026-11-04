@@ -183,7 +183,7 @@ def test_raw_string_action_is_rejected_at_engine_boundary():
 
 
 def test_cli_from_another_directory_and_invalid_config(tmp_path):
-    cmd = [sys.executable, str(ROOT/'scripts/quickstart.py')]
+    cmd = [sys.executable, str(ROOT/'scripts/quickstart.py'), '--mode', 'baseline']
     result = subprocess.run([*cmd, '--seeds', '1', '2', '3', '--plate-appearances', '5', '--output', str(tmp_path/'run')],
                             cwd=tmp_path, capture_output=True, text=True, encoding='utf-8', env={**os.environ, 'PYTHONUTF8': '1'})
     assert result.returncode == 0, result.stderr

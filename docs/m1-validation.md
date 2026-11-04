@@ -7,8 +7,8 @@ Python 3.12.14 / pytest 8.3.5 / Linux CPU에서 검증했다.
 ```bash
 python -m pip install -e '.[dev]'
 python -m pytest -q
-python scripts/quickstart.py
-python scripts/quickstart.py --seeds 20261104 20261105 20261106 --output outputs/E01/verified
+python scripts/quickstart.py --mode baseline
+python scripts/quickstart.py --mode baseline --seeds 20261104 20261105 20261106 --output outputs/E01/verified
 ```
 
 현재 테스트 **69 passed**. 기본 실행은 9개 대결·9,000타석, 3개 seed 반복은 27개 대결·27,000타석이다. 모듈 실행 `python -m baseball_lab --list`, 설치된 `baseball-lab` 명령, E01 자체 run.py를 다른 작업 디렉터리에서도 실행했다.

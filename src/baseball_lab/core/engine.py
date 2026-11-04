@@ -9,7 +9,7 @@ from .contracts import (
     positive_integer,
 )
 
-TERMINAL_RESULTS = ("walk", "strikeout", "out", "single", "double", "triple", "home_run")
+TERMINAL_RESULTS = ("walk", "strikeout", "out", "single", "double", "triple", "home_run", "bunt_out", "ground_out")
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,6 @@
 # 공통 플랫폼과 자식 실험
 
-## 실행 흐름
+## M1 기준선 실행 흐름
 
 ```text
 E01 설정 JSON → ExperimentConfig → run_experiment
@@ -47,3 +47,11 @@ run_experiment(config, Path("outputs/my_experiment"), experiment_id="MY_EXPERIME
 ## 경기·학습으로 연결
 
 타석은 매번 초기화됩니다. 경기 상태(주자/득점/이닝/선후공)는 다음 단계에서 이 타석 엔진의 상위에 연결하고, 데이터 보정 모델과 정책 평가를 재사용합니다. 최종 학습 보상은 경기 승패이며, BB/K/장타/스윙률은 관찰 지표입니다. 단계별 검증 결과를 바탕으로 데이터 보정 → 전체 경기 → 경쟁 학습으로 개발을 이어갑니다.
+
+## 경기·신경망 학습 실행 경로
+
+기본 CLI는 `training.self_play.train` → 공통 `core.game.GameEngine` → 기존 `core.engine.transition` 규칙을 사용한다. 주자·득점·이닝은 GameEngine이 관리하고 기존 타석 카운트 규칙을 다시 구현하지 않는다. GameOutcome은 타석 합성 모델을 재사용해 투구 강도·누적 부하·번트/땅볼 사건을 더한다.
+
+경기 관측/행동은 `game-public-v1` / `game-bat4-pitch18-v1`이다. 기존 count-v1 타석 정책과 혼합하지 않으며 저장 신경망 로딩 시 경기 스키마와 특징 순서를 검사한다. 다른 프로파일·확률 모델은 GameEngine 생성자에 주입할 수 있다. 두 팀은 같은 능력/환경을 사용한다.
+
+`agents.neural`은 신경망·행동 확률·기울기·옵티마이저를, `training`은 경기 보상과 상대 풀·스냅샷을, `evaluation.games`는 학습 없는 선후공 교환 평가를 담당한다. `tracking.learning_report`는 공통 JSON을 한국어 HTML/Markdown으로 보여준다. 재평가는 같은 정책을 고정해 실행한다. 원래 타석 실행 경로는 `--mode baseline`에 남아 있다. [상세 설계](learning.md)를 참고한다.

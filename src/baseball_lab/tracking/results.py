@@ -11,6 +11,7 @@ from pathlib import Path
 
 from baseball_lab.core.contracts import ACTION_SCHEMA, OBSERVATION_SCHEMA
 from baseball_lab.data.schema import EVENT_SCHEMA
+from baseball_lab.labels import korean
 
 
 def code_identity(root: Path | None = None) -> dict:
@@ -61,14 +62,14 @@ def summarize(matches: list[dict]) -> list[dict]:
 
 def report(payload: dict) -> str:
     lines = [f"# {payload['experiment_id']} 실행 결과", "",
-             f"프로파일: `{payload['profile']['league_id']}` / 보정: `{payload['profile']['calibration_id']}`",
+             f"프로파일: `{korean(payload['profile']['league_id'])}` / 보정: `{korean(payload['profile']['calibration_id'])}`",
              f"데이터 출처: {payload['profile']['data_provenance']}", "",
              "타석 단위의 정책 평가다. 이 실행은 학습을 수행하지 않으며 경기 승패를 측정하지 않는다.", "",
              "## 대결 요약", "",
              "| 타자 | 투수 | seed 수 | 타석 | BB% | K% | 안타/타석 | 초구 스윙% |",
              "|---|---|---:|---:|---:|---:|---:|---:|"]
     for item in payload["summary"]:
-        lines.append(f"| {item['batter']} | {item['pitcher']} | {len(item['seeds'])} | {item['plate_appearances']} | "
+        lines.append(f"| {korean(item['batter'])} | {korean(item['pitcher'])} | {len(item['seeds'])} | {item['plate_appearances']} | "
                      f"{item['walk_rate']:.1%} | {item['strikeout_rate']:.1%} | {item['hit_rate']:.1%} | "
                      f"{item['first_pitch_swing_rate']:.1%} |")
     batters = list(dict.fromkeys(m["batter"] for m in payload["summary"]))
@@ -76,11 +77,11 @@ def report(payload: dict) -> str:
     lookup = {(m["batter"], m["pitcher"]): m for m in payload["summary"]}
     for metric, label in (("walk_rate", "볼넷 비율"), ("strikeout_rate", "삼진 비율")):
         lines.extend(["", f"## 매치업 행렬: {label}", "",
-                      "| 타자 / 투수 | " + " | ".join(pitchers) + " |",
+                      "| 타자 / 투수 | " + " | ".join(korean(p) for p in pitchers) + " |",
                       "|---|" + "---:|"*len(pitchers)])
         for batter in batters:
             values = [f"{lookup[batter, pitcher][metric]:.1%}" if (batter, pitcher) in lookup else "—" for pitcher in pitchers]
-            lines.append("| " + batter + " | " + " | ".join(values) + " |")
+            lines.append("| " + korean(batter) + " | " + " | ".join(values) + " |")
     lines.extend(["", "## 지표·재현성", "",
                   "- BB%, K%, 안타/타석의 분모는 타석 수다. 안타/타석은 타율(안타/타수)과 다르다.",
                   "- 초구 스트라이크는 첫 공의 strike/foul 사건이며 인플레이는 포함하지 않는다.",

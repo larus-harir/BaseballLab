@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "baseball-ai-lab"
-version = "0.2.0"
+version = "0.3.0"
 requires-python = ">=3.11"
 description = "Reusable baseball research platform with synthetic E01 baselines"
 
@@ -12,7 +12,8 @@ description = "Reusable baseball research platform with synthetic E01 baselines"
 baseball-lab = "baseball_lab.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest==8.3.5"]
+dev = ["pytest==8.3.5", "numpy>=1.26,<3"]
+learning = ["numpy>=1.26,<3"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
