@@ -1,5 +1,9 @@
+"""Policy identity and schema checks used by the actual evaluation path."""
+
 from dataclasses import dataclass
+
 from baseball_lab.core.contracts import ACTION_SCHEMA, OBSERVATION_SCHEMA
+
 
 @dataclass(frozen=True)
 class PolicyMetadata:
@@ -13,6 +17,14 @@ class PolicyMetadata:
     algorithm: str
     seed: int
     commit: str
+
+    def __post_init__(self):
+        for name, value in vars(self).items():
+            if name == "seed":
+                if type(value) is not int:
+                    raise ValueError("Policy seed must be an integer")
+            elif not isinstance(value, str) or not value.strip():
+                raise ValueError(f"Policy metadata {name} is required")
 
     def validate_compatibility(self):
         if (self.observation_schema, self.action_schema) != (OBSERVATION_SCHEMA, ACTION_SCHEMA):

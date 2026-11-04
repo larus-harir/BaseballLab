@@ -1,0 +1,16 @@
+schema_version,league,season,source,source_version,match_id,seed,batter_policy,pitcher_policy,plate_appearance,pitch_number,balls,strikes,pitch_type,target_zone,batter_action,event,result
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,1,1,0,0,breaking,False,power,out,out
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,2,1,0,0,breaking,True,take,strike,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,2,2,0,1,breaking,False,power,strike,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,2,3,0,2,fastball,True,power,strike,strikeout
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,3,1,0,0,changeup,False,contact,strike,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,3,2,0,1,changeup,False,power,single,single
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,4,1,0,0,breaking,True,power,strike,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,4,2,0,1,breaking,False,take,ball,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,4,3,1,1,breaking,False,contact,strike,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,4,4,1,2,fastball,True,take,strike,strikeout
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,5,1,0,0,changeup,False,take,ball,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,5,2,1,0,changeup,False,contact,strike,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,5,3,1,1,changeup,False,take,ball,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,5,4,2,1,changeup,False,take,ball,
+pitch-event-v1,synthetic_demo,none,Hand-authored synthetic probabilities; no real league data,synthetic-v1,01923b9748ebb9a5,20261104,random,random,5,5,3,1,fastball,True,take,strike,

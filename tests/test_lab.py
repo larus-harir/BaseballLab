@@ -95,7 +95,7 @@ def test_schema_rejection():
 def test_safety_limit_is_not_a_result():
     class Fouls:
         calibration_id = 'synthetic-v1'
-        def sample(self, pitch, bat, rng):
+        def sample(self, pitch, bat, rng, *, context=None):
             return 'foul'
     e = Engine(RuleSet(), LeagueProfile(), Fouls())
     with pytest.raises(RuntimeError, match='safety limit'):
@@ -104,7 +104,7 @@ def test_safety_limit_is_not_a_result():
 
 def test_saved_results(tmp_path):
     matches = [evaluate(engine(), MatchSpec('random', 'mixed', 5, 10))]
-    save(tmp_path, LeagueProfile(), RuleSet(), matches, {'seed': 5})
+    save(tmp_path, LeagueProfile(), RuleSet(), matches, {'seed': 5}, experiment_id='TEST')
     payload = json.loads((tmp_path/'results.json').read_text())
     assert payload['trained'] is False
     assert payload['matches'] == matches

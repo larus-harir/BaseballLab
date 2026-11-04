@@ -1,1 +1,16 @@
-{"seed": 20261104, "plate_appearances": 1000, "batters": ["random", "aggressive", "patient"], "pitchers": ["random", "strike_first", "mixed"], "profile": {"league_id": "synthetic_demo"}, "rules": {}}
+{
+  "seed": 20261104,
+  "plate_appearances": 1000,
+  "batters": ["random", "aggressive", "patient"],
+  "pitchers": ["random", "strike_first", "mixed"],
+  "profile": {
+    "league_id": "synthetic_demo",
+    "season": "none",
+    "ruleset_id": "basic-pa-v1",
+    "calibration_id": "synthetic-v1",
+    "data_provenance": "Hand-authored synthetic probabilities; no real league data",
+    "source_data_version": "synthetic-v1"
+  },
+  "rules": {"ruleset_id": "basic-pa-v1", "balls_to_walk": 4, "strikes_to_out": 3},
+  "attributes": {"contact": 0.5, "power": 0.5, "control": 0.5}
+}
