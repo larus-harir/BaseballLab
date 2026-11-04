@@ -9,7 +9,9 @@ from baseball_lab.experiments.registry import REPOSITORY_ROOT
 
 def main():
     parser=argparse.ArgumentParser(description='야구 AI 연구실 · 실제 데이터와 실행 근거로 관찰하는 E01')
-    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline'),default='train')
+    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web'),default='web')
+    parser.add_argument('--port',type=int,default=8765,help='웹 연구실 포트')
+    parser.add_argument('--authorization-reference',help='자동 수집에 별도로 허용받은 근거 (기본은 수동 내보내기)')
     parser.add_argument('--data-dir',type=Path,default=REPOSITORY_ROOT/'data/local/statcast')
     parser.add_argument('--model',type=Path,help='실제 데이터로 보정·독립 검증한 model.json')
     parser.add_argument('--start',default='2024-05-01');parser.add_argument('--end',default='2024-05-06')
@@ -29,7 +31,13 @@ def main():
     parser.add_argument('--list',action='store_true')
     args=parser.parse_args()
     if args.list:
-        print('E01: 실제 기록 보정 기반 타석 경쟁 학습 · 출루 대리보상 · 경기 승리 미지원')
+        print('E01 · 타자와 투수의 학습 연구 — 현재는 타석 출루 연습입니다. 웹 화면에서 자료 검사 후 시작하세요.')
+        return
+    if args.mode=='web':
+        if not 0<=args.port<=65535:parser.error('포트는 0~65535 사이의 정수로 입력하세요.')
+        from baseball_lab.web.server import serve
+        try: serve(REPOSITORY_ROOT,args.port,args.open)
+        except OSError as exc: parser.exit(2,f'연구실을 열지 못했어요: {exc}. --port 8766 등 다른 번호를 사용하세요.\n')
         return
     output=args.output or REPOSITORY_ROOT/'outputs/E01'/('research_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
     model_path=args.model or args.data_dir/'model.json'
@@ -38,7 +46,7 @@ def main():
         from baseball_lab.outcome.empirical import fit,load_model
         from baseball_lab.tracking.evidence_report import write_report
         if args.mode=='prepare':
-            acquisition=acquire(args.start,args.end,args.data_dir/'raw',usage_note=args.usage_note)
+            acquisition=acquire(args.start,args.end,args.data_dir/'raw',usage_note=args.usage_note,authorization_reference=args.authorization_reference)
             sources=[RawSource(**s) for s in acquisition['sources']]
             dataset=audit(sources,args.data_dir)
             model=fit(args.data_dir/'dataset.json',args.data_dir,train_before=args.train_before,test_from=args.test_from,min_support=args.min_support)

@@ -10,7 +10,7 @@ from baseball_lab.data.statcast import load_dataset
 from baseball_lab.evaluation.metrics import wilson_interval
 
 EVENTS = ('ball','strike','foul','out','single','double','triple','home_run','reached')
-MODEL_VERSION = 'statcast-observational-pa-v1'
+MODEL_VERSION = 'statcast-observational-pa-v2'
 ASSUMPTIONS = [
     'UNVERIFIED_ASSUMPTION: observed-action conditioning is associational, not an identified causal intervention',
     'UNVERIFIED_ASSUMPTION: pooled players/situations and pitch selection are exchangeable within fitted groups',
@@ -81,7 +81,7 @@ class EmpiricalModel:
         row = rng.choice(donors)
         probabilities, n, _ = self.probabilities(balls,strikes,pitch_type,action,arrival)
         return {'event':row['event'],'sampled_record':arrival,'probabilities':probabilities,
-                'support_n':n,'backoff_level':level,'source_status':'MODEL_SIMULATED',
+                'support_n':n,'backoff_level':level,'source_status':'MOCK_TEST_ONLY' if self.artifact['source_status']=='MOCK_TEST_ONLY' else 'MODEL_SIMULATED',
                 'arrival_support_n':len(arrivals),'arrival_backoff_level':arrival_level,
                 'probability_status':'EMPIRICALLY_ESTIMATED', 'model_version':MODEL_VERSION,
                 'probability_intervals':{event:wilson_interval(round(p*n),n) for event,p in probabilities.items()},
@@ -95,7 +95,7 @@ def validate(model, rows, seed):
     groups=defaultdict(lambda:{'n':0,'observed':Counter(),'expected':Counter()})
     arrival_stats=defaultdict(lambda:defaultdict(list))
     supported = unseen = 0
-    nll = brier = 0.
+    nll = brier = baseline_brier = 0.
     for row in rows:
         try:
             probs,n,level=model.probabilities(row['balls'],row['strikes'],row['pitch_type'],row['observed_action'],row)
@@ -117,6 +117,9 @@ def validate(model, rows, seed):
         unseen += p == 0
         nll -= math.log(max(p,1e-12))
         brier += sum((probs[event]-(row['event']==event))**2 for event in EVENTS)
+        baseline_rows=model.groups[(row['balls'],row['strikes'],row['observed_action'],None)]
+        baseline_counts=Counter(r['event'] for r in baseline_rows)
+        baseline_brier += sum((baseline_counts[event]/len(baseline_rows)-(row['event']==event))**2 for event in EVENTS)
         key=f"{row['pitch_type']}:{row['balls']}-{row['strikes']}:{row['observed_action']}"
         group=groups[key];group['n']+=1;group['observed'][row['event']]+=1
         for event,p in probs.items(): group['expected'][event]+=p
@@ -136,6 +139,9 @@ def validate(model, rows, seed):
             'coverage':supported/len(rows) if rows else 0,'unseen_event_n':unseen,
             'nll_epsilon_1e_12':nll/supported if supported else None,
             'brier':brier/supported if supported else None,
+            'count_action_baseline_brier':baseline_brier/supported if supported else None,
+            'brier_difference_vs_baseline':(brier-baseline_brier)/supported if supported else None,
+            'weighted_conditional_tv':sum(c['n']*c['total_variation'] for c in conditions)/supported if supported else None,
             'total_variation':sum(d['absolute_error'] for d in distributions)/2 if supported else None,
             'distributions':distributions,'conditions':conditions,'simulation_seed':seed,
             'arrival_validation':[{'pitch_type':key[0],'field':key[1],'n':len(values['observed']),
@@ -169,7 +175,7 @@ def fit(dataset_path: Path, output: Path, *, train_before: str, test_from: str,
     if not fit_rows or not partitions['validation'] or not partitions['test']:
         raise ValueError('훈련·검증·최종 검증 기간에 각각 자료가 필요합니다.')
     settings={'min_support':min_support,'min_fit_rows':min_fit_rows,'min_holdout_rows':min_holdout_rows,
-              'minimum_holdout_coverage':.95,'maximum_validation_tv':.15,
+              'minimum_holdout_coverage':.95,'maximum_validation_tv':.15, 'maximum_weighted_conditional_tv':.30,'maximum_brier_increase_vs_baseline':.02,
               'note':'Predeclared engineering eligibility thresholds, not proof of causal/physical realism'}
     types=sorted(k for k,n in Counter(r['pitch_type'] for r in fit_rows).items() if n>=min_support)
     artifact={'model_version':MODEL_VERSION,'source_status':'EMPIRICALLY_ESTIMATED' if not test_only else 'MOCK_TEST_ONLY',
@@ -197,6 +203,10 @@ def fit(dataset_path: Path, output: Path, *, train_before: str, test_from: str,
                     issues.append(f'unsupported state {balls}-{strikes} {action}')
     if min(validation['coverage'],test['coverage'])<.95: issues.append('holdout support below threshold')
     if validation['total_variation'] is None or validation['total_variation']>.15: issues.append('validation distribution error above threshold')
+    if validation['weighted_conditional_tv'] is None or validation['weighted_conditional_tv']>.30:
+        issues.append('conditional errors too high even if aggregate frequencies match')
+    if validation['brier_difference_vs_baseline'] is None or validation['brier_difference_vs_baseline']>.02:
+        issues.append('model worse than count/action baseline')
     artifact['validation']={'validation':validation,'test':test,
                             'eligibility_issues':issues, 'research_ready':not issues and manifest['source_status']=='REAL_OBSERVED',
                             'status':'LIMITED_OBSERVATIONAL_POC' if not issues and not test_only else 'MOCK_TEST_ONLY' if test_only else 'VALIDATION_FAILED',

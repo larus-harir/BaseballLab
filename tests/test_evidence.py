@@ -146,7 +146,7 @@ def test_model_hash_and_bound_dataset(fitted):
 def test_acquisition_failure_records_no_fake_data(tmp_path):
     with patch('baseball_lab.data.statcast.request_bytes',side_effect=OSError('403 policy denied')):
         with pytest.raises(OSError):
-            acquire('2024-05-01','2024-05-02',tmp_path,usage_note='test request')
+            acquire('2024-05-01','2024-05-02',tmp_path,usage_note='test request',authorization_reference='MOCK_TEST_ONLY request test')
     failure=json.loads((tmp_path/'acquisition_failure.json').read_text())
     assert failure['research_executed'] is False and failure['partial_sources']==[]
     assert not list(tmp_path.glob('*.csv'))
@@ -155,10 +155,10 @@ def test_acquisition_failure_records_no_fake_data(tmp_path):
 def test_robots_denial_and_html_response(tmp_path):
     with patch('baseball_lab.data.statcast.request_bytes',return_value=b'User-agent: *\nDisallow: /'):
         with pytest.raises(PermissionError):
-            acquire('2024-05-01','2024-05-01',tmp_path/'robots',usage_note='test')
+            acquire('2024-05-01','2024-05-01',tmp_path/'robots',usage_note='test',authorization_reference='MOCK_TEST_ONLY request test')
     with patch('baseball_lab.data.statcast.request_bytes',side_effect=[b'User-agent: *\nAllow: /',b'<html>error</html>']):
         with pytest.raises(ValueError,match='CSV'):
-            acquire('2024-05-01','2024-05-01',tmp_path/'html',usage_note='test')
+            acquire('2024-05-01','2024-05-01',tmp_path/'html',usage_note='test',authorization_reference='MOCK_TEST_ONLY request test')
     assert not list(tmp_path.rglob('*.csv'))
 
 
@@ -198,3 +198,20 @@ def test_two_policies_really_update_and_replay_without_research_claim(fitted):
     before=(root/'run-a/checkpoints/pa_000024.json').read_bytes()
     replay(root/'run-a/checkpoints/pa_000024.json',root/'model/model.json',root/'replay',test_only=True)
     assert before==(root/'run-a/checkpoints/pa_000024.json').read_bytes()
+
+
+def test_aggregate_match_does_not_hide_wrong_conditional_predictions():
+    from collections import defaultdict
+    from baseball_lab.outcome.empirical import validate,EVENTS
+    # MOCK_TEST_ONLY: deliberately invert conditional outcomes while matching the aggregate.
+    rows=[{'balls':0,'strikes':0,'pitch_type':kind,'observed_action':'take','event':event,
+           'plate_x':None,'plate_z':None,'release_speed_kmh':None} for kind,event in [('FF','ball'),('SL','strike')]]
+    class Wrong:
+        def __init__(self):self.groups=defaultdict(lambda:rows)
+        def probabilities(self,b,s,k,a,arrival):return {e:float(e==('strike' if k=='FF' else 'ball')) for e in EVENTS},2,'test'
+        def donors(self,b,s,k,a,arrival):return [rows[1 if k=='FF' else 0]],'test'
+        def arrival_donors(self,*args):return rows,'test'
+    result=validate(Wrong(),rows,1)
+    assert result['total_variation']==0
+    assert result['weighted_conditional_tv']==1
+    assert result['brier_difference_vs_baseline']>0

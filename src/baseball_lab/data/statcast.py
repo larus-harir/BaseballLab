@@ -29,7 +29,9 @@ def request_bytes(url, *, limit=32*1024*1024, timeout=60):
     return data
 
 
-def acquire(start: str, end: str, output: Path, *, usage_note: str):
+def acquire(start: str, end: str, output: Path, *, usage_note: str, authorization_reference: str | None = None):
+    if not authorization_reference or not authorization_reference.strip():
+        raise PermissionError('공식 이용약관에 자동 스크립트 수집 제한이 있습니다. 기본 경로는 공식 CSV 내보내기 후 업로드입니다. 별도 자동 수집 허용 근거가 있을 때만 --authorization-reference를 사용하세요.')
     first, last = date.fromisoformat(start), date.fromisoformat(end)
     if last < first or (last-first).days > 13:
         raise ValueError('한 번에 최대 14일, 시작일 <= 종료일이어야 합니다.')
@@ -64,7 +66,7 @@ def acquire(start: str, end: str, output: Path, *, usage_note: str):
             path.write_bytes(data)
             sources.append(RawSource('MLB Baseball Savant Statcast', url, str(path.resolve()), utc_now(),
                            checksum(path), SourceStatus.REAL_OBSERVED.value,
-                           usage_note+'; raw redistribution disabled; https://www.mlb.com/official-information/terms-of-use',
+                           usage_note+'; user-declared automation authorization: '+authorization_reference+'; raw redistribution disabled; https://www.mlb.com/official-information/terms-of-use',
                            'official_https_csv').to_dict())
             write_json(output/'acquisition.json', {'status':'partial', 'sources':sources,'requested_dates':[start,end]})
             if offset < (last-first).days:

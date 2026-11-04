@@ -21,7 +21,9 @@ def write_report(output, run=None, dataset=None, model=None, replays=None, *, fa
     write_json(output/'report-data.json',payload)
     encoded=json.dumps(payload,ensure_ascii=False,allow_nan=False).replace('<','\\u003c')
     template=Path(__file__).with_name('evidence_view.html').read_text(encoding='utf-8')
-    (output/'report.html').write_text(template.replace('__REPORT_DATA__',encoded),encoding='utf-8')
+    temporary=output/'report.html.tmp'
+    temporary.write_text(template.replace('__REPORT_DATA__',encoded),encoding='utf-8')
+    temporary.replace(output/'report.html')
     lines=['# E01 · 실제 근거 기반 관찰실','',f"상태: {payload['status']}",'']
     if failure: lines.extend(['데이터 확보 필요. 연구 학습을 실행하지 않았습니다.',str(failure),''])
     if dataset:

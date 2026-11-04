@@ -17,4 +17,4 @@ jobs:
       - run: python -m pip install -e ".[dev]"
       - run: python -m pytest -q
       - run: python scripts/quickstart.py --list
-      - run: python -c "import subprocess,sys; r=subprocess.run([sys.executable,'scripts/quickstart.py','--data-dir','outputs/ci/no-data','--output','outputs/ci/data-required']); sys.exit(0 if r.returncode==2 else 1)"
+      - run: python -c "import subprocess,sys; r=subprocess.run([sys.executable,'scripts/quickstart.py','--mode','train','--data-dir','outputs/ci/no-data','--output','outputs/ci/data-required']); sys.exit(0 if r.returncode==2 else 1)"
