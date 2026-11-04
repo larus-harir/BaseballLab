@@ -11,7 +11,9 @@ from baseball_lab.labels import korean
 from .self_play import load_checkpoint, probe_team
 
 
-def replay_checkpoint(checkpoint, output: Path, pairs=12):
+def replay_checkpoint(checkpoint, output: Path, pairs=12, *, test_only=False):
+    if not test_only:
+        raise ValueError("합성 체크포인트는 연구 재평가에 사용할 수 없습니다.")
     team, config, data = load_checkpoint(checkpoint)
     output.mkdir(parents=True, exist_ok=True)
     engine = GameEngine(GameOutcome(), GameRules(config.innings))

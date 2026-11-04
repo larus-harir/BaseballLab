@@ -1,3 +1,5 @@
+> UNVERIFIED_ASSUMPTION · v4 이전 합성 환경의 실행 이력입니다. 연구 근거에서 제외합니다.
+
 # 실제 신경망 학습 검증
 
 Python 3.12.14 / NumPy 2.5.4 / Linux CPU. 알고리즘은 은닉층 2개의 타자·투수 신경망을 학습하는 REINFORCE다.

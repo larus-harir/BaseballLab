@@ -156,8 +156,8 @@ def test_checkpoint_round_trip_and_rejection():
 
 def test_actual_training_and_replay_are_reproducible(tmp_path):
     config=TrainingConfig(games=24,innings=1,evaluate_every=8,evaluation_pairs=2,batch_size=4,hidden=8,seed=71)
-    a=train(config,tmp_path/'a',progress=lambda *args: None, experiment_id='TRAIN_TEST')
-    b=train(config,tmp_path/'b',progress=lambda *args: None, experiment_id='TRAIN_TEST')
+    a=train(config,tmp_path/'a',progress=lambda *args: None, experiment_id='TRAIN_TEST', test_only=True)
+    b=train(config,tmp_path/'b',progress=lambda *args: None, experiment_id='TRAIN_TEST', test_only=True)
     assert a['history'] == b['history']
     assert a['reward'] == {'win':1,'loss':-1,'draw':0,'intermediate':0}
     assert [e['games'] for e in a['history']] == [0,8,16,24]
@@ -168,27 +168,17 @@ def test_actual_training_and_replay_are_reproducible(tmp_path):
     for role in ('batter','pitcher'):
         assert any(not np.array_equal(x,y) for x,y in zip(getattr(learned,role).params,getattr(initial,role).params))
     before=checkpoint.read_bytes()
-    evaluated=replay_checkpoint(checkpoint,tmp_path/'replay',pairs=2)
+    evaluated=replay_checkpoint(checkpoint,tmp_path/'replay',pairs=2, test_only=True)
     assert before == checkpoint.read_bytes()
     assert evaluated['training_executed'] is False
     assert evaluated['history'][0]['evaluation'] == a['history'][-1]['evaluation'][:3]
     assert (tmp_path/'a/report.html').exists() and (tmp_path/'replay/report.html').exists()
     assert (tmp_path/'a/summary.md').read_text(encoding='utf-8').startswith('# 타자·투수')
     with pytest.raises(ValueError,match='기존 학습 결과'):
-        train(config,tmp_path/'a',progress=lambda *args: None, experiment_id='TRAIN_TEST')
+        train(config,tmp_path/'a',progress=lambda *args: None, experiment_id='TRAIN_TEST', test_only=True)
 
 
-def test_default_cli_runs_learning_and_reports_invalid_replay(tmp_path):
-    import os
-    import subprocess
-    import sys
-    root=Path(__file__).resolve().parents[1]
-    command=[sys.executable,str(root/'scripts/quickstart.py')]
-    env={**os.environ,'PYTHONUTF8':'1'}
-    result=subprocess.run([*command,'--games','8','--evaluate-every','4','--evaluation-pairs','1','--output',str(tmp_path/'cli')],
-                          cwd=tmp_path,env=env,capture_output=True,text=True,encoding='utf-8')
-    assert result.returncode == 0,result.stderr
-    data=json.loads((tmp_path/'cli/training.json').read_text(encoding='utf-8'))
-    assert data['training_executed'] and data['history'][-1]['games'] == 8
-    bad=subprocess.run([*command,'--mode','replay'],cwd=tmp_path,env=env,capture_output=True,text=True,encoding='utf-8')
-    assert bad.returncode == 2 and '--checkpoint' in bad.stderr
+def test_legacy_synthetic_learning_cannot_run_as_research(tmp_path):
+    with pytest.raises(ValueError,match='단위 테스트 전용'):
+        train(TrainingConfig(games=8),tmp_path/'denied',experiment_id='E01')
+    assert not (tmp_path/'denied').exists()

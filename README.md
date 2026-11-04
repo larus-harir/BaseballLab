@@ -1,87 +1,73 @@
 # Baseball AI Lab · 야구 AI 연구실
 
-**승리만 추구하는 AI가 어떤 야구 전략을 스스로 발전시키는지 관찰하고, 인간 야구의 역사·현대 전략과 비교하는 부모 연구 플랫폼**입니다. 첫 자식 E01은 타자·투수의 경쟁 학습, 후속 E02는 MLB/KBO에서 독립 학습한 정책의 교차 대결입니다.
+**승리만 추구하는 AI가 어떤 야구 전략을 발전시키는지 관찰하고, 실제 인간 야구와 비교하는 연구 플랫폼**입니다. 부모 패키지는 데이터·규칙·정책·학습·평가·기록·시각화를 공유하며 E01은 첫 타자·투수 경쟁 실험입니다.
 
-지금 기본 실행은 **실제 신경망 강화학습**입니다. 타석 통계만 출력하던 기준선 비교는 `--mode baseline`으로 별도 실행합니다.
+개발 기준은 [PROJECT_VISION.md](PROJECT_VISION.md)의 **v4**입니다. 기존 임의 확률·능력·피로 모델을 연구 경로에서 제거했습니다. 이제 **실제 CSV 확보 → 품질 검사 → 기간 분리 보정·검증 → 제한된 경쟁 학습 → 근거가 연결된 화면** 순서로 실행합니다. 자료나 검증이 없으면 연구 실행을 보류하며 합성 자료로 대체하지 않습니다.
 
 ## 실행 — Windows PowerShell
 
-이미 복제한 `BaseballLab-git` 폴더에서 실행하세요. Python 3.11 이상이 필요합니다.
+복제한 저장소 폴더에서:
 
 ```powershell
 git pull origin main
 python -m pip install -e ".[learning]"
-python scripts/quickstart.py --open
+
+# 1. 공식 Statcast 2024-05-01~06 자료 확보·감사·기간 분리 보정/검증
+python scripts/quickstart.py --mode prepare --open
+
+# 2. 보정·검증이 통과한 실제 자료가 있을 때 학습
+python scripts/quickstart.py --episodes 600 --open
 ```
 
-처음 내려받는 경우 `git clone https://github.com/larus-harir/BaseballLab.git` 후 해당 폴더로 이동하세요. NumPy만 추가 설치하며, GPU나 PyTorch는 필요하지 않습니다.
+Python 3.11 이상, NumPy만 추가 설치합니다. prepare의 첫 3일은 보정, 4일은 검증, 마지막 2일은 독립 최종 검증에 사용합니다. 수집은 최대 14일, 하루 단위 직렬 요청·캐시 보존이며 robots.txt의 접근 규칙을 확인합니다. 원본은 덮어쓰거나 GitHub에 재배포하지 않습니다. 공개 CSV라는 사실은 재배포 허가를 뜻하지 않습니다. [사용조건·출처 확인](docs/data-sources.md)을 참고하세요.
 
-기본으로 **600번의 3이닝 경기**를 학습합니다. 경기 종료 시 승리 `+1`, 패배 `-1`, 무승부 `0`만 보상으로 사용하고, 중간 타격 성적·득점·삼진·특정 전략을 보상하지 않습니다. 200경기마다 같은 상대·같은 평가 시드·선후공 교환으로 평가합니다. 완료 후 한국어 HTML 보고서가 브라우저에서 열립니다.
+**이 클라우드에서는 공식 데이터 도메인이 프록시 정책으로 403 차단되어 실제 CSV를 확보하지 못했습니다.** 코드와 테스트·브라우저 동작은 검증했지만, 실데이터 모델 성능·실데이터 AI 학습 결과는 아직 없습니다. 로컬에서도 수집이 실패하면 오류를 확인하고 아래 공식 수동 내보내기 경로를 사용하세요.
 
-보고서에서는 다음을 볼 수 있습니다.
+### 공식 사이트에서 직접 내보낸 CSV 가져오기
 
-- 학습 전부터 각 세대까지의 고정 상대 평가 성적.
-- **같은 경기 상황에서** 기다리기·컨택·강공·번트 선택 확률의 변화.
-- 구종·존 공략/유인구·투구 강도 선택 변화.
-- 학습된 팀의 평가 경기 재생: 투구별 행동, 주자·아웃·점수 변화.
+Baseball Savant의 실제 검색 결과를 CSV로 내보낸 뒤 사용한 검색 URL, 획득 시각과 사용조건 확인 내용을 기록합니다. 파일을 프로그램이 스스로 진짜 원본이라고 보증하지 않으며 `user_attested_export`로 출처를 표시합니다.
 
 ```powershell
-# 더 오래 학습 / 9이닝 경기 / 재현할 seed
-python scripts/quickstart.py --games 5000 --innings 9 --seed 42 --open
-
-# 결과 위치 지정 — 기존 학습을 덮어쓰지 않도록 새 폴더 사용
-python scripts/quickstart.py --games 1200 --evaluation-pairs 32 --output outputs/E01/my_run --open
-
-# 저장된 모델을 새 학습 없이 재평가하고 경기 재생
-python scripts/quickstart.py --mode replay --checkpoint outputs/E01/my_run/checkpoints/game_001200.json --output outputs/E01/review --open
+python scripts/quickstart.py --mode audit --csv "C:\Data\statcast.csv" --source-url "https://baseballsavant.mlb.com/statcast_search" --acquired-at "2026-11-04T23:00:00+09:00" --usage-note "확인한 사용조건과 수집 범위를 여기에 기록" --open
+python scripts/quickstart.py --mode fit --train-before 2024-05-04 --test-from 2024-05-05 --open
+python scripts/quickstart.py --episodes 600 --open
 ```
 
-`--open` 없이 실행하면 마지막에 출력되는 `report.html` 경로를 직접 여세요. 기본 결과 폴더는 `outputs/E01/학습_<실행시각>/`입니다. `training.json`에 전체 이력·설정·시드·환경 버전, `checkpoints/`에 타자·투수 신경망 가중치, `replay.json`에 재생 기록이 저장됩니다.
+예시 획득 시각은 본인의 실제 획득 시각으로 바꾸세요. CSV에 세 기간의 날짜가 모두 있어야 합니다. 다른 기간은 `--start`, `--end`, `--train-before`, `--test-from`을 함께 맞추세요.
 
-## AI가 선택하는 것
+## 무엇을 볼 수 있나?
 
-| 타자 | 투수 | 공개 관측 |
-|---|---|---|
-| 기다리기·컨택·강공·번트 | 직구·변화구·체인지업 × 존/유인구 × 절약/보통/전력 투구 (18조합) | 카운트·주자·아웃·이닝·점수 차·선후공·누적 투구 부하 |
+브라우저의 한국어 `report.html`에는 세 화면이 있습니다.
 
-각 역할은 **은닉층 2개의 작은 신경망**으로 확률적 행동을 선택하며, 경기 종료 보상에 대한 정책경사(REINFORCE)로 가중치를 갱신합니다. 과거의 자기 모델들과 고정 기준선을 상대하며 타격·투구 두 정책을 함께 학습합니다. 특정 플레이스타일을 선택하도록 정답 레이블을 주지 않습니다. 타자는 현재 투구의 구종·코스를 미리 관측하지 못합니다.
+1. **한 구 관찰실:** 포수 시점 스트라이크존·도착 위치·구종·확인된 구속/회전, 사전 공개 상태·양쪽 정책 확률·실제 선택·결과. 이전/다음/재생/1배속/4배속, 체크포인트·기존 실행 seed 전환.
+2. **전략 변화:** 실제 로그의 초구 스윙·구종 빈도, 같은 카운트의 정책 확률, 고정 상대·과거 모델 평가, N·구간·업데이트 수·정책 ID.
+3. **현실 검증:** 별도 기간의 관측 결과·모델 기대 분포·모델 재추출 분포, 조건별 오차·희소 표본·도착 위치/구속 평균 비교, 원천 해시·필터·결측·모델·실행 ID.
 
-공격/수비·주루의 모든 동작을 학습하는 완성형 야구 AI는 아직 아닙니다. 현재는 동질 선수, 자동 수비·보수적인 진루, 간이 병살·번트·투수 피로를 가진 합성 경기입니다. **실제 리그로 보정되지 않은 모델을 공략하는 현상**도 생길 수 있습니다. 이를 발견하고 데이터·규칙·평가로 검증하는 것이 다음 연구의 일부입니다. 한 번의 승률 상승이나 선택 변화만으로 실제 야구의 최적 전략을 발견했다고 결론내리지 않습니다.
+위치 점을 선택하거나 세부정보를 열면 원본 투구 ID와 모델 버전을 확인할 수 있습니다. 실제 관측과 모델 생성은 다른 색·상태를 사용합니다. 자료가 없거나 결측인 값은 **데이터 없음**으로 남깁니다. 3D 궤적·사람의 속마음·미지원 수비 동작을 생성하지 않습니다.
 
-[실제 1,200경기 학습 기록](experiments/E01_batter_pitcher_evolution/reports/learning-validation.md) · [학습·경기 설계](docs/learning.md)
-
-## 기존 기준선 시뮬레이션
-
-이 명령은 외부 패키지 없이 실행됩니다. 고정 전략을 비교하는 용도이며 학습하지 않습니다.
+결과는 `outputs/E01/research_<시각>/`, 원본·보정 자료는 `data/local/statcast/`에 저장됩니다. `--output`과 `--data-dir`로 바꿀 수 있습니다. 모델/로그는 각 원본 해시 및 로컬 경로에 결합되어 있으므로 다른 컴퓨터로 옮긴 경우 원본을 다시 가져와 보정하세요.
 
 ```powershell
-python scripts/quickstart.py --mode baseline
-python scripts/quickstart.py --mode baseline --seeds 1 2 3 --plate-appearances 1000 --output outputs/E01/baselines
+# 검증만 확인
+python scripts/quickstart.py --mode inspect --open
+
+# 저장된 정책을 같은 데이터/모델에 연결해 다른 seed로 재생
+python scripts/quickstart.py --mode replay --checkpoint "outputs/E01/실행폴더/checkpoints/pa_000600.json" --seed 42 --open
 ```
 
-한국어 대결표·요약, 상세 JSON, 투구별 CSV를 저장합니다.
+## 현재 연구 모델의 범위
 
-## 개발·테스트
+모델은 **관측된 카운트·구종·위치 구간·스윙/테이크에 따른 실제 결과 빈도**로 보정합니다. 도착 위치는 타자의 선택과 독립적으로 재추출하고, 결과는 그 위치 구간과 선택을 조건으로 추정합니다. 희소 구간의 풀링과 남은 선택 편향을 공개합니다. 이는 인과효과가 입증된 전체 야구 물리 모델이 아닙니다.
+
+최소 학습은 타자 스윙/테이크와 투수 구종 선택을 하는 두 신경망의 경쟁입니다. **보상은 출루(+1)/출루 저지(-1)의 명시된 타석 대리변수이며 경기 승리 보상이 아닙니다.** 궁극적 승리 목표는 유지하되, 근거 없는 주루·수비·능력·피로·번트 확률을 연결해 경기 승리 연구라고 부르지 않습니다. 컨택/파워 의도·목표 코스·선수 능력 탐색·전체 경기·KBO는 자료와 모델을 검증한 뒤 확장합니다.
+
+## 개발·검증
 
 ```powershell
 python -m pip install -e ".[dev]"
 python -m pytest -q
 ```
 
-가상환경을 사용하려면 먼저 `python -m venv .venv`를 실행하고 해당 환경의 Python을 사용하세요. 개발 설치 후 `python -m baseball_lab`과 `baseball-lab`도 같은 CLI를 제공합니다. GitHub Actions는 Python 3.11–3.13 / Ubuntu·Windows에서 테스트와 기준선·학습 실행을 검사하도록 설정했습니다.
+테스트용 생성 자료는 `MOCK_TEST_ONLY`이고 연구 실행은 거부합니다. 테스트에서 양쪽 정책의 업데이트·재현·재생과 데이터/모델 무결성·기간 분리·실패 처리를 검사합니다. 기존 합성 모듈은 단위 테스트 전용이며, 과거 합성 샘플은 [감사 보관본](docs/archive/pre-v4/README.md)으로 이동했습니다.
 
-## 부모 플랫폼과 자식 실험
-
-| 모듈 | 역할 |
-|---|---|
-| `core` | 타석 규칙 + 주자·득점·이닝·승패 경기 엔진, 공개 관측·행동 |
-| `outcome` | 교체 가능한 확률 결과 모델·능력·피로·투구 강도 |
-| `agents` | 정책 계약, 기준선·신경망, 메타데이터·스키마 검사 |
-| `training` | 승패 보상 학습, 과거 상대 풀, 체크포인트 |
-| `evaluation` | 고정 조건·선후공 교환 평가, 학습과 독립된 재평가 |
-| `tracking` | 행동 변화·대결 결과·재생·한국어 HTML 보고서 |
-| `data` | 출처·버전과 공통 이벤트 스키마; 실제 리그 어댑터 확장 위치 |
-| `experiments/E01_batter_pitcher_evolution` | 자식 실험 E01의 설명·설정·검증 기록 |
-| `experiments/E02_mlb_vs_kbo` | 리그별 데이터 가용성·공정성·교차 평가 설계 |
-
-[아키텍처](docs/architecture.md) · [개발 단계](docs/roadmap.md) · [연구 원칙](docs/research-principles.md) · [데이터 계획](docs/data-sources.md) · [원본 설계서](docs/specs/Baseball_AI_Lab_Master_Handoff.md)
+[파일별 근거 감사](docs/data-audit-v4.md) · [보정·학습 설계](docs/learning.md) · [아키텍처](docs/architecture.md) · [개발 단계](docs/roadmap.md) · [v4 검증 기록](docs/v4-validation.md) · [상세 명세](docs/specs/Baseball_AI_Lab_VISUAL_REAL_DATA_SPEC.md)

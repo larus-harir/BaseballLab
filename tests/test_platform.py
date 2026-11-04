@@ -74,7 +74,7 @@ def test_new_policy_and_league_use_same_engine_and_recorder(tmp_path):
     registry.register(PolicyEntry('another_league_policy', 'batter', Batter('patient'),
                                   replace(baseline.metadata, training_league='another_synthetic_league')))
     c = config(batters=['another_league_policy'], profile={'league_id': 'neutral_synthetic'})
-    payload = run_experiment(c, tmp_path, experiment_id='EXTENSION_TEST', registry=registry)
+    payload = run_experiment(c, tmp_path, experiment_id='EXTENSION_TEST', test_only=True, registry=registry)
     assert payload['experiment_id'] == 'EXTENSION_TEST'
     assert payload['profile']['league_id'] == 'neutral_synthetic'
     assert payload['matches'][0]['policies']['batter']['training_league'] == 'another_synthetic_league'
@@ -84,12 +84,12 @@ def test_new_policy_and_league_use_same_engine_and_recorder(tmp_path):
 def test_validate_entire_tournament_before_writing(tmp_path):
     output = tmp_path/'invalid'
     with pytest.raises(ValueError, match='Unknown pitcher'):
-        run_experiment(config(pitchers=['random', 'unregistered']), output, experiment_id='TEST')
+        run_experiment(config(pitchers=['random', 'unregistered']), output, experiment_id='TEST', test_only=True)
     assert not output.exists()
 
 
 def test_streamed_trace_can_reconstruct_results_and_metrics(tmp_path):
-    payload = run_experiment(config(), tmp_path, experiment_id='TEST')
+    payload = run_experiment(config(), tmp_path, experiment_id='TEST', test_only=True)
     with (tmp_path/'pitches.csv').open(newline='', encoding='utf-8') as file:
         rows = list(csv.DictReader(file))
     assert len(rows) == sum(m['pitches'] for m in payload['matches'])
@@ -120,8 +120,8 @@ def test_multiseed_reproducibility_and_no_trace_cleans_old_trace(tmp_path):
     raw = config().to_dict()
     raw['seeds'] = [5, 6, 7]
     c = ExperimentConfig.from_dict(raw)
-    first = run_experiment(c, tmp_path, experiment_id='TEST')
-    second = run_experiment(c, tmp_path, experiment_id='TEST', trace=False)
+    first = run_experiment(c, tmp_path, experiment_id='TEST', test_only=True)
+    second = run_experiment(c, tmp_path, experiment_id='TEST', test_only=True, trace=False)
     assert first['matches'] == second['matches']
     assert len(first['matches']) == 6
     assert all(m['seeds'] == [5, 6, 7] for m in first['summary'])
@@ -182,20 +182,14 @@ def test_raw_string_action_is_rejected_at_engine_boundary():
         engine().play(Bad(), Bad(), Random(1), Random(2), Random(3))
 
 
-def test_cli_from_another_directory_and_invalid_config(tmp_path):
-    cmd = [sys.executable, str(ROOT/'scripts/quickstart.py'), '--mode', 'baseline']
-    result = subprocess.run([*cmd, '--seeds', '1', '2', '3', '--plate-appearances', '5', '--output', str(tmp_path/'run')],
-                            cwd=tmp_path, capture_output=True, text=True, encoding='utf-8', env={**os.environ, 'PYTHONUTF8': '1'})
-    assert result.returncode == 0, result.stderr
-    payload = json.loads((tmp_path/'run/results.json').read_text(encoding='utf-8'))
-    assert len(payload['matches']) == 27
-    assert sum(m['match']['plate_appearances'] for m in payload['matches']) == 135
-    assert '135' in result.stdout
-    invalid = subprocess.run([*cmd, '--plate-appearances', '0', '--output', str(tmp_path/'invalid')],
-                             cwd=tmp_path, capture_output=True, text=True, encoding='utf-8', env={**os.environ, 'PYTHONUTF8': '1'})
-    assert invalid.returncode == 2
-    assert 'positive integer' in invalid.stderr
-    assert not (tmp_path/'invalid').exists()
+def test_cli_from_another_directory_requires_real_data(tmp_path):
+    cmd = [sys.executable, str(ROOT/'scripts/quickstart.py')]
+    result = subprocess.run([*cmd, '--data-dir',str(tmp_path/'absent'),'--output',str(tmp_path/'run')],
+                            cwd=tmp_path,capture_output=True,text=True,encoding='utf-8',env={**os.environ,'PYTHONUTF8':'1'})
+    assert result.returncode == 2
+    payload=json.loads((tmp_path/'run/report-data.json').read_text(encoding='utf-8'))
+    assert payload['status']=='DATA_REQUIRED' and payload['observed']==[] and payload['replays']==[]
+    assert not (tmp_path/'run/checkpoints').exists()
 
 
 def test_git_optional_for_result_tracking(tmp_path):
@@ -212,9 +206,9 @@ def test_failed_simulation_preserves_previous_complete_run(tmp_path):
         def sample(self, pitch, bat, rng, *, context):
             raise RuntimeError('broken model')
     output = tmp_path/'results'
-    run_experiment(config(), output, experiment_id='TEST')
+    run_experiment(config(), output, experiment_id='TEST', test_only=True)
     before = {path.name: path.read_bytes() for path in output.iterdir()}
     with pytest.raises(RuntimeError, match='broken model'):
-        run_experiment(config(), output, experiment_id='TEST', outcome=Broken())
+        run_experiment(config(), output, experiment_id='TEST', test_only=True, outcome=Broken())
     assert before == {path.name: path.read_bytes() for path in output.iterdir()}
     assert list(tmp_path.iterdir()) == [output]

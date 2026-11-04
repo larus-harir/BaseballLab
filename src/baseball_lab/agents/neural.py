@@ -27,14 +27,18 @@ def features(obs, role):
 
 
 class NeuralPolicy:
-    def __init__(self, role, seed=0, hidden=24):
+    def __init__(self, role, seed=0, hidden=24, *, actions=None, feature_encoder=None,
+                 feature_names=FEATURES, observation_schema=GAME_OBSERVATION_SCHEMA, action_schema=GAME_ACTION_SCHEMA):
         if role not in ('batter', 'pitcher'):
             raise ValueError('Unknown policy role')
         self.role = role
-        self.actions = BAT_PLAYS if role == 'batter' else PITCH_PLAYS
+        self.actions = tuple(actions) if actions is not None else BAT_PLAYS if role == 'batter' else PITCH_PLAYS
+        self.encoder = feature_encoder or features
+        self.feature_names = tuple(feature_names)
+        self.observation_schema, self.action_schema = observation_schema, action_schema
         rng = np.random.default_rng(seed)
         self.params = []
-        for inputs, outputs in ((len(FEATURES), hidden), (hidden, hidden), (hidden, len(self.actions))):
+        for inputs, outputs in ((len(self.feature_names), hidden), (hidden, hidden), (hidden, len(self.actions))):
             self.params.extend([rng.normal(0, 1/np.sqrt(inputs), (inputs, outputs)), np.zeros(outputs)])
         self.m = [np.zeros_like(p) for p in self.params]
         self.v = [np.zeros_like(p) for p in self.params]
@@ -53,12 +57,12 @@ class NeuralPolicy:
         return probs, (x, h1, h2)
 
     def probabilities(self, observation):
-        return self.forward(features(observation, self.role)[None, :])[0][0]
+        return self.forward(self.encoder(observation, self.role)[None, :])[0][0]
 
     def act(self, observation, legal_actions, rng):
         if tuple(legal_actions) != self.actions:
             raise ValueError('Incompatible legal-action schema')
-        x = features(observation, self.role)
+        x = self.encoder(observation, self.role)
         probs = self.forward(x[None, :])[0][0]
         index = rng.choices(range(len(self.actions)), weights=probs, k=1)[0]
         if self.collect:
@@ -108,16 +112,17 @@ class NeuralPolicy:
     def state_dict(self):
         return {'role': self.role, 'parameters': [p.tolist() for p in self.params],
                 'adam_m': [p.tolist() for p in self.m], 'adam_v': [p.tolist() for p in self.v], 'steps': self.steps,
-                'observation_schema': GAME_OBSERVATION_SCHEMA, 'action_schema': GAME_ACTION_SCHEMA,
-                'feature_names': list(FEATURES)}
+                'observation_schema': self.observation_schema, 'action_schema': self.action_schema,
+                'feature_names': list(self.feature_names)}
 
     @classmethod
-    def from_state_dict(cls, data):
-        if (data.get('observation_schema') != GAME_OBSERVATION_SCHEMA
-                or data.get('action_schema') != GAME_ACTION_SCHEMA or data.get('feature_names') != list(FEATURES)):
+    def from_state_dict(cls, data, *, actions=None, feature_encoder=None, feature_names=FEATURES,
+                        observation_schema=GAME_OBSERVATION_SCHEMA, action_schema=GAME_ACTION_SCHEMA):
+        if (data.get('observation_schema') != observation_schema
+                or data.get('action_schema') != action_schema or data.get('feature_names') != list(feature_names)):
             raise ValueError('Incompatible neural checkpoint schema/features')
         hidden = len(data['parameters'][1])
-        policy = cls(data['role'], hidden=hidden)
+        policy = cls(data['role'], hidden=hidden, actions=actions, feature_encoder=feature_encoder, feature_names=feature_names, observation_schema=observation_schema, action_schema=action_schema)
         for name, source in (('params', 'parameters'), ('m', 'adam_m'), ('v', 'adam_v')):
             values = [np.asarray(value, dtype=np.float64) for value in data[source]]
             if len(values) != len(policy.params) or any(a.shape != b.shape or not np.isfinite(a).all() for a, b in zip(values, policy.params)):

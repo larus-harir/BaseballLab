@@ -86,7 +86,9 @@ def load_checkpoint(path):
     return Team(f"학습 {data['trained_games']}경기", batter, pitcher), config, data
 
 
-def train(config: TrainingConfig, output: Path, progress=print, *, experiment_id: str):
+def train(config: TrainingConfig, output: Path, progress=print, *, experiment_id: str, test_only: bool = False):
+    if not test_only:
+        raise ValueError("UNVERIFIED_ASSUMPTION: 합성 학습은 단위 테스트 전용입니다. v4 연구 CLI와 실데이터 보정 모델을 사용하세요.")
     if not experiment_id:
         raise ValueError("experiment_id is required")
     output = Path(output)
@@ -116,7 +118,7 @@ def train(config: TrainingConfig, output: Path, progress=print, *, experiment_id
         history.append(entry)
         (output/'checkpoints'/f'game_{games:06d}.json').write_text(
             json.dumps(checkpoint(learner, config, games, metadata), ensure_ascii=False), encoding='utf-8')
-        payload = {'experiment_id': experiment_id, 'training_executed': games > 0, 'algorithm': 'REINFORCE',
+        payload = {'source_status': 'MOCK_TEST_ONLY', 'experiment_id': experiment_id, 'training_executed': games > 0, 'algorithm': 'REINFORCE',
                    'config': asdict(config), 'reward': {'win': 1, 'loss': -1, 'draw': 0, 'intermediate': 0},
                    'profile': 'synthetic_demo', 'calibration': 'synthetic-game-v1',
                    'game_rules': asdict(engine.rules), 'league_profile': asdict(engine.profile), 'status': 'completed' if games == config.games else 'running', 'attributes': asdict(engine.outcome.attributes),

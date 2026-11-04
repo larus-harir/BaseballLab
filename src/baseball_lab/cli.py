@@ -1,88 +1,92 @@
-"""Command line interface for the parent research platform."""
-
+"""Evidence-first CLI. Production paths never fall back to synthetic models."""
 import argparse
+from datetime import datetime
 from pathlib import Path
 
-from baseball_lab.labels import korean
-from baseball_lab.experiments.config import ExperimentConfig
-from baseball_lab.experiments.registry import EXPERIMENTS, REPOSITORY_ROOT
-from baseball_lab.experiments.runner import run_experiment
+from baseball_lab.data.lineage import RawSource, utc_now
+from baseball_lab.experiments.registry import REPOSITORY_ROOT
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Baseball AI Lab — 야구 AI 연구 실험 실행")
-    parser.add_argument("--mode", choices=("train", "baseline", "replay"), default="train", help="train: 실제 학습 / baseline: 고정 전략 비교 / replay: 저장 정책 평가")
-    parser.add_argument("--games", type=int, default=600, help="학습 경기 수")
-    parser.add_argument("--innings", type=int, default=3, help="경기 이닝 수 (9이닝도 가능)")
-    parser.add_argument("--evaluate-every", type=int, default=200)
-    parser.add_argument("--evaluation-pairs", type=int, default=12, help="상대별 선후공 교환 평가 쌍 수")
-    parser.add_argument("--checkpoint", type=Path, help="재평가할 신경망 체크포인트")
-    parser.add_argument("--open", action="store_true", help="완료 후 한국어 HTML 보고서 열기")
-    parser.add_argument("--experiment", choices=EXPERIMENTS, default="E01")
-    parser.add_argument("--list", action="store_true", help="실행 가능한 실험 목록")
-    parser.add_argument("--config", type=Path, help="실험 JSON 설정")
-    parser.add_argument("--output", type=Path, help="결과 저장 경로")
-    seed_group = parser.add_mutually_exclusive_group()
-    seed_group.add_argument("--seed", type=int)
-    seed_group.add_argument("--seeds", type=int, nargs="+", help="반복 평가 seed 목록")
-    parser.add_argument("--plate-appearances", type=int, help="각 조합·seed별 타석 수")
-    parser.add_argument("--no-trace", action="store_true", help="투구별 CSV 없이 집계만 저장")
-    args = parser.parse_args()
+    parser=argparse.ArgumentParser(description='야구 AI 연구실 · 실제 데이터와 실행 근거로 관찰하는 E01')
+    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline'),default='train')
+    parser.add_argument('--data-dir',type=Path,default=REPOSITORY_ROOT/'data/local/statcast')
+    parser.add_argument('--model',type=Path,help='실제 데이터로 보정·독립 검증한 model.json')
+    parser.add_argument('--start',default='2024-05-01');parser.add_argument('--end',default='2024-05-06')
+    parser.add_argument('--train-before',default='2024-05-04');parser.add_argument('--test-from',default='2024-05-05')
+    parser.add_argument('--usage-note',default='Local exploratory research; terms not independently verified by software; no redistribution grant')
+    parser.add_argument('--csv',type=Path,action='append',help='사용자가 공식 사이트에서 내보낸 원본 CSV')
+    parser.add_argument('--source-url',help='수동 내보내기의 공식 원천 HTTPS URL')
+    parser.add_argument('--acquired-at',help='원본 획득 시각 ISO-8601')
+    parser.add_argument('--episodes',type=int,default=600,help='학습 타석 수; 경기 수가 아님')
+    parser.add_argument('--seed',type=int,default=20261104)
+    parser.add_argument('--evaluate-every',type=int,default=200)
+    parser.add_argument('--evaluation-n',type=int,default=100,help='상대별 평가 타석 수')
+    parser.add_argument('--min-support',type=int,default=10)
+    parser.add_argument('--checkpoint',type=Path)
+    parser.add_argument('--output',type=Path)
+    parser.add_argument('--open',action='store_true',help='한국어 관찰실을 브라우저로 열기')
+    parser.add_argument('--list',action='store_true')
+    args=parser.parse_args()
     if args.list:
-        for item in EXPERIMENTS.values():
-            print(f"{item.experiment_id}: {korean(item.experiment_id)}")
+        print('E01: 실제 기록 보정 기반 타석 경쟁 학습 · 출루 대리보상 · 경기 승리 미지원')
         return
-    definition = EXPERIMENTS[args.experiment]
-    if args.checkpoint is not None and args.mode != "replay":
-        parser.error("저장 정책은 --mode replay와 함께 실행하세요. 이어 학습 옵션이 아닙니다.")
-    if args.mode != "baseline":
-        if args.config or args.seeds is not None or args.plate_appearances is not None or args.no_trace:
-            parser.error("타석 기준선 옵션은 --mode baseline과 함께 사용하세요.")
-        try:
-            from baseball_lab.training.self_play import TrainingConfig, train
-            if args.mode == "replay":
-                if args.checkpoint is None:
-                    parser.error("--mode replay에는 --checkpoint가 필요합니다.")
-                from baseball_lab.training.replay import replay_checkpoint
-                output = args.output or REPOSITORY_ROOT / "outputs/E01/replay"
-                replay_checkpoint(args.checkpoint, output, pairs=args.evaluation_pairs)
-            else:
-                from datetime import datetime
-                output = args.output or REPOSITORY_ROOT / "outputs/E01" / ("학습_" + datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
-                config = TrainingConfig(games=args.games, innings=args.innings,
-                                        seed=args.seed if args.seed is not None else 20261104,
-                                        evaluate_every=args.evaluate_every, evaluation_pairs=args.evaluation_pairs)
-                train(config, output, experiment_id=args.experiment)
+    output=args.output or REPOSITORY_ROOT/'outputs/E01'/('research_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
+    model_path=args.model or args.data_dir/'model.json'
+    try:
+        from baseball_lab.data.statcast import acquire,audit,manual_source,load_dataset
+        from baseball_lab.outcome.empirical import fit,load_model
+        from baseball_lab.tracking.evidence_report import write_report
+        if args.mode=='prepare':
+            acquisition=acquire(args.start,args.end,args.data_dir/'raw',usage_note=args.usage_note)
+            sources=[RawSource(**s) for s in acquisition['sources']]
+            dataset=audit(sources,args.data_dir)
+            model=fit(args.data_dir/'dataset.json',args.data_dir,train_before=args.train_before,test_from=args.test_from,min_support=args.min_support)
+            write_report(output,dataset=dataset,model=model)
+            print(f"자료 {dataset['manifest']['used_rows']}구 / 연구 적격: {model['validation']['research_ready']}")
+            print(f'모델: {args.data_dir/"model.json"}')
+            if not model['validation']['research_ready']:
+                print('연구 실행 보류: '+str(model['validation']['eligibility_issues']))
+        elif args.mode=='audit':
+            if not args.csv or not args.source_url or not args.acquired_at:
+                parser.error('--csv, --source-url, --acquired-at를 지정하세요.')
+            sources=[manual_source(p,args.source_url,args.usage_note,args.acquired_at) for p in args.csv]
+            dataset=audit(sources,args.data_dir)
+            write_report(output,dataset=dataset)
+            print(f"실제 내보내기 자료 감사 완료: 사용 {dataset['manifest']['used_rows']}구. fit 단계가 필요합니다.")
+        elif args.mode=='fit':
+            model=fit(args.data_dir/'dataset.json',args.data_dir,train_before=args.train_before,test_from=args.test_from,min_support=args.min_support)
+            dataset=load_dataset(args.data_dir/'dataset.json')
+            write_report(output,dataset=dataset,model=model)
+            print(f"보정·독립 검증 완료. 연구 적격: {model['validation']['research_ready']}")
+        elif args.mode in ('inspect','baseline'):
+            model,dataset=load_model(model_path)
+            write_report(output,dataset=dataset,model=model.artifact)
+            print('실제 자료·보정 검증 화면입니다. AI 학습은 실행하지 않았습니다.')
+        elif args.mode=='replay':
+            if not args.checkpoint: parser.error('--mode replay에는 --checkpoint가 필요합니다.')
+            from baseball_lab.research.replay import replay
+            replay(args.checkpoint,model_path,output,seed=args.seed)
+        else:
+            if args.checkpoint: parser.error('저장 모델 재평가는 --mode replay를 사용하세요.')
+            if not model_path.exists():
+                raise FileNotFoundError('실데이터·보정 모델이 없습니다. 먼저 python scripts/quickstart.py --mode prepare --open 을 실행하세요. 공식 CSV 수동 내보내기도 audit로 가져올 수 있습니다.')
+            from baseball_lab.research.training import ResearchConfig,train
+            config=ResearchConfig(args.episodes,args.seed,args.evaluate_every,args.evaluation_n)
+            train(config,model_path,output)
+        print(f'관찰실: {(output/"report.html").resolve()}')
+        if args.open:
+            import webbrowser
+            webbrowser.open((output/'report.html').resolve().as_uri())
+    except (OSError,ValueError,KeyError,TypeError,RuntimeError,ImportError) as exc:
+        failure={'status':'DATA_OR_VALIDATION_REQUIRED','observed_at':utc_now(),'error':str(exc),
+                 'research_executed':False,'synthetic_fallback':False}
+        # Keep previous successful runs intact if the chosen directory already has evidence.
+        if not output.exists() or not any(output.iterdir()):
+            from baseball_lab.tracking.evidence_report import write_report
+            write_report(output,failure=failure)
+            print(f'대기 상태 관찰실: {(output/"report.html").resolve()}')
             if args.open:
                 import webbrowser
-                webbrowser.open((output / "report.html").resolve().as_uri())
-        except ImportError as exc:
-            parser.exit(2, f"학습 의존성을 설치하세요: python -m pip install -e \".[learning]\"\n({exc})\n")
-        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
-            parser.exit(2, f"학습 실행 오류: {exc}\n")
-        return
-    try:
-        config = ExperimentConfig.load(args.config or definition.config_path).to_dict()
-        if args.seed is not None:
-            config["seeds"] = [args.seed]
-        elif args.seeds is not None:
-            config["seeds"] = args.seeds
-        if args.plate_appearances is not None:
-            config["plate_appearances"] = args.plate_appearances
-        config = ExperimentConfig.from_dict(config)
-        output = args.output or REPOSITORY_ROOT / "outputs" / args.experiment
-        payload = run_experiment(config, output, experiment_id=args.experiment, trace=not args.no_trace)
-    except (OSError, ValueError, TypeError, RuntimeError) as exc:
-        parser.exit(2, f"실행 오류: {exc}\n")
-    print(f"{definition.experiment_id}: {korean(definition.experiment_id)}")
-    print(f"환경: {korean(config.profile.league_id)} / {korean(config.profile.calibration_id)}")
-    print("고정 기준선의 타석 시뮬레이션입니다. 학습 여부: 없음")
-    print(f"{'타자':12} {'투수':14} {'타석':>6} {'볼넷비율':>8} {'삼진비율':>8} {'초구스윙':>9}")
-    for item in payload["summary"]:
-        print(f"{korean(item['batter']):12} {korean(item['pitcher']):14} {item['plate_appearances']:6} "
-              f"{item['walk_rate']:8.1%} {item['strikeout_rate']:8.1%} {item['first_pitch_swing_rate']:9.1%}")
-    print(f"완료: {len(payload['matches'])}개 대결 / 총 {sum(m['match']['plate_appearances'] for m in payload['matches']):,}타석")
-    print(f"결과 폴더: {output.resolve()}")
-    print("summary.md: 전략 요약·매치업 행렬 / results.json: 상세 결과 / matchups.csv: 대결표")
-    if not args.no_trace:
-        print("pitches.csv: 투구별 행동·카운트·사건 기록")
+                webbrowser.open((output/'report.html').resolve().as_uri())
+        parser.exit(2,f'연구 실행 보류: {exc}\n임의 합성 자료로 대체하지 않았습니다.\n')

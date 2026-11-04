@@ -15,8 +15,10 @@ from .config import ExperimentConfig
 
 def run_experiment(
     config: ExperimentConfig, output: Path, *, experiment_id: str,
-    registry: PolicyRegistry | None = None, outcome=None, trace: bool = True,
+    registry: PolicyRegistry | None = None, outcome=None, trace: bool = True, test_only: bool = False,
 ) -> dict:
+    if not test_only:
+        raise ValueError("합성 기준선 실행은 단위 테스트 전용입니다. 실제 기록 모델을 준비하세요.")
     registry = registry if registry is not None else baseline_registry()
     engine = Engine(config.rules, config.profile,
                     outcome if outcome is not None else SyntheticOutcome(), config.attributes)

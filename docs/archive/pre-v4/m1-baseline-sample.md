@@ -1,3 +1,5 @@
+> UNVERIFIED_ASSUMPTION · v4 이전 합성 환경의 실행 이력입니다. 연구 근거에서 제외합니다.
+
 > 검증 명령: `python scripts/quickstart.py --seeds 20261104 20261105 20261106 --output outputs/E01/verified`
 > 커밋 전 작업 트리에서 생성한 실제 실행 샘플이다. 소스 SHA256으로 사용한 구현을 식별한다. 합성 확률이며 학습 결과가 아니다.
 

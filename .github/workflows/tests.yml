@@ -16,5 +16,5 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e ".[dev]"
       - run: python -m pytest -q
-      - run: python scripts/quickstart.py --mode baseline --seeds 1 2 3 --plate-appearances 100
-      - run: python scripts/quickstart.py --games 8 --evaluate-every 4 --evaluation-pairs 1 --output outputs/ci-learning
+      - run: python scripts/quickstart.py --list
+      - run: python -c "import subprocess,sys; r=subprocess.run([sys.executable,'scripts/quickstart.py','--data-dir','outputs/ci/no-data','--output','outputs/ci/data-required']); sys.exit(0 if r.returncode==2 else 1)"
