@@ -51,6 +51,11 @@ class Workbench:
         except (OSError,ValueError,KeyError,TypeError) as exc:
             result.update({'title':'자료나 모델을 다시 확인해야 해요','reason':str(exc),'issues':[str(exc)]})
         self._cache=(now,result)
+        # This provider can prepare its public distribution on the first run;
+        # a missing cache is not a request for users to find/upload a CSV.
+        result['scoring']={'available':True,'cached':(self.root/'data/local/retrosheet/official-2024/dataset.json').exists(),
+                           'title':'실제 Retrosheet 기록으로 득점 상황 학습',
+                           'reason':'2024년 공식 배포 자료를 자동 준비하고 재사용합니다. 최초 실행에는 인터넷이 필요합니다. 전체 경기 승리 학습은 아닙니다.'}
         return result
 
     def state(self):
@@ -97,12 +102,23 @@ class Workbench:
             if not isinstance(options,dict):raise ValueError('작업 설정은 객체여야 합니다.')
             if kind not in ('fit','train','run'):raise ValueError('지원하지 않는 작업')
             if kind=='run':
-                from baseball_lab.research.pipeline import Plan
-                plan=Plan(str(options.get('start','')),str(options.get('end','')))
+                source=options.get('source','statcast')
+                if source not in ('statcast','retrosheet'):raise ValueError('지원하지 않는 자료 연결입니다.')
+                if source=='retrosheet':
+                    first=date.fromisoformat(str(options.get('start','')));last=date.fromisoformat(str(options.get('end','')))
+                    if first.year!=2024 or last.year!=2024 or first>last:raise ValueError('2024년 정규시즌 날짜 범위를 선택하세요.')
+                    start,end=str(first),str(last)
+                else:
+                    from baseball_lab.research.pipeline import Plan
+                    plan=Plan(str(options.get('start','')),str(options.get('end','')))
+                    start,end=plan.start,plan.end
                 episodes=options.get('episodes',600);seed=options.get('seed',20261104)
                 if type(episodes) is not int or not 20<=episodes<=100000:raise ValueError('학습 타석 수는 20~100,000 사이의 정수입니다.')
                 if type(seed) is not int or not 0<=seed<=2**31-1:raise ValueError('재현 번호 범위를 확인하세요.')
-                extra=['--mode','run','--start',plan.start,'--end',plan.end,'--episodes',str(episodes),'--seed',str(seed)]
+                extra=['--mode','scoring' if source=='retrosheet' else 'run','--start',start,'--end',end,'--episodes',str(episodes),'--seed',str(seed)]
+                if source=='retrosheet':
+                    if seed>2**31-3:raise ValueError('여러 재현 번호를 만들기 위해 seed는 2,147,483,645 이하여야 합니다.')
+                    extra.extend(['--evaluation-n','500'])
                 reference=options.get('authorization_reference','')
                 if not isinstance(reference,str) or len(reference)>2000:raise ValueError('자료 연결 설정을 확인하세요.')
                 if reference.strip():extra.extend(['--authorization-reference',reference.strip()])
@@ -149,11 +165,11 @@ class Workbench:
                     log.write(line);log.flush()
                     with self.lock:
                         self.job['logs'].append(line.rstrip())
-                        progress=re.search(r'학습 (\d+)/(\d+)타석',line)
+                        progress=re.search(r'학습 (\d+)/(\d+)(타석|상황)',line)
                         if line.startswith('단계 '):self.job['message']=line.strip()
                         if progress and self.job['kind'] in ('train','run'):
-                            done,total=map(int,progress.groups())
-                            self.job.update(completed_episodes=done,target_episodes=total,message=f'학습 {done:,}/{total:,}타석 · 현재까지의 결과를 볼 수 있어요.')
+                            done,total=map(int,progress.groups()[:2]);unit=progress.group(3)
+                            self.job.update(completed_episodes=done,target_episodes=total,message=line.strip()+' · 현재까지의 결과를 볼 수 있어요.')
                         if (output/'result/report.html').exists():
                             self.job['report']=f'/reports/{job_id}/result/report.html'
                         self.job['logs']=self.job['logs'][-120:]

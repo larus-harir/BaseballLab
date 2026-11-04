@@ -9,12 +9,12 @@ from baseball_lab.experiments.registry import REPOSITORY_ROOT
 
 def main():
     parser=argparse.ArgumentParser(description='야구 AI 연구실 · 실제 데이터와 실행 근거로 관찰하는 E01')
-    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run'),default='web')
+    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run','scoring'),default='web')
     parser.add_argument('--port',type=int,default=8765,help='웹 연구실 포트')
     parser.add_argument('--authorization-reference',help='자동 수집에 별도로 허용받은 근거 (기본은 수동 내보내기)')
     parser.add_argument('--data-dir',type=Path,default=REPOSITORY_ROOT/'data/local/statcast')
     parser.add_argument('--model',type=Path,help='실제 데이터로 보정·독립 검증한 model.json')
-    parser.add_argument('--start',default='2024-05-01');parser.add_argument('--end',default='2024-05-06')
+    parser.add_argument('--start');parser.add_argument('--end')
     parser.add_argument('--train-before',default='2024-05-04');parser.add_argument('--test-from',default='2024-05-05')
     parser.add_argument('--usage-note',default='Local exploratory research; terms not independently verified by software; no redistribution grant')
     parser.add_argument('--csv',type=Path,action='append',help='사용자가 공식 사이트에서 내보낸 원본 CSV')
@@ -22,7 +22,8 @@ def main():
     parser.add_argument('--acquired-at',help='원본 획득 시각 ISO-8601')
     parser.add_argument('--episodes',type=int,default=600,help='학습 타석 수; 경기 수가 아님')
     parser.add_argument('--seed',type=int,default=20261104)
-    parser.add_argument('--evaluate-every',type=int,default=200)
+    parser.add_argument('--seeds',help='득점 상황 연구의 여러 재현 번호. 예: 41,42,43')
+    parser.add_argument('--evaluate-every',type=int)
     parser.add_argument('--evaluation-n',type=int,default=100,help='상대별 평가 타석 수')
     parser.add_argument('--min-support',type=int,default=10)
     parser.add_argument('--checkpoint',type=Path)
@@ -30,8 +31,11 @@ def main():
     parser.add_argument('--open',action='store_true',help='한국어 관찰실을 브라우저로 열기')
     parser.add_argument('--list',action='store_true')
     args=parser.parse_args()
+    args.start=args.start or ('2024-03-20' if args.mode=='scoring' else '2024-05-01')
+    args.end=args.end or ('2024-09-30' if args.mode=='scoring' else '2024-05-06')
+    args.evaluate_every=args.evaluate_every or (max(200,args.episodes//3) if args.mode=='scoring' else 200)
     if args.list:
-        print('E01 · 타자와 투수의 학습 연구 — 현재는 타석 출루 연습입니다. 웹 화면에서 자료 검사 후 시작하세요.')
+        print('E01 · 실제 경기 기록으로 득점·실점 방어를 배우는 상황 실험. 웹에서 AI 학습 시작을 누르세요. 전체 경기 승리는 아직 미지원입니다.')
         return
     if args.mode=='web':
         if not 0<=args.port<=65535:parser.error('포트는 0~65535 사이의 정수로 입력하세요.')
@@ -45,7 +49,17 @@ def main():
         from baseball_lab.data.statcast import acquire,audit,manual_source,load_dataset
         from baseball_lab.outcome.empirical import fit,load_model
         from baseball_lab.tracking.evidence_report import write_report
-        if args.mode=='run':
+        if args.mode=='scoring':
+            from baseball_lab.r1.provider import acquire
+            from baseball_lab.r1.training import train,Config
+            seeds=tuple(int(s.strip()) for s in args.seeds.split(',')) if args.seeds else (args.seed,args.seed+1,args.seed+2)
+            config=Config(args.episodes,seeds,args.evaluate_every,args.evaluation_n)
+            config.validate()
+            dataset=acquire(REPOSITORY_ROOT/'data/local/retrosheet')
+            print('단계 2 · 경기와 날짜를 나눠 실제 전이 분포를 검사합니다.',flush=True)
+            print('단계 3 · 출루가 아닌 한 점 득점·실점 방어를 학습합니다. 전체 경기 승리는 아닙니다.',flush=True)
+            train(dataset,args.start,args.end,output,config)
+        elif args.mode=='run':
             from baseball_lab.research.pipeline import Plan,run
             run(Plan(args.start,args.end),args.data_dir,output,episodes=args.episodes,seed=args.seed,authorization_reference=args.authorization_reference)
         elif args.mode=='prepare':

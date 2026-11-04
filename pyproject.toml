@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "baseball-ai-lab"
-version = "0.6.0"
+version = "0.7.0"
 requires-python = ">=3.11"
 description = "Evidence-gated baseball learning and visual research platform"
 
@@ -23,4 +23,4 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-baseball_lab = ["tracking/*.html", "web/*.html"]
+baseball_lab = ["tracking/*.html", "web/*.html", "r1/*.html"]

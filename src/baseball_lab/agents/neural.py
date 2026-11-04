@@ -1,4 +1,4 @@
-"""Small two-hidden-layer neural policies, trained by terminal-win REINFORCE.
+"""Small two-hidden-layer neural policies, trained by terminal-outcome REINFORCE.
 
 NumPy is the only learning dependency. No action targets, imitation labels or
 baseball-stat rewards are supplied to the optimizer.
@@ -56,22 +56,34 @@ class NeuralPolicy:
         probs /= probs.sum(axis=-1, keepdims=True)
         return probs, (x, h1, h2)
 
-    def probabilities(self, observation):
-        return self.forward(self.encoder(observation, self.role)[None, :])[0][0]
+    def _mask(self, legal_actions):
+        legal = tuple(legal_actions)
+        if not legal or len(set(legal)) != len(legal) or any(a not in self.actions for a in legal):
+            raise ValueError('Incompatible legal-action schema')
+        return np.array([a in legal for a in self.actions], dtype=bool)
+
+    def probabilities(self, observation, legal_actions=None):
+        probs = self.forward(self.encoder(observation, self.role)[None, :])[0][0]
+        if legal_actions is not None:
+            probs = probs*self._mask(legal_actions)
+            probs /= probs.sum()
+        return probs
 
     def act(self, observation, legal_actions, rng):
-        if tuple(legal_actions) != self.actions:
-            raise ValueError('Incompatible legal-action schema')
+        mask = self._mask(legal_actions)
         x = self.encoder(observation, self.role)
-        probs = self.forward(x[None, :])[0][0]
+        probs = self.probabilities(observation, legal_actions)
         index = rng.choices(range(len(self.actions)), weights=probs, k=1)[0]
         if self.collect:
-            self.decisions.append((x, index))
+            self.decisions.append((x, index, mask))
         return self.actions[index]
 
-    def gradients(self, x, actions, advantages, episode_count):
+    def gradients(self, x, actions, advantages, episode_count, masks=None):
         """Exact gradient of -sum(return-baseline)*log pi(a|s) / episodes."""
         probabilities, (x, h1, h2) = self.forward(x)
+        if masks is not None:
+            probabilities = probabilities*masks
+            probabilities /= probabilities.sum(axis=1, keepdims=True)
         loss = -np.sum(np.log(np.maximum(probabilities[np.arange(len(actions)), actions], 1e-30))*advantages)/episode_count
         delta = probabilities.copy()
         delta[np.arange(len(actions)), actions] -= 1
@@ -84,13 +96,14 @@ class NeuralPolicy:
         return float(loss), [x.T @ d1, d1.sum(axis=0), g2, gb2, g3, gb3]
 
     def update(self, episodes, learning_rate=.001):
-        decisions = [(x, action, advantage) for trace, advantage in episodes for x, action in trace]
+        decisions = [(d[0], d[1], advantage, d[2] if len(d) == 3 else np.ones(len(self.actions), dtype=bool))
+                     for trace, advantage in episodes for d in trace]
         if not decisions:
             return 0.
         x = np.stack([d[0] for d in decisions])
         actions = np.array([d[1] for d in decisions])
         advantages = np.array([d[2] for d in decisions])
-        loss, grads = self.gradients(x, actions, advantages, len(episodes))
+        loss, grads = self.gradients(x, actions, advantages, len(episodes), np.stack([d[3] for d in decisions]))
         norm = np.sqrt(sum(np.sum(g*g) for g in grads))
         scale = min(1., 5./max(float(norm), 1e-12))
         self.steps += 1

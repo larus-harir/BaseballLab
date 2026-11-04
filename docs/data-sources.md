@@ -15,7 +15,17 @@
 
 ## Retrosheet
 
-https://www.retrosheet.org/game.htm 및 https://www.retrosheet.org/downloads/plays.html 은 후속 주루/이닝 전이·역사 비교의 후보다. 이번 작업에서 수집·이용 조건·시대별 대응을 검증하지 않았다. 현재 모델에 실제 전이 근거로 연결하지 않는다.
+현재 E01-R1의 실제 원천이다. 2026-11-04 UTC에 공식 https://www.retrosheet.org/downloads/plays.html 과 공식 2024년 ZIP https://www.retrosheet.org/downloads/plays/2024plays.zip 에 접근해 배포·열 정의·고지를 확인했다. 직전 프록시 CONNECT 403은 이 공식 경로에서 해소됐으며, 이를 모든 MLB 도메인의 수집 권한이나 접속 보장으로 확대하지 않는다.
+
+공식 NOTICES는 “Recipients of Retrosheet data are free to make any desired use of the information”라고 설명하고 지정한 저작권 고지의 명시를 요구한다. README·각 결과 보고서에 원문을 표시한다. 정확성을 보증하지 않으며 향후 수정 가능하다는 공식 설명도 함께 고려한다.
+
+- 확인한 ZIP SHA256: `a3e8c08876ddf70e1ffb0b20486c2873cf4aae19e0acc8002096e9056107615b`.
+- 공식 파싱 CSV를 그대로 보관하며, `gametype=regular`, `pbp=full`만 사용한다. 포스트시즌·올스타전 등 제외 수를 기록한다.
+- 아웃·주자·득점·PA 종료·번트 관측·고의볼넷과 원문 이벤트·투구 결과 문자열을 사용한다. 구종·좌표·구속·의도는 생성하지 않는다.
+- 원본·이용 고지·체크섬은 `data/local/retrosheet/official-2024`에 보존한다. 공식 수정 배포의 해시가 달라지면 재검토 전 멈춘다.
+- 초기 조사에서는 Chadwick의 Retrosheet official 브랜치 미러와 외부 파서도 확인했다. 최종 기본 경로는 **공식 파싱 CSV 직접 배포**이며 Git·C 컴파일러·외부 실행 파일 설치를 요구하지 않는다.
+
+The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at 20 Sunset Rd., Newark, DE 19711.
 
 ## KBO / E02
 
