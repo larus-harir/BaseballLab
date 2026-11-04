@@ -31,7 +31,7 @@ class Workbench:
         now=time.monotonic()
         if not refresh and self._cache[1] is not None and now-self._cache[0]<5:
             return self._cache[1]
-        result={'ready':False,'title':'먼저 실제 자료를 준비하세요','reason':'공식 CSV를 올리면 출처와 기록을 확인합니다.',
+        result={'ready':False,'title':'기간을 고르고 AI 학습을 시작하세요','reason':'확인된 보관 자료를 먼저 찾습니다. 없으면 자동 수집이 허용된 자료 연결이 필요합니다.',
                 'model_id':None,'dataset':None,'issues':[],'warning':'현재 학습은 타석 출루 연습입니다. 경기 승리 학습이 아닙니다.'}
         try:
             quality=self.data/'quality.json'
@@ -95,8 +95,18 @@ class Workbench:
             self._idle()
             from datetime import date
             if not isinstance(options,dict):raise ValueError('작업 설정은 객체여야 합니다.')
-            if kind not in ('fit','train'):raise ValueError('지원하지 않는 작업')
-            if kind=='fit':
+            if kind not in ('fit','train','run'):raise ValueError('지원하지 않는 작업')
+            if kind=='run':
+                from baseball_lab.research.pipeline import Plan
+                plan=Plan(str(options.get('start','')),str(options.get('end','')))
+                episodes=options.get('episodes',600);seed=options.get('seed',20261104)
+                if type(episodes) is not int or not 20<=episodes<=100000:raise ValueError('학습 타석 수는 20~100,000 사이의 정수입니다.')
+                if type(seed) is not int or not 0<=seed<=2**31-1:raise ValueError('재현 번호 범위를 확인하세요.')
+                extra=['--mode','run','--start',plan.start,'--end',plan.end,'--episodes',str(episodes),'--seed',str(seed)]
+                reference=options.get('authorization_reference','')
+                if not isinstance(reference,str) or len(reference)>2000:raise ValueError('자료 연결 설정을 확인하세요.')
+                if reference.strip():extra.extend(['--authorization-reference',reference.strip()])
+            elif kind=='fit':
                 before=date.fromisoformat(str(options.get('train_before','')))
                 after=date.fromisoformat(str(options.get('test_from','')))
                 if before>=after:raise ValueError('검증 시작일은 최종 확인 시작일보다 빨라야 합니다.')
@@ -132,7 +142,7 @@ class Workbench:
                 process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
                                          cwd=self.root,env=env,text=True,encoding='utf-8',errors='replace')
                 self.process=process
-                self.job.update(status='running',message='기록을 검사하고 있어요.' if self.job['kind']=='fit' else '두 AI가 타석 대결을 학습하고 있어요.')
+                self.job.update(status='running',message='자료 준비부터 순서대로 진행하고 있어요.' if self.job['kind']=='run' else '기록을 검사하고 있어요.' if self.job['kind']=='fit' else '두 AI가 타석 대결을 학습하고 있어요.')
                 self._persist()
             with (output/'output.log').open('w',encoding='utf-8') as log:
                 for line in process.stdout:
@@ -140,7 +150,8 @@ class Workbench:
                     with self.lock:
                         self.job['logs'].append(line.rstrip())
                         progress=re.search(r'학습 (\d+)/(\d+)타석',line)
-                        if progress and self.job['kind']=='train':
+                        if line.startswith('단계 '):self.job['message']=line.strip()
+                        if progress and self.job['kind'] in ('train','run'):
                             done,total=map(int,progress.groups())
                             self.job.update(completed_episodes=done,target_episodes=total,message=f'학습 {done:,}/{total:,}타석 · 현재까지의 결과를 볼 수 있어요.')
                         if (output/'result/report.html').exists():
@@ -155,6 +166,10 @@ class Workbench:
                 status='cancelled' if cancelled else 'failed' if code or invalid_fit else 'completed'
                 message='작업을 중지했습니다.' if cancelled else '검사를 통과하지 못했어요. 아래 이유를 확인하세요.' if invalid_fit else '문제가 생겼어요. 아래 기록과 도움말을 확인하세요.' if code else '완료했어요. 결과 보기를 눌러 주세요.'
                 report=output/'result/report.html'
+                failure=output/'result/failure.json'
+                if failure.exists() and not cancelled:
+                    try:message=json.loads(failure.read_text(encoding='utf-8'))['error']
+                    except (OSError,ValueError,KeyError):pass
                 self.job.update(status=status,message=message,exit_code=code,completed_at=utc_now(),
                     report=f'/reports/{job_id}/result/report.html' if report.exists() else None)
                 self._persist()

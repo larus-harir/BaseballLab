@@ -9,7 +9,7 @@ from baseball_lab.experiments.registry import REPOSITORY_ROOT
 
 def main():
     parser=argparse.ArgumentParser(description='야구 AI 연구실 · 실제 데이터와 실행 근거로 관찰하는 E01')
-    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web'),default='web')
+    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run'),default='web')
     parser.add_argument('--port',type=int,default=8765,help='웹 연구실 포트')
     parser.add_argument('--authorization-reference',help='자동 수집에 별도로 허용받은 근거 (기본은 수동 내보내기)')
     parser.add_argument('--data-dir',type=Path,default=REPOSITORY_ROOT/'data/local/statcast')
@@ -45,7 +45,10 @@ def main():
         from baseball_lab.data.statcast import acquire,audit,manual_source,load_dataset
         from baseball_lab.outcome.empirical import fit,load_model
         from baseball_lab.tracking.evidence_report import write_report
-        if args.mode=='prepare':
+        if args.mode=='run':
+            from baseball_lab.research.pipeline import Plan,run
+            run(Plan(args.start,args.end),args.data_dir,output,episodes=args.episodes,seed=args.seed,authorization_reference=args.authorization_reference)
+        elif args.mode=='prepare':
             acquisition=acquire(args.start,args.end,args.data_dir/'raw',usage_note=args.usage_note,authorization_reference=args.authorization_reference)
             sources=[RawSource(**s) for s in acquisition['sources']]
             dataset=audit(sources,args.data_dir)
