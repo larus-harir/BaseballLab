@@ -136,7 +136,11 @@ def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty
 
 def load(path):
     import json
-    data=json.loads(Path(path).read_text(encoding='utf-8'));m=data['manifest']
+    path=Path(path)
+    data=json.loads(path.read_text(encoding='utf-8'));m=data['manifest']
+    for source in [m['parsed_csv_path'],m.get('terms_path'),*[r['path'] for r in m.get('raw_files',[])]]:
+        if source and not Path(source).resolve().is_relative_to(path.parent.resolve()):
+            raise ValueError('원천 파일의 보관 폴더 밖 경로를 거부했습니다.')
     if m['schema']!=SCHEMA or m['source_status']!='REAL_OBSERVED' or content_hash(data['records'])!=m['records_checksum']:
         raise ValueError('Dataset integrity/status mismatch')
     if checksum(Path(m['parsed_csv_path']))!=m['parsed_csv_sha256']:raise ValueError('Parsed source checksum mismatch')

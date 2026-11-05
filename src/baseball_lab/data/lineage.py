@@ -5,6 +5,8 @@ from enum import Enum
 from pathlib import Path
 import hashlib
 import json
+import os
+from .protection import private
 
 
 class SourceStatus(str, Enum):
@@ -31,8 +33,12 @@ def write_json(path, payload):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + '.tmp')
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False)+'\n', encoding='utf-8')
+    descriptor=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_TRUNC|getattr(os,'O_NOFOLLOW',0),0o600)
+    with os.fdopen(descriptor,'w',encoding='utf-8') as file:
+        json.dump(payload,file,ensure_ascii=False,indent=2,allow_nan=False)
+        file.write('\n')
     temporary.replace(path)
+    private(path)
 
 
 @dataclass(frozen=True)

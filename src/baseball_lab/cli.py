@@ -1,5 +1,7 @@
 """Evidence-first CLI. Production paths never fall back to synthetic models."""
 import argparse
+import csv
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -8,6 +10,7 @@ from baseball_lab.experiments.registry import REPOSITORY_ROOT
 
 
 def main():
+    if os.name=='posix':os.umask(0o077)
     parser=argparse.ArgumentParser(description='야구 AI 연구실 · 실제 데이터와 실행 근거로 관찰하는 E01')
     parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run','scoring','simulate'),default='web')
     parser.add_argument('--port',type=int,default=8765,help='웹 연구실 포트')
@@ -113,7 +116,7 @@ def main():
         if args.open:
             import webbrowser
             webbrowser.open((output/'report.html').resolve().as_uri())
-    except (OSError,ValueError,KeyError,TypeError,RuntimeError,ImportError) as exc:
+    except (OSError,ValueError,KeyError,TypeError,RuntimeError,ImportError,csv.Error) as exc:
         failure={'status':'DATA_OR_VALIDATION_REQUIRED','observed_at':utc_now(),'error':str(exc),
                  'research_executed':False,'synthetic_fallback':False}
         # Keep previous successful runs intact if the chosen directory already has evidence.

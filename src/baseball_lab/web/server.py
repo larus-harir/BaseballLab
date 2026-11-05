@@ -1,5 +1,6 @@
 """Loopback-only research workbench. Fixed task API, no shell commands from clients."""
 import argparse
+import csv
 import json
 import mimetypes
 import os
@@ -14,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from baseball_lab.data.lineage import write_json, utc_now
+from baseball_lab.data.protection import private,public_text,public_view
+from .storage import Storage
 
 
 class Workbench:
@@ -21,7 +24,10 @@ class Workbench:
         self.root=Path(root).resolve()
         self.data=self.root/'data/local/statcast'
         self.outputs=self.root/'outputs/workbench'
-        self.outputs.mkdir(parents=True,exist_ok=True)
+        private(self.root/'outputs',directory=True)
+        private(self.outputs,directory=True)
+        private(self.root/'data/local',directory=True)
+        self.storage=Storage(self.root)
         self.token=secrets.token_urlsafe(32)
         self.lock=threading.RLock()
         self.job=None; self.process=None
@@ -77,7 +83,7 @@ class Workbench:
                         reading=build_summary(data)
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
             except (OSError,ValueError,KeyError):continue
-        return {'readiness':self.readiness(),'job':current,'runs':runs}
+        return public_view({'readiness':self.readiness(),'job':current,'runs':runs})
 
     def _idle(self):
         if self.job and self.job['status'] in ('queued','running','cancelling'):
@@ -91,8 +97,8 @@ class Workbench:
             from baseball_lab.data.statcast import manual_source, audit
             # The browser filename is informational only; never use it as a server path.
             directory=self.data/'uploads'/secrets.token_hex(8)
-            directory.mkdir(parents=True)
-            path=directory/'official-export.csv';path.write_bytes(content)
+            private(directory,directory=True)
+            path=directory/'official-export.csv';path.write_bytes(content);private(path)
             try:
                 source=manual_source(path,source_url,usage_note,acquired_at)
                 dataset=audit([source],self.data)
@@ -153,9 +159,10 @@ class Workbench:
                 if type(seed) is not int or not 0<=seed<=2**31-1:raise ValueError('재현 번호는 0~2,147,483,647 사이의 정수입니다.')
                 extra=['--mode','train','--episodes',str(episodes),'--seed',str(seed),'--evaluate-every',str(min(episodes,200))]
             job_id=time.strftime('%Y%m%d_%H%M%S')+'_'+secrets.token_hex(4)
-            output=self.outputs/job_id;output.mkdir()
+            output=self.outputs/job_id;private(output,directory=True)
             self.job={'id':job_id,'kind':kind,'status':'queued','started_at':utc_now(),'logs':[],
                       'report':None,'message':'작업을 준비하고 있어요.'}
+            if kind in ('run','simulate') and source=='retrosheet':self.job['source_year']=start[:4]
             self._persist()
             command=[sys.executable,'-u',str(self.root/'scripts/quickstart.py'),'--data-dir',str(self.data),
                      '--output',str(output/'result'),*extra]
@@ -178,7 +185,9 @@ class Workbench:
                 self.job.update(status='running',message='학습 없이 상황을 준비하고 있어요.' if self.job['kind']=='simulate' else '자료 준비부터 순서대로 진행하고 있어요.' if self.job['kind']=='run' else '기록을 검사하고 있어요.' if self.job['kind']=='fit' else '두 AI가 타석 대결을 학습하고 있어요.')
                 self._persist()
             with (output/'output.log').open('w',encoding='utf-8') as log:
+                private(output/'output.log')
                 for line in process.stdout:
+                    line=public_text(line)
                     log.write(line);log.flush()
                     with self.lock:
                         self.job['logs'].append(line.rstrip())
@@ -203,13 +212,13 @@ class Workbench:
                 if failure.exists() and not cancelled:
                     try:message=json.loads(failure.read_text(encoding='utf-8'))['error']
                     except (OSError,ValueError,KeyError):pass
-                self.job.update(status=status,message=message,exit_code=code,completed_at=utc_now(),
+                self.job.update(status=status,message=public_text(message),exit_code=code,completed_at=utc_now(),
                     report=f'/reports/{job_id}/result/report.html' if report.exists() else None)
                 self._persist()
         except Exception as exc:
             if process and process.poll() is None:process.terminate();process.wait(timeout=10)
             with self.lock:
-                self.job.update(status='failed',message=str(exc),completed_at=utc_now());self._persist()
+                self.job.update(status='failed',message=public_text(exc),completed_at=utc_now());self._persist()
         finally:
             with self.lock:
                 if self.process is process:self.process=None
@@ -232,16 +241,22 @@ def make_handler(workbench):
         def _json(self,payload,status=200):
             data=json.dumps(payload,ensure_ascii=False,allow_nan=False).encode()
             self.send_response(status);self.send_header('Content-Type','application/json; charset=utf-8')
+            self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer')
             self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
         def _file(self,path):
             try:body=path.read_bytes()
             except OSError:return self._json({'error':'파일이 없어요.'},404)
+            if path.name in ('summary.md','output.log'):
+                body=public_text(body.decode('utf-8',errors='replace')).encode('utf-8')
             self.send_response(200);self.send_header('Content-Type',mimetypes.guess_type(str(path))[0] or 'application/octet-stream')
             self.send_header('Content-Length',str(len(body)));self.send_header('X-Content-Type-Options','nosniff')
             self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(body)
         def _html(self,body):
             data=body.encode('utf-8')
             self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8')
+            self.send_header('X-Content-Type-Options','nosniff');self.send_header('X-Frame-Options','DENY')
+            self.send_header('Referrer-Policy','no-referrer')
+            self.send_header('Content-Security-Policy',"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
             self.send_header('Content-Length',str(len(data)));self.send_header('Cache-Control','no-store')
             self.end_headers();self.wfile.write(data)
         def do_GET(self):
@@ -253,6 +268,7 @@ def make_handler(workbench):
                 body=Path(__file__).with_name(pages[path]).read_text(encoding='utf-8').replace('__SESSION_TOKEN__',workbench.token)
                 self._html(body)
             elif path=='/api/state':self._json(workbench.state())
+            elif path=='/api/storage':self._json(workbench.storage.inventory())
             elif path.startswith('/reports/'):
                 from urllib.parse import unquote
                 resolved=(workbench.outputs/unquote(path[len('/reports/'):])).resolve()
@@ -267,7 +283,15 @@ def make_handler(workbench):
                             from baseball_lab.experiments.match.reporting.report import render
                             return self._html(render(evidence))
                     except (OSError,ValueError,KeyError,TypeError) as exc:
-                        return self._json({'error':f'결과 근거를 읽을 수 없습니다: {exc}'},409)
+                        return self._json({'error':public_text(f'결과 근거를 읽을 수 없습니다: {exc}')},409)
+                if resolved.name=='report.html' and (resolved.parent/'session.json').is_file():
+                    try:
+                        from baseball_lab.simulation.scoring import render
+                        return self._html(render(json.loads((resolved.parent/'session.json').read_text(encoding='utf-8'))))
+                    except (OSError,ValueError,KeyError,TypeError) as exc:return self._json({'error':public_text(exc)},409)
+                if resolved.name=='report.html':
+                    try:return self._html(public_text(resolved.read_text(encoding='utf-8')))
+                    except OSError:return self._json({'error':'결과 파일이 없습니다.'},404)
                 self._file(resolved)
             else:self._json({'error':'페이지가 없어요.'},404)
         def do_POST(self):
@@ -292,9 +316,17 @@ def make_handler(workbench):
                     if not isinstance(payload,dict):raise ValueError('올바른 작업 요청이 아닙니다.')
                     result=workbench.start(payload['kind'],payload.get('options',{}))
                 elif path=='/api/cancel':result=workbench.cancel()
+                elif path in ('/api/storage/preview','/api/storage/delete','/api/storage/verify'):
+                    payload=json.loads(body)
+                    if not isinstance(payload,dict):raise ValueError('올바른 자료 관리 요청이 아닙니다.')
+                    with workbench.lock:
+                        workbench._idle()
+                        if path.endswith('/preview'):result=workbench.storage.preview(payload['id'])
+                        elif path.endswith('/verify'):result=workbench.storage.verify(payload['id'])
+                        else:result=workbench.storage.delete(payload['confirmation'],payload.get('confirmed'))
                 else:return self._json({'error':'지원하지 않는 요청'},404)
                 self._json(result)
-            except (ValueError,KeyError,TypeError,OSError) as exc:self._json({'error':str(exc)},400)
+            except (ValueError,KeyError,TypeError,OSError,csv.Error) as exc:self._json({'error':public_text(exc)},400)
     return Handler
 
 

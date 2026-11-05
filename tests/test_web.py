@@ -29,7 +29,7 @@ def call(server,path='/',method='GET',data=None,headers=None):
 def test_home_state_and_training_blocked_without_data(web):
     wb,s=web
     code,body=call(s)
-    assert code==200 and '학습 시작' in body.decode() and wb.token in body.decode()
+    assert code==200 and '실험 설정하기' in body.decode() and wb.token in body.decode()
     code,body=call(s,'/api/state')
     assert not json.loads(body)['readiness']['ready']
     code,body=call(s,'/api/start','POST',json.dumps({'kind':'train'}),{'X-Lab-Token':wb.token})
@@ -117,7 +117,7 @@ def test_real_process_cancel_and_progress_are_recorded(tmp_path):
 
 def test_platform_match_and_observer_are_separate_pages(web):
     wb,s=web
-    for path,label in [('/','무엇을 해볼까요?'),('/match','BaseballLab-Match'),('/match/team','한 점을 만들고 막는'),('/match/at-bat','researchSource'),('/simulation','학습 없이 관찰'),('/lab/data','어떤 자료')]:
+    for path,label in [('/','야구를 AI는 어떻게 배울까?'),('/match','AI 전략 연구'),('/match/team','득점 전략 연구 시작'),('/match/at-bat','researchSource'),('/simulation','장면 살펴보기'),('/lab/data','자료와 신뢰성')]:
         code,body=call(s,path)
         assert code==200 and label in body.decode()
     with pytest.raises(ValueError):wb.start('simulate',{'start':'2024-03-20','end':'2024-09-30','outs':3})
@@ -130,6 +130,6 @@ def test_old_r1_result_is_summarized_without_overwriting_original(web):
     source=json.dumps(data);(output/'research.json').write_text(source)
     (output/'report.html').write_text('LEGACY_UNCHANGED')
     code,body=call(s,'/reports/old/result/report.html')
-    assert code==200 and '이번 조건에서는 수비 쪽 우세' in body.decode()
+    assert code==200 and '1,500번 중 704번' in body.decode()
     assert (output/'report.html').read_text()=='LEGACY_UNCHANGED'
     assert (output/'research.json').read_text()==source

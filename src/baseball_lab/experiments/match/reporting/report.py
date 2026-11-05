@@ -3,11 +3,13 @@ import json
 from pathlib import Path
 from baseball_lab.data.lineage import write_json
 from .summary import build_summary
+from baseball_lab.data.protection import public_view
+from baseball_lab.web.scene_assets import embed
 
 
 def render(result):
-    payload=json.dumps({**result,'reading':build_summary(result)},ensure_ascii=False,allow_nan=False).replace('<','\\u003c')
-    return Path(__file__).with_name('report.html').read_text(encoding='utf-8').replace('__RESEARCH__',payload)
+    payload=json.dumps(public_view({**result,'reading':build_summary(result)}),ensure_ascii=False,allow_nan=False).replace('<','\\u003c')
+    return embed(Path(__file__).with_name('report.html').read_text(encoding='utf-8')).replace('__RESEARCH__',payload)
 
 
 def report(output,result):

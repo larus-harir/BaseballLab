@@ -1,3 +1,9 @@
+# 현재 화면·자료 경계
+
+공통 2D 장면 렌더러를 관람과 Match 비교 화면에서 재사용합니다. 연구자의 사적 계보는 디스크에 보존하고 표시용 사본만 가립니다. 자료 관리는 고정된 보관 영역과 두 번 확인하는 삭제 절차로 분리했습니다. [현재 상태](PROJECT_STATUS.md) · [보안 점검](security-audit.md)
+
+---
+
 # 현재 부모와 Match 경계
 
 부모 `/`·`/simulation`·`/lab/data`와 자식 `/match`·`/match/team`·`/match/at-bat`를 한 서버에서 제공합니다. 공통 신경망과 전이 어댑터는 재사용하며 Match 학습/보고는 `experiments/match/`가 소유합니다. `r1.training/report`는 기존 호출을 보존하는 호환 경로입니다.

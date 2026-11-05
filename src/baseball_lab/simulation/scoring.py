@@ -9,6 +9,8 @@ import json
 
 from baseball_lab.data.lineage import write_json
 from baseball_lab.r1.environment import fit
+from baseball_lab.web.scene_assets import embed
+from baseball_lab.data.protection import public_view
 
 
 class SessionPolicy:
@@ -34,7 +36,7 @@ def observe(dataset,start,end,output,*,seed=41,outs=0,bases=1,source='model',sty
         r=Random(seed).choice(rows)
         events=[{'before':{'outs':outs,'bases':bases},'after':{'outs':outs+r['outs_added'],'bases':r['end_bases']},
                  'runs':r['runs'],'source_row_ids':r['source_row_ids'],'record_id':r['record_id'],
-                 'game_id':r['game_id'],'source_status':'REAL_OBSERVED','event_codes':r['event_codes']}]
+                 'inning':r.get('inning'),'bottom':r.get('bottom'),'game_id':r['game_id'],'source_status':'REAL_OBSERVED','event_codes':r['event_codes']}]
         label='실제 원천의 관측 턴';policies='AI가 선택한 플레이가 아닙니다.'
     elif source=='model':
         envs,_=fit(dataset,start,end)
@@ -43,12 +45,16 @@ def observe(dataset,start,end,output,*,seed=41,outs=0,bases=1,source='model',sty
     else:raise ValueError('실제 기록 또는 모델 관찰을 선택하세요.')
     result={'schema':'baseball-lab-observation-v1','training_executed':False,'label':label,'policies':policies,
             'dataset_id':dataset['manifest']['dataset_id'],'source_status':'REAL_OBSERVED' if source=='observed' else 'MODEL_SIMULATED',
-            'seed':seed,'events':events,'credit':dataset['manifest']['credit']}
+            'style':style,'season':start[:4],'seed':seed,'events':events,'credit':dataset['manifest']['credit']}
     if test_only:
         result['source_status']='MOCK_TEST_ONLY'
         for event in result['events']:event['source_status']='MOCK_TEST_ONLY'
     output.mkdir(parents=True);write_json(output/'session.json',result)
-    payload=json.dumps(result,ensure_ascii=False,allow_nan=False).replace('<','\\u003c')
-    template=Path(__file__).with_name('session.html').read_text(encoding='utf-8')
-    (output/'report.html').write_text(template.replace('__SESSION__',payload),encoding='utf-8')
+    (output/'report.html').write_text(render(result),encoding='utf-8')
     return result
+
+
+def render(result):
+    payload=json.dumps(public_view(result),ensure_ascii=False,allow_nan=False).replace('<','\\u003c')
+    template=embed(Path(__file__).with_name('session.html').read_text(encoding='utf-8'))
+    return template.replace('__SESSION__',payload)

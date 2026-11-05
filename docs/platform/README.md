@@ -1,3 +1,9 @@
+# 현재 사용자 화면
+
+야구장 그림으로 실제 기록과 가상 공격을 관람하고, 별도 AI 연구에서는 같은 상황의 선택 변화를 비교합니다. [자료와 신뢰성](/lab/data)은 실제 저장 자료의 분류·용량·검사·삭제 확인을 제공합니다. 앱 자체 암호화나 Windows 사용자 권한을 검증한 것으로 표시하지 않습니다. [검증과 한계](../ux-validation.md) · [자료 보호 점검](../security-audit.md)
+
+---
+
 # BaseballLab 공통 플랫폼
 
 부모는 실제 자료·규칙·경험 전이·공통 신경망·실행 및 관찰을 제공하고, Match는 연구 목표·상대·보상·전략 변화 해석을 소유합니다. 같은 저장소와 같은 서버를 사용합니다.
@@ -24,7 +30,7 @@
 | `r1.environment` | 레거시 경로의 경험 전이/한 점 상황 어댑터. 다른 전체 경기의 구현으로 해석하지 않음 |
 | `simulation` | 부모의 독립 관찰 세션. 학습 의존 없음 |
 | `experiments.match.team_win` | Match-B 학습·외부 시즌 평가 |
-| `experiments.match.reporting` | Match 전용 우세·개선·변화 해석과 보고서 |
+| `experiments.match.reporting` | Match 전용 관측 결과·개선·변화 해석과 보고서 |
 | `r1.training/report` | 기존 CLI/외부 코드 호환 재노출 |
 | `web` | 공통 실행 서버·부모/자식의 다른 화면 |
 | 기존 synthetic 결과 모델 | 테스트 전용, 실제 연구 대체 금지 |

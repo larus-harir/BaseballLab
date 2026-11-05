@@ -22,7 +22,7 @@ def test_actual_evidence_separates_duel_from_growth():
     data=evidence();summary=build_summary(data)
     assert summary['duel']['successes']==704 and summary['duel']['n']==1500
     assert summary['duel']['rate']==pytest.approx(704/1500)
-    assert summary['verdict']=='defense'
+    assert summary['verdict']=='observed'
     assert [g['improved'] for g in summary['growth']]==[False,True]
     assert summary['growth'][1]['before']['successes']==433
     assert summary['growth'][1]['after']['successes']==782
@@ -31,11 +31,13 @@ def test_actual_evidence_separates_duel_from_growth():
     assert summary['choices'][0]['text']=='반복마다 방향이 달라요'
 
 
-@pytest.mark.parametrize('rates,expected', [([501,501,501],'uncertain'),([1000,1000,1000],'offense'),([0,0,0],'defense'),([950,950,490],'uncertain')])
+@pytest.mark.parametrize('rates,expected', [([501,501,501],'observed'),([1000,1000,1000],'observed'),([0,0,0],'observed'),([950,950,490],'observed')])
 def test_small_or_conflicting_results_do_not_force_a_winner(rates,expected):
     result=pool({'n':1000,'scored':n,'environment_id':'same'} for n in rates)
     assert verdict(result)[0]==expected
-    assert verdict(pool([{'n':1000,'scored':900}]))[0]=='uncertain'
+    assert verdict(pool([{'n':1000,'scored':900}]))[0]=='observed'
+    assert '우세' not in verdict(result)[1]
+    assert str(sum(rates)) in verdict(result)[1].replace(',','')
 
 
 def test_partial_training_missing_evaluation_and_incompatible_environments():

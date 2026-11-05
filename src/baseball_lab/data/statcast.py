@@ -83,7 +83,8 @@ def acquire(start: str, end: str, output: Path, *, usage_note: str, authorizatio
 
 
 def manual_source(path: Path, source_url: str, usage_note: str, acquired_at: str):
-    if parse.urlparse(source_url).hostname != 'baseballsavant.mlb.com' or not source_url.startswith('https://'):
+    parsed=parse.urlparse(source_url)
+    if parsed.hostname != 'baseballsavant.mlb.com' or parsed.scheme!='https' or parsed.username or parsed.password or parsed.port not in (None,443):
         raise ValueError('공식 Baseball Savant HTTPS 내보내기 URL이 필요합니다.')
     if not usage_note.strip() or not acquired_at.strip():
         raise ValueError('직접 내보낸 파일의 사용조건·획득 시각을 기록하세요.')

@@ -26,14 +26,7 @@ def find(run, stage, role, opponent):
 def verdict(result):
     if result is None:
         return 'pending', '평가를 기다리고 있어요'
-    lo, hi = result['ci95']; rates = result['repeat_rates']
-    if result['repeats'] < 2:
-        return 'uncertain', '우세 판단 보류 · 반복 확인이 더 필요해요'
-    if lo > .5 and all(r > .5 for r in rates):
-        return 'offense', '이번 조건에서는 공격 쪽 우세'
-    if hi < .5 and all(r < .5 for r in rates):
-        return 'defense', '이번 조건에서는 수비 쪽 우세'
-    return 'uncertain', '우세 판단 보류 · 결과 차이가 뚜렷하지 않아요'
+    return 'observed', f"{result['n']:,}번 중 {result['successes']:,}번, 3아웃 전에 득점했어요"
 
 
 def build_summary(result):
@@ -43,7 +36,7 @@ def build_summary(result):
     code, title = verdict(duel)
     complete = result['status']=='COMPLETED' and len(finished)==len(result['config']['seeds'])
     if not complete:
-        code, title = 'pending', '학습 중 · 최종 우세는 아직 평가하지 않았어요'
+        code, title = 'pending', '학습 중 · 마지막 확인 대결을 기다리고 있어요'
     growth=[]
     for role, label in (('batter','공격'), ('pitcher','수비')):
         valid=[r for r in finished if find(r,'initial_test_evaluation',role,'fixed') and find(r,'test_evaluation',role,'fixed')]
@@ -89,9 +82,9 @@ def build_summary(result):
         direction='반복마다 방향이 달라요' if min(differences)<0<max(differences) else '줄어들었어요' if max(differences)<0 else '늘어났어요' if min(differences)>0 else '뚜렷한 방향이 없어요'
         choices.append({'field':field,'label':label,'before':before,'after':after,'text':direction,
                         'scope':'지원되는 같은 아웃·주자 상황의 평균 선택 확률'})
-    return {'version':'match-summary-v1','complete':complete,'verdict':code,'headline':title,'duel':duel,
+    return {'version':'match-summary-v2','complete':complete,'verdict':code,'headline':title,'duel':duel,
             'growth_headline':growth_title,'growth':growth,'timeline':timeline,'choices':choices,
             'episodes_per_repeat':result['config']['episodes'],'planned_repeats':len(result['config']['seeds']),
             'finished_repeats':len(finished),
             'scope':'한 점 득점 실험에서 24개 아웃·주자 상태를 같은 비중으로 시작한 결과입니다. 실제 경기 승률이나 AI 실력의 일반적 우열은 아닙니다.',
-            'uncertainty':'95% 구간은 가상 대결의 표본 오차만 반영합니다. 우세는 구간이 50%를 벗어나고 반복마다 방향이 같을 때 표시합니다. 여러 학습 시점의 유의성 검정은 하지 않습니다.'}
+            'uncertainty':'공격과 수비는 서로 다른 과제를 수행하므로 50%가 동등한 실력의 기준이라는 근거가 없습니다. 득점·차단 빈도로 능력 우열을 판정하지 않습니다. 95% 구간은 이 가상 대결의 표본 오차만 반영합니다.'}

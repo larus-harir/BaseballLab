@@ -1,0 +1,369 @@
+{
+  "job_id": "20261105_062831_10dfe156",
+  "run_id": "8cf45f0c543ee44503e4fc4cc3b6ac19329527de252be4402871866785868644",
+  "run_python_source_hash": "56fda0beb0a47b9181a9b24068f072501db072385378378daa368810e6717c64",
+  "preserved_existing_files": 85,
+  "changed_existing_files": 0,
+  "seed_history_and_evaluation_unchanged": true,
+  "episodes": 3000,
+  "seeds": [
+    41,
+    42,
+    43
+  ],
+  "external_2023": {
+    "year": 2023,
+    "run_id": "8cf45f0c543ee44503e4fc4cc3b6ac19329527de252be4402871866785868644",
+    "source_url": "https://www.retrosheet.org/downloads/plays/2023plays.zip",
+    "dataset_id": "3ad542facdc0fe2d0f1af7e0737d2e4e16977737fda4463f739f19ed6300a933",
+    "games": 2430,
+    "turns": 184506,
+    "training_executed": false,
+    "rows": [
+      {
+        "seed": 41,
+        "checkpoint_sha256": "0e5d2c9824a8e8d53157bf54a7c220c3dd6f787958119be31b9bc4e2f4108cc9",
+        "n": 500,
+        "scored": 215,
+        "scoring_rate": 0.43,
+        "wilson_95": [
+          0.38730164759035934,
+          0.4737657600742581
+        ],
+        "environment_id": "23552df07246c3c11c9980c4f8c5d9be4cec85946eb16617fee0a32c030a0d39",
+        "uncertainty_scope": "Monte Carlo only; excludes data/model/selection uncertainty."
+      },
+      {
+        "seed": 42,
+        "checkpoint_sha256": "b6a0b7357e5d8525d8071f46ebd25aff8aa792fb00fc320c4230a0a86a37d6df",
+        "n": 500,
+        "scored": 239,
+        "scoring_rate": 0.478,
+        "wilson_95": [
+          0.43455096039387586,
+          0.5217845105864325
+        ],
+        "environment_id": "23552df07246c3c11c9980c4f8c5d9be4cec85946eb16617fee0a32c030a0d39",
+        "uncertainty_scope": "Monte Carlo only; excludes data/model/selection uncertainty."
+      },
+      {
+        "seed": 43,
+        "checkpoint_sha256": "c39d265660ed95adccbe7e2087d6c7f97ee68126e83acf5d669a8c560c7e746e",
+        "n": 500,
+        "scored": 234,
+        "scoring_rate": 0.468,
+        "wilson_95": [
+          0.4246740659219794,
+          0.5118138918675601
+        ],
+        "environment_id": "23552df07246c3c11c9980c4f8c5d9be4cec85946eb16617fee0a32c030a0d39",
+        "uncertainty_scope": "Monte Carlo only; excludes data/model/selection uncertainty."
+      }
+    ],
+    "transition_check": {
+      "supported_n": 183864,
+      "all_n": 184506,
+      "weighted_total_variation": 0.01865370312690623,
+      "unseen_outcomes": 71,
+      "cells": [
+        {
+          "cell": "0:0:bunt_attempt",
+          "fit_n": 264,
+          "evaluation_n": 368,
+          "total_variation": 0.03334980237154149,
+          "mean_runs_error": 0.0004940711462450599,
+          "unseen_outcomes": 1
+        },
+        {
+          "cell": "0:0:ordinary_turn",
+          "fit_n": 26262,
+          "evaluation_n": 44439,
+          "total_variation": 0.013614823230513357,
+          "mean_runs_error": -0.005123191847341259,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "0:1:bunt_attempt",
+          "fit_n": 277,
+          "evaluation_n": 424,
+          "total_variation": 0.07295143382603367,
+          "mean_runs_error": 0.005440705674000408,
+          "unseen_outcomes": 3
+        },
+        {
+          "cell": "0:1:ordinary_turn",
+          "fit_n": 6006,
+          "evaluation_n": 10450,
+          "total_variation": 0.026284943127048394,
+          "mean_runs_error": -0.013247454300085879,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "0:2:bunt_attempt",
+          "fit_n": 152,
+          "evaluation_n": 224,
+          "total_variation": 0.06062030075187971,
+          "mean_runs_error": -0.018562030075187974,
+          "unseen_outcomes": 5
+        },
+        {
+          "cell": "0:2:ordinary_turn",
+          "fit_n": 1613,
+          "evaluation_n": 2834,
+          "total_variation": 0.029731307158973423,
+          "mean_runs_error": -0.02282027510247764,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "0:3:bunt_attempt",
+          "fit_n": 189,
+          "evaluation_n": 273,
+          "total_variation": 0.09523809523809525,
+          "mean_runs_error": 0.05046805046805046,
+          "unseen_outcomes": 3
+        },
+        {
+          "cell": "0:3:ordinary_turn",
+          "fit_n": 1460,
+          "evaluation_n": 2422,
+          "total_variation": 0.029288033211542587,
+          "mean_runs_error": 0.006614028935669591,
+          "unseen_outcomes": 1
+        },
+        {
+          "cell": "0:4:ordinary_turn",
+          "fit_n": 187,
+          "evaluation_n": 285,
+          "total_variation": 0.041204615817618924,
+          "mean_runs_error": 0.0084435688150859,
+          "unseen_outcomes": 3
+        },
+        {
+          "cell": "0:5:ordinary_turn",
+          "fit_n": 556,
+          "evaluation_n": 908,
+          "total_variation": 0.06300510252590878,
+          "mean_runs_error": -0.04425886603492535,
+          "unseen_outcomes": 6
+        },
+        {
+          "cell": "0:6:ordinary_turn",
+          "fit_n": 311,
+          "evaluation_n": 552,
+          "total_variation": 0.09309613681905028,
+          "mean_runs_error": 0.10716948599655163,
+          "unseen_outcomes": 2
+        },
+        {
+          "cell": "0:7:ordinary_turn",
+          "fit_n": 422,
+          "evaluation_n": 746,
+          "total_variation": 0.0992528874375818,
+          "mean_runs_error": 0.1402996073847249,
+          "unseen_outcomes": 9
+        },
+        {
+          "cell": "1:0:bunt_attempt",
+          "fit_n": 144,
+          "evaluation_n": 242,
+          "total_variation": 0.020431588613406805,
+          "mean_runs_error": -0.013716712580348945,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "1:0:ordinary_turn",
+          "fit_n": 19282,
+          "evaluation_n": 32071,
+          "total_variation": 0.007932519975944996,
+          "mean_runs_error": -0.003406737988709066,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "1:1:bunt_attempt",
+          "fit_n": 102,
+          "evaluation_n": 119,
+          "total_variation": 0.12324929971988796,
+          "mean_runs_error": 0.0042016806722689065,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "1:1:ordinary_turn",
+          "fit_n": 7697,
+          "evaluation_n": 13161,
+          "total_variation": 0.02611755510849497,
+          "mean_runs_error": -0.0011091684038544575,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "1:2:ordinary_turn",
+          "fit_n": 2562,
+          "evaluation_n": 4515,
+          "total_variation": 0.023519053065374062,
+          "mean_runs_error": -0.0037216564094185167,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "1:3:ordinary_turn",
+          "fit_n": 2661,
+          "evaluation_n": 4703,
+          "total_variation": 0.02317461816651688,
+          "mean_runs_error": -0.0009339429532493893,
+          "unseen_outcomes": 7
+        },
+        {
+          "cell": "1:4:ordinary_turn",
+          "fit_n": 788,
+          "evaluation_n": 1336,
+          "total_variation": 0.04261907656767682,
+          "mean_runs_error": 0.0225158819417004,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "1:5:bunt_attempt",
+          "fit_n": 46,
+          "evaluation_n": 86,
+          "total_variation": 0.2158746208291203,
+          "mean_runs_error": 0.00707785642062686,
+          "unseen_outcomes": 3
+        },
+        {
+          "cell": "1:5:ordinary_turn",
+          "fit_n": 1148,
+          "evaluation_n": 1999,
+          "total_variation": 0.08829894041097205,
+          "mean_runs_error": 0.03506326333898657,
+          "unseen_outcomes": 2
+        },
+        {
+          "cell": "1:6:ordinary_turn",
+          "fit_n": 726,
+          "evaluation_n": 1210,
+          "total_variation": 0.050137741046831934,
+          "mean_runs_error": 0.021212121212121238,
+          "unseen_outcomes": 5
+        },
+        {
+          "cell": "1:7:ordinary_turn",
+          "fit_n": 911,
+          "evaluation_n": 1614,
+          "total_variation": 0.044455280837131746,
+          "mean_runs_error": -0.035611832252641196,
+          "unseen_outcomes": 10
+        },
+        {
+          "cell": "2:0:bunt_attempt",
+          "fit_n": 80,
+          "evaluation_n": 155,
+          "total_variation": 0.013306451612903229,
+          "mean_runs_error": 0.006048387096774194,
+          "unseen_outcomes": 1
+        },
+        {
+          "cell": "2:0:ordinary_turn",
+          "fit_n": 15392,
+          "evaluation_n": 25507,
+          "total_variation": 0.010070380276353123,
+          "mean_runs_error": -0.004698724931161125,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "2:1:bunt_attempt",
+          "fit_n": 43,
+          "evaluation_n": 60,
+          "total_variation": 0.07751937984496123,
+          "mean_runs_error": -0.016666666666666666,
+          "unseen_outcomes": 1
+        },
+        {
+          "cell": "2:1:ordinary_turn",
+          "fit_n": 8015,
+          "evaluation_n": 13358,
+          "total_variation": 0.010386396520149483,
+          "mean_runs_error": -0.00494333455658498,
+          "unseen_outcomes": 2
+        },
+        {
+          "cell": "2:2:ordinary_turn",
+          "fit_n": 3259,
+          "evaluation_n": 5544,
+          "total_variation": 0.016451057721386043,
+          "mean_runs_error": 0.011370056590983252,
+          "unseen_outcomes": 1
+        },
+        {
+          "cell": "2:3:ordinary_turn",
+          "fit_n": 3237,
+          "evaluation_n": 5641,
+          "total_variation": 0.01824646848066176,
+          "mean_runs_error": -0.013351648860178256,
+          "unseen_outcomes": 1
+        },
+        {
+          "cell": "2:4:ordinary_turn",
+          "fit_n": 1349,
+          "evaluation_n": 2255,
+          "total_variation": 0.03913550153764224,
+          "mean_runs_error": -0.0023941525216182313,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "2:5:ordinary_turn",
+          "fit_n": 1620,
+          "evaluation_n": 2888,
+          "total_variation": 0.04427772647994254,
+          "mean_runs_error": 5.98474744362143e-06,
+          "unseen_outcomes": 0
+        },
+        {
+          "cell": "2:6:ordinary_turn",
+          "fit_n": 798,
+          "evaluation_n": 1342,
+          "total_variation": 0.03445648398193697,
+          "mean_runs_error": 0.02090173272226764,
+          "unseen_outcomes": 4
+        },
+        {
+          "cell": "2:7:ordinary_turn",
+          "fit_n": 1140,
+          "evaluation_n": 2133,
+          "total_variation": 0.01945616502578526,
+          "mean_runs_error": 0.006016976336763236,
+          "unseen_outcomes": 1
+        }
+      ],
+      "interpretation": "Descriptive predictive check, not proof of causal transport or real-game validity."
+    },
+    "scope": "Frozen policies, whole independent season, unchanged legal actions and 24-state starts; not causal or historical strategy validation.",
+    "credit": "The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at 20 Sunset Rd., Newark, DE 19711. https://www.retrosheet.org/"
+  },
+  "interpretation": "Observed frequency only; no 50-percent role superiority test. Same-opponent before/after comparison retained.",
+  "screenshots": [
+    "docs/images/ux-home.png",
+    "docs/images/ux-field.png",
+    "docs/images/ux-strategy.png"
+  ],
+  "browser": "Chromium: actual stored data, slider/pair comparison, replay, source verification, mobile/keyboard, cancellation and duplicate tab; deletion only disposable mock root.",
+  "security_scan_before_commit": {
+    "tracked_files": 124,
+    "tracked_private_artifact_paths": [],
+    "historical_blobs_scanned": 225,
+    "recognized_key_pattern_hits": [],
+    "scope": "Known token/private-key patterns only, not proof of no secrets or personal information."
+  },
+  "credit": "The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at 20 Sunset Rd., Newark, DE 19711. https://www.retrosheet.org/",
+  "security_scan_staged_files_and_history": {
+    "tracked_files": 139,
+    "tracked_private_artifact_paths": [],
+    "historical_blobs_scanned": 225,
+    "recognized_key_pattern_hits": [],
+    "scope": "Known token/private-key patterns only; no proof of absence of all secrets or personal data."
+  },
+  "pytest_passed": 155,
+  "first_visitor_scope": "Automated product walkthrough; no independent human usability or screen-reader study",
+  "protection_limits": [
+    "No app encryption",
+    "Windows ACL and backup/sync protection unverified",
+    "Known-pattern scan only",
+    "No public multi-user deployment"
+  ]
+}
