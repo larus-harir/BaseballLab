@@ -41,3 +41,17 @@ The information used here was obtained free of charge from and is copyrighted by
 공식 `https://www.retrosheet.org/downloads/plays/2023plays.zip`의 SHA256 `0129befd7944f60a858e5fdc265a44ed20afaa568679b37fca1083e3c083b20e`를 개별 등록했습니다. 2,430경기·184,506개 턴을 정규화하고 2024년 고정 정책의 외부 시즌 평가를 실제 수행했습니다. 원본의 행정용 NP 567행과 이닝 종료 후 NP 1행은 실제 플레이가 아니므로 원천 ID·사유를 보존해 제외했습니다. 아웃/주자를 임의 보정하지 않았습니다. 기존 2024년 원천·저장 정책은 유지했습니다.
 
 배포별 메타데이터는 `data.retrosheet_releases`에 있고, 자동 해시 변경이나 미검토 연도 추측은 하지 않습니다. 다른 시즌 성능은 [실제 검증](match/validation.md)을 참고하세요. 같은 시즌을 외부 평가라고 부르거나, 미검증 KBO 기록을 섞지 않습니다.
+
+## 2026-11-09 통계 대결 카탈로그
+
+**BaseballLab:** 기존 공식 공급원에서 받은 `https://www.retrosheet.org/downloads/plays/2024plays.zip`을 재사용합니다. 실제 사용 URL·해시는 카탈로그 source와 [예측 검사 기록](results/mlb-matchup-predictive-validation.json)에 보존합니다. 이름은 공식 `https://www.retrosheet.org/events/2024eve.zip`의 `.ROS`에서 선수 ID로 연결합니다(고정 SHA-256 `5dfd9ed678c9c619f6a216322922c99234c067d0ec15b12790546f620ced2fa4`). 같은 시즌의 정규·완료 기록 중 `pa=1`만 사용하고 `(gid,pn)` 중복과 K/BB/HBP/단타/2루타/3루타/HR의 중복을 거부합니다. 나머지는 기타 타석 결과이며 모두 아웃으로 단정하지 않습니다. 실제 `ab/sf/sh`는 별도 집계합니다. 현재 182,449타석, 타자/투수 역할별 1,506 프로필입니다.
+
+프로필의 시즌 전체 탐색과 기간 분리 예측 검사는 구분합니다. 예측 검사의 분모·선수 기록은 최초 구간에서만 계산하고, 중단 경기는 실제 CSV `date`의 마지막 타석 날짜로 경기 전체를 배정합니다. 경기 ID 원래 날짜만 써서 미래 재개 타석을 과거에 섞지 않습니다. 구종·구속·코스·미관측 의도를 채워 넣지 않습니다.
+
+**EraMatch:** 제공된 `code.zip`의 SHA-256은 `57ab8411a07b901206b0af798d9f55a00cab79ea1d61adac492e86571b2a1058`입니다. 검토한 정확한 3개 멤버만 크기를 제한해 읽고, Python 원본은 앱에서 실행하지 않습니다. CP949 타자 9,731행·투수 7,727행에서 ID/시즌/역할로 17,116 프로필을 구성합니다. 중복 팀/합계/이름 모순 4그룹은 차단합니다. 서로 다른 팀 행 339그룹은 개선 후보에서 합산하는 가정을 명시하며, 원본 방식은 조건을 만족한 첫 행을 유지합니다.
+
+KBO 자료는 `LEGACY_UNVERIFIED`입니다. 원본 Kaggle URL·버전·재배포 권한을 독립 확인하지 못했습니다. HP→사구 후보 대응 및 BB/IB의 포함 관계도 미확인입니다. 일부 과거 투수의 피2루타/피3루타가 비어 있으므로 개선 후보를 막습니다. KBO 원본 ZIP/CSV/Python/PDF를 Git에 싣지 않으며, 새 PC에는 사용자가 보관한 원본 ZIP의 최초 연결이 필요합니다.
+
+두 프로그램은 `data/local/catalog/`를 공유하며, 각 실행에 자료 ID·원본 해시·모델·코드 지문·재현 번호·반복 횟수를 저장합니다. MLB 선수 카탈로그는 원본 배포 ZIP을 사본으로 보존하므로 기존 R1 캐시를 별도로 정리해도 카탈로그 원본 검사가 유지됩니다. 네트워크 재다운로드 공급원을 따로 만들지 않습니다.
+
+지표 정의/근거는 [SABR 다항 Log5](https://sabr.org/journal/article/matchup-probabilities-in-major-league-baseball/), [MLB BABIP](https://www.mlb.com/glossary/advanced-stats/babip), [MLB FIP](https://www.mlb.com/glossary/advanced-stats/fielding-independent-pitching)를 대조했습니다. FIP를 계산에 새로 넣거나 ‘운 제거·진짜 실력 추출’을 입증했다고 주장하지 않습니다. 다른 지표·리그·독립 시즌 검증은 후속 카탈로그 확장으로 남깁니다.

@@ -1,0 +1,667 @@
+{
+  "dataset_id": "26f82e19815ec38ed11e8dd2dec6158c240b8c8d5e2ac539c59248983c949394",
+  "source": {
+    "id": "mlb-2024",
+    "label": "Retrosheet · MLB 2024 정규시즌",
+    "status": "REAL_OBSERVED",
+    "league": "MLB",
+    "source_url": "https://www.retrosheet.org/downloads/plays/2024plays.zip",
+    "license": "The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at 20 Sunset Rd., Newark, DE 19711. https://www.retrosheet.org/",
+    "acquired_at": "2026-11-09T02:40:37.517619+00:00",
+    "files": [
+      {
+        "name": "2024plays.zip",
+        "sha256": "a3e8c08876ddf70e1ffb0b20486c2873cf4aae19e0acc8002096e9056107615b"
+      },
+      {
+        "name": "2024eve.zip",
+        "sha256": "5dfd9ed678c9c619f6a216322922c99234c067d0ec15b12790546f620ced2fa4"
+      }
+    ],
+    "original_dataset_id": "219501916a9edf5e32f3e875f50e3003bf27ee74b7a22853ca49e97fa712e8f3",
+    "name_source_url": "https://www.retrosheet.org/events/2024eve.zip"
+  },
+  "validation": {
+    "method": "Chronological held-out PA prediction; all profiles and priors use fit only; suspended games grouped by last actual PA date, never game-ID date.",
+    "split": {
+      "fit": {
+        "n": 108740,
+        "games": 1449,
+        "record_hash": "3e74747b88b8b96f905ed83e8fe5f68ef1260aee4d94d85cbe7f8fc152446cb7",
+        "dates": [
+          "20240320",
+          "20240714"
+        ]
+      },
+      "validation": {
+        "n": 37403,
+        "games": 496,
+        "record_hash": "1dc50162113a6ffcb5cf67cc340228ed5eac0b2d90317a6482a55e2338db7fd0",
+        "dates": [
+          "20240719",
+          "20240824"
+        ]
+      },
+      "test": {
+        "n": 36306,
+        "games": 484,
+        "record_hash": "7c4552c27aa959d2d92af39e4c2121c13ed526098bc1fe9b78fddf55f68e0a13",
+        "dates": [
+          "20240825",
+          "20240930"
+        ]
+      }
+    },
+    "suspended_game_handling": {
+      "policy": "entire game assigned by last actual observed PA date",
+      "cross_date_games": 2
+    },
+    "selected_strength": 300,
+    "validation_candidates": [
+      {
+        "strength": 25,
+        "n": 37403,
+        "log_loss": 1.4984885099644445,
+        "brier": 0.7041800427145014,
+        "hit_calibration": [
+          {
+            "n": 65,
+            "predicted_sum": 5.764301488065943,
+            "observed_sum": 8
+          },
+          {
+            "n": 12345,
+            "predicted_sum": 2138.4652216736163,
+            "observed_sum": 2565
+          },
+          {
+            "n": 23367,
+            "predicted_sum": 5547.008520013764,
+            "observed_sum": 5289
+          },
+          {
+            "n": 1604,
+            "predicted_sum": 517.1826591095679,
+            "observed_sum": 402
+          },
+          {
+            "n": 22,
+            "predicted_sum": 9.169905863346338,
+            "observed_sum": 4
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "cold_start_n": 3203
+      },
+      {
+        "strength": 100,
+        "n": 37403,
+        "log_loss": 1.4845004052489534,
+        "brier": 0.7022392944190826,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 10009,
+            "predicted_sum": 1825.0970162776005,
+            "observed_sum": 2040
+          },
+          {
+            "n": 26985,
+            "predicted_sum": 6270.620711602145,
+            "observed_sum": 6124
+          },
+          {
+            "n": 409,
+            "predicted_sum": 128.3752802423078,
+            "observed_sum": 104
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "cold_start_n": 3203
+      },
+      {
+        "strength": 300,
+        "n": 37403,
+        "log_loss": 1.4818062798176614,
+        "brier": 0.7026331171564925,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 5619,
+            "predicted_sum": 1071.3146385966518,
+            "observed_sum": 1112
+          },
+          {
+            "n": 31768,
+            "predicted_sum": 7140.76219661867,
+            "observed_sum": 7149
+          },
+          {
+            "n": 16,
+            "predicted_sum": 4.909479405880024,
+            "observed_sum": 7
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "cold_start_n": 3203
+      },
+      {
+        "strength": 1000,
+        "n": 37403,
+        "log_loss": 1.486530012689848,
+        "brier": 0.7048607185637281,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 491,
+            "predicted_sum": 96.48612366979948,
+            "observed_sum": 102
+          },
+          {
+            "n": 36912,
+            "predicted_sum": 8090.357031256078,
+            "observed_sum": 8166
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "cold_start_n": 3203
+      }
+    ],
+    "comparison": {
+      "league": {
+        "validation": {
+          "n": 37403,
+          "log_loss": 1.4956615003981126,
+          "brier": 0.7080945066518725,
+          "hit_calibration": [
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 37403,
+              "predicted_sum": 8146.176650721712,
+              "observed_sum": 8268
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            }
+          ],
+          "cold_start_n": 3203
+        },
+        "test": {
+          "n": 36306,
+          "log_loss": 1.4803972134257266,
+          "brier": 0.7062914273956759,
+          "hit_calibration": [
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 36306,
+              "predicted_sum": 7907.255821220524,
+              "observed_sum": 7872
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            }
+          ],
+          "cold_start_n": 6745
+        }
+      },
+      "batter": {
+        "validation": {
+          "n": 37403,
+          "log_loss": 1.4848233418809262,
+          "brier": 0.7040149280689337,
+          "hit_calibration": [
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 2158,
+              "predicted_sum": 422.919954536006,
+              "observed_sum": 401
+            },
+            {
+              "n": 35245,
+              "predicted_sum": 7822.821739530867,
+              "observed_sum": 7867
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            }
+          ],
+          "cold_start_n": 3203
+        },
+        "test": {
+          "n": 36306,
+          "log_loss": 1.4715837661661642,
+          "brier": 0.7028593303479083,
+          "hit_calibration": [
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 1874,
+              "predicted_sum": 367.2222292487766,
+              "observed_sum": 375
+            },
+            {
+              "n": 34432,
+              "predicted_sum": 7624.866723923199,
+              "observed_sum": 7497
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            }
+          ],
+          "cold_start_n": 6745
+        }
+      },
+      "log5": {
+        "validation": {
+          "n": 37403,
+          "log_loss": 1.4818062798176614,
+          "brier": 0.7026331171564925,
+          "hit_calibration": [
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 5619,
+              "predicted_sum": 1071.3146385966518,
+              "observed_sum": 1112
+            },
+            {
+              "n": 31768,
+              "predicted_sum": 7140.76219661867,
+              "observed_sum": 7149
+            },
+            {
+              "n": 16,
+              "predicted_sum": 4.909479405880024,
+              "observed_sum": 7
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            }
+          ],
+          "cold_start_n": 3203
+        },
+        "test": {
+          "n": 36306,
+          "log_loss": 1.4680192745215697,
+          "brier": 0.7014730364159936,
+          "hit_calibration": [
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 4859,
+              "predicted_sum": 927.9365875118506,
+              "observed_sum": 910
+            },
+            {
+              "n": 31444,
+              "predicted_sum": 7058.538546696515,
+              "observed_sum": 6961
+            },
+            {
+              "n": 3,
+              "predicted_sum": 0.9306019093283484,
+              "observed_sum": 1
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            },
+            {
+              "n": 0,
+              "predicted_sum": 0.0,
+              "observed_sum": 0
+            }
+          ],
+          "cold_start_n": 6745
+        }
+      }
+    },
+    "research_ready": true,
+    "scope": "Predictive check in MLB 2024 only. No causal matchup, KBO, cross-era or player ability guarantee. Full-season exploratory profiles are distinct from fit-only evaluation profiles."
+  },
+  "profile_count": 1506,
+  "full_season_pa": 182449,
+  "code_sha256": {
+    "web.py": "68548be0f2e45734115aae62f19b6c441a7e15781c3684cabc9893437d1a2a7b",
+    "__init__.py": "b78b8c0f6153b0f45dd1d0c9b18eb43223cd01b13472119268579a9a59637974",
+    "service.py": "b95112f3b68db8bcbbe7852f1ba7c08707d9fcbf0e151ebac64833c2cbfbbbe3",
+    "catalog.py": "1105181b1def88ce03a92fcb248bb646e7cca32a76abd35e54e47c0f6e6e19cb",
+    "models.py": "885eb6d2b3cbc76519402dec4db7c7ff5dbfc6f3b13ba5ced73865fed6db79bf",
+    "mlb.py": "44aa0a0b71ff875f7a6c88eccaea8bb0511b798b4c4a598b026b0d1ccd6ca6a1"
+  }
+}

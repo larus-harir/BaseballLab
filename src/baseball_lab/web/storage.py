@@ -43,6 +43,9 @@ class Storage:
             if p.exists():targets[f'source:{year}']=(p,f'{year}년 MLB 경기 기록','official')
         p=self.root/'data/local/statcast'
         if p.exists():targets['private:statcast']=(p,'사용자가 연결한 투구 자료','private')
+        for source,label,category in (('mlb-2024','BaseballLab · MLB 2024 선수 기록','official'),('kbo-assignment','EraMatch · 사용자 과제 원본과 선수 기록','private')):
+            p=self.root/'data/local/catalog'/source
+            if p.exists():targets['catalog:'+source]=(p,label,category)
         output=self.root/'outputs/workbench'
         try:self._safe(output);safe_output=True
         except ValueError:safe_output=False
@@ -63,6 +66,7 @@ class Storage:
     def inventory(self):
         targets=self._targets();items=[]
         run_sources={}
+        catalog_runs={}
         for identifier,(p,_,_) in targets.items():
             if not identifier.startswith('run:') or p.is_symlink():continue
             try:
@@ -71,6 +75,7 @@ class Storage:
                 if task.is_file() and not task.is_symlink():
                     metadata=json.loads(task.read_text(encoding='utf-8'))
                     if metadata.get('source_year'):run_sources[identifier]={str(metadata['source_year'])}
+                    if metadata.get('catalog_source'):catalog_runs[identifier]=metadata['catalog_source']
                 if r.is_file() and not r.is_symlink():
                     data=json.loads(r.read_text(encoding='utf-8'));run_sources[identifier]={d[:4] for d in data.get('model',{}).get('selected_dates',[])}
                     run_sources[identifier].update(f.stem.split('-')[-1] for f in (p/'result').glob('external-*.json'))
@@ -79,11 +84,15 @@ class Storage:
             try:
                 self._safe(p);stats=scan(p)
                 dependencies=[key for key,years in run_sources.items() if identifier.startswith('source:') and identifier.split(':')[1] in years]
+                dependencies.extend(key for key,source in catalog_runs.items() if identifier=='catalog:'+source)
+                # KBO assignment ZIP/CSV are private user materials, never "official".
+                if identifier=='catalog:kbo-assignment':
+                    stats['categories']['private']+=stats['categories']['official'];stats['categories']['official']=0
                 items.append({'id':identifier,'label':label,'category':category,'location':str(p.relative_to(self.root)),
                               **{k:stats[k] for k in ('bytes','file_count','changed_at','categories')},
                               'dependent_runs':len(dependencies),'verified':self.verifications.get(identifier,{}).get('message','해시 검사 전입니다') if self.verifications.get(identifier,{}).get('fingerprint')==stats['fingerprint'] else '해시 재검사 전입니다',
                               'deletable':not stats['links'],'link_warning':bool(stats['links']),
-                              'use':'아웃·주자·득점 상황' if category=='official' else '별도 투구 연구' if category=='private' else '학습·관찰의 실행 기록'})
+                              'use':'선수별 사건 비율·확률 대결' if identifier.startswith('catalog:') else '아웃·주자·득점 상황' if category=='official' else '별도 투구 연구' if category=='private' else '학습·관찰의 실행 기록'})
             except (OSError,ValueError):
                 items.append({'id':identifier,'label':label,'category':category,'bytes':None,'deletable':False,'link_warning':True})
         for location,label in (('data/local/retrosheet','이전 조사 자료·도구'),('outputs/E01','명령줄에서 만든 연구 결과')):
@@ -115,9 +124,16 @@ class Storage:
 
     def verify(self,identifier):
         target=self._targets().get(identifier)
-        if not target or not identifier.startswith('source:'):raise ValueError('공식 경기 기록을 선택하세요.')
+        if not target or not identifier.startswith(('source:','catalog:')):raise ValueError('등록된 원본 기록을 선택하세요.')
         path=self._safe(target[0])
         if scan(path)['links']:raise ValueError('링크가 포함된 자료는 검사하지 않습니다.')
+        if identifier.startswith('catalog:'):
+            from baseball_lab.matchup.catalog import read_catalog
+            catalog=read_catalog(self.root,identifier.split(':',1)[1])
+            message='선수 자료·원본 파일 해시 일치. 자료의 공인 정확도·인과 타당성·재배포 권한의 인증은 아닙니다.'
+            if not catalog:raise ValueError('선수 카탈로그가 없습니다.')
+            self.verifications[identifier]={'fingerprint':scan(path)['fingerprint'],'message':message}
+            return {'id':identifier,'verified':True,'message':message}
         from baseball_lab.r1.data import load
         from baseball_lab.data.lineage import checksum
         year=int(identifier.split(':')[1])

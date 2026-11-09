@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import urlparse,parse_qs
 
 from baseball_lab.data.lineage import write_json, utc_now
 from baseball_lab.data.protection import private,public_text,public_view
@@ -64,14 +64,17 @@ class Workbench:
                            'reason':'2024년 공식 배포 자료를 자동 준비하고 재사용합니다. 최초 실행에는 인터넷이 필요합니다. 전체 경기 승리 학습은 아닙니다.'}
         return result
 
-    def state(self):
+    def state(self,project=None):
+        if project not in (None,'match','baseball','eramatch'):raise ValueError('프로젝트를 확인하세요.')
         with self.lock:
             current=dict(self.job) if self.job else None
             if current:current['logs']=list(current['logs'])
         runs=[]
-        for p in sorted(self.outputs.glob('*/task.json'),reverse=True)[:30]:
+        for p in sorted(self.outputs.glob('*/task.json'),reverse=True):
             try:
                 run=json.loads(p.read_text(encoding='utf-8'))
+                if project=='match' and run.get('kind')=='matchup':continue
+                if project in ('baseball','eramatch') and (run.get('kind')!='matchup' or run.get('project')!=project):continue
                 if run['status'] in ('queued','running') and (not current or run['id']!=current['id']):
                     run['status']='interrupted'
                 run.pop('logs',None);runs.append(run)
@@ -82,12 +85,48 @@ class Workbench:
                         from baseball_lab.experiments.match.reporting.summary import build_summary
                         reading=build_summary(data)
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
+                if len(runs)>=30:break
             except (OSError,ValueError,KeyError):continue
         return public_view({'readiness':self.readiness(),'job':current,'runs':runs})
 
     def _idle(self):
         if self.job and self.job['status'] in ('queued','running','cancelling'):
             raise ValueError('이미 작업 중입니다. 끝날 때까지 기다리거나 중지해 주세요.')
+
+    def matchup_prepare(self, archive=None):
+        with self.lock:
+            self._idle()
+            if archive is None:
+                from baseball_lab.matchup.mlb import prepare
+                result=prepare(self.root)
+            else:
+                from baseball_lab.matchup.catalog import import_assignment
+                result=import_assignment(self.root,archive)
+            return {'ready':True,'dataset_id':result['dataset_id'],'message':'선수 기록을 준비했습니다.'}
+
+    def matchup_analyze(self,project,options):
+        with self.lock:
+            self._idle()
+            from baseball_lab.matchup.service import analyze
+            from baseball_lab.matchup.web import render
+            from baseball_lab.data.lineage import checksum,content_hash
+            analysis=analyze(self.root,project,options)
+            sources=Path(__file__).parents[1]/'matchup'
+            versions={p.name:checksum(p) for p in sorted(sources.glob('*.py'))}
+            versions.update({'matchup.html':checksum(Path(__file__).with_name('matchup.html')),
+                             'server.py':checksum(Path(__file__))})
+            analysis['execution']={'engine_files':versions,'engine_id':content_hash(versions),'python':sys.version.split()[0]}
+            job_id=time.strftime('%Y%m%d_%H%M%S')+'_'+secrets.token_hex(4)
+            directory=self.outputs/job_id;private(directory,directory=True)
+            result=directory/'result';private(result,directory=True)
+            report=f'/reports/{job_id}/result/report.html'
+            write_json(result/'analysis.json',analysis)
+            from baseball_lab.data.protection import open_private
+            with open_private(result/'report.html') as file:file.write(render(project,analysis=analysis).encode('utf-8'))
+            write_json(directory/'task.json',{'id':job_id,'kind':'matchup','project':project,'status':'completed',
+                'started_at':analysis['created_at'],'completed_at':utc_now(),'report':report,'training_executed':False,
+                'catalog_source':analysis['source']['id'],'message':f"{analysis['batter']['name']} ({analysis['batter']['season']}) vs {analysis['pitcher']['name']} ({analysis['pitcher']['season']}) · {analysis['simulation']['n']}타석"})
+            return public_view({'analysis':analysis,'report':report})
 
     def upload(self, filename, content, source_url, acquired_at, usage_note):
         with self.lock:
@@ -264,16 +303,35 @@ def make_handler(workbench):
             path=urlparse(self.path).path
             pages={'/':'portal.html','/lab':'portal.html','/match':'match.html','/match/team':'workbench.html',
                    '/match/at-bat':'workbench.html','/simulation':'simulation.html','/lab/data':'data.html'}
-            if path in pages:
+            if path in ('/baseball','/eramatch'):
+                from baseball_lab.matchup.web import render
+                self._html(render('eramatch' if path=='/eramatch' else 'baseball',workbench.token))
+            elif path in pages:
                 body=Path(__file__).with_name(pages[path]).read_text(encoding='utf-8').replace('__SESSION_TOKEN__',workbench.token)
                 self._html(body)
-            elif path=='/api/state':self._json(workbench.state())
+            elif path=='/api/state':
+                try:self._json(workbench.state(parse_qs(urlparse(self.path).query).get('project',[None])[0]))
+                except ValueError as exc:self._json({'error':str(exc)},400)
             elif path=='/api/storage':self._json(workbench.storage.inventory())
+            elif path=='/api/matchup/catalog':
+                try:
+                    from baseball_lab.matchup.service import overview
+                    query=parse_qs(urlparse(self.path).query)
+                    result=overview(workbench.root,query.get('project',['baseball'])[0],
+                        role=query.get('role',[None])[0],query=query.get('query',[''])[0],season=query.get('season',[None])[0])
+                    self._json(public_view(result))
+                except (ValueError,KeyError,TypeError,OSError) as exc:self._json({'error':public_text(exc)},400)
             elif path.startswith('/reports/'):
                 from urllib.parse import unquote
                 resolved=(workbench.outputs/unquote(path[len('/reports/'):])).resolve()
                 if not resolved.is_relative_to(workbench.outputs.resolve()) or resolved.name not in ('report.html','summary.md','output.log'):
                     return self._json({'error':'허용하지 않는 경로'},403)
+                if resolved.name=='report.html' and (resolved.parent/'analysis.json').is_file():
+                    try:
+                        from baseball_lab.matchup.web import render
+                        data=json.loads((resolved.parent/'analysis.json').read_text(encoding='utf-8'))
+                        return self._html(render(data['project'],analysis=data))
+                    except (OSError,ValueError,KeyError,TypeError) as exc:return self._json({'error':public_text(exc)},409)
                 if resolved.name=='report.html' and (resolved.parent/'research.json').is_file():
                     try:
                         evidence=json.loads((resolved.parent/'research.json').read_text(encoding='utf-8'))
@@ -306,7 +364,13 @@ def make_handler(workbench):
                 body=self.rfile.read(length)
                 if len(body)!=length:raise ValueError('전송이 끝나지 않았어요.')
                 path=urlparse(self.path).path
-                if path=='/api/upload':
+                if path=='/api/matchup/prepare':result=workbench.matchup_prepare()
+                elif path=='/api/matchup/import':result=workbench.matchup_prepare(body)
+                elif path=='/api/matchup/analyze':
+                    payload=json.loads(body)
+                    if not isinstance(payload,dict):raise ValueError('대결 설정이 필요합니다.')
+                    result=workbench.matchup_analyze(payload.get('project'),payload.get('options'))
+                elif path=='/api/upload':
                     from urllib.parse import unquote
                     result=workbench.upload(unquote(self.headers.get('X-Filename','export.csv')),body,
                         unquote(self.headers.get('X-Source-URL','')),unquote(self.headers.get('X-Acquired-At','')),
@@ -336,7 +400,7 @@ def serve(root,port=8765,open_browser=False):
     server.daemon_threads=True
     address=f'http://127.0.0.1:{server.server_port}'
     print('야구 AI 연구실을 열었습니다: '+address,flush=True)
-    print('브라우저에서 자료 준비 → 모델 검사 → 학습 → 결과 보기를 진행하세요. 종료: Ctrl+C',flush=True)
+    print('BaseballLab 통계 대결 · Match AI 학습 · EraMatch 시대 대결을 선택하세요. 종료: Ctrl+C',flush=True)
     if open_browser:
         import webbrowser
         threading.Timer(.3,lambda:webbrowser.open(address)).start()

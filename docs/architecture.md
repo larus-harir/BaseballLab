@@ -4,11 +4,13 @@
 
 ---
 
-# 현재 부모와 Match 경계
+# 현재 세 프로그램과 공유 엔진
 
-부모 `/`·`/simulation`·`/lab/data`와 자식 `/match`·`/match/team`·`/match/at-bat`를 한 서버에서 제공합니다. 공통 신경망과 전이 어댑터는 재사용하며 Match 학습/보고는 `experiments/match/`가 소유합니다. `r1.training/report`는 기존 호출을 보존하는 호환 경로입니다.
+`/baseball`은 통계 선수 대결, `/eramatch`는 KBO 과제 웹화, `/match`는 AI 경쟁 학습·인간 비교다. 홈 `/`에서 각각 진입하며 자료 관리는 `/lab/data`를 공유한다. 기존 R1 관찰 `/simulation`, 학습 `/match/team`, 투구 준비 `/match/at-bat` 경로를 보존했다.
 
-[책임·실제 구현 범위](platform/README.md) · [Match 해석과 호환](match/README.md) · [실행 검증](match/validation.md)
+`matchup.catalog/mlb` → 고유 ID·시즌 선수 프로필 → `matchup.models`의 원본 재현/다항 Log5 → `matchup.service` 반복 타석 → 공유 `web/matchup.html`의 왼쪽 실행/오른쪽 맥락 설명과 저장 결과로 연결한다. 과제 전용 계산을 EraMatch 아래 복제하지 않는다. 원본 SHA·자료 ID·코드 지문·모델·재현 번호·반복을 실행별로 남긴다.
+
+Match 학습/보고는 `experiments/match/`가 소유한다. 공통 신경망과 기존 경험 전이를 재사용하며 새 통계 모델의 예측 검사를 행동 변경의 인과 효과로 간주해 자동 연결하지 않는다. `r1.training/report`는 호환 경로다. [책임 표](platform/README.md) · [이번 검증](three-project-validation.md).
 
 이하 이전 구현 설명을 보존합니다. 과거의 `r1.training` 구현 본문은 현재 Match 모듈로 이관됐습니다.
 
