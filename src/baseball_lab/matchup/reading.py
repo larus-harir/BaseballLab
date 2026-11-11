@@ -4,6 +4,12 @@ from .models import EVENTS,LABELS
 
 
 def interpret(result):
+    if result['model']['model']=='common':
+        q=result['model']['probabilities'];s=result['simulation']
+        return {'headline':'리그 평균 대비 공통 기록 비교 · 절대 실력 검증 전',
+            'rows':[{'key':k,'label':result['labels'][k],'count':s['counts'][k],'expected':s['expected'][k],'probability':q[k]} for k in q],
+            'notes':[result['scope']],'hits':s['counts']['hit'],'extra_base_hits':None,
+            'events':s['events'],'labels':result['labels'],'denominator':s['n']}
     simulation=result['simulation'];q=result['model']['probabilities'];n=simulation['n'];counts=simulation['counts']
     detail=result.get('event_display',{});display=detail.get('events',simulation['events']);labels={**LABELS,**detail.get('labels',{})}
     labels['other']='기타 결과 (세부 기록 없음)'

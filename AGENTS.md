@@ -44,10 +44,10 @@ User instructions take precedence over this file and archived plans.
   model selection and data inspection settings under optional advanced details.
 - Reuse `matchup`, the existing providers, catalog paths, Match training and
   reports. Do not create a second app or duplicate probability implementations.
-- Main owns integration and final review. Use the separately requested designer
-  and QA agents with assigned files; a data agent may collect/audit trustworthy
-  sources when requested. This supersedes the archived designer-only rule.
-  Avoid repeated repository-wide analysis or unrequested parallel agents.
+- Main implements and reviews work directly. The latest user instruction pauses
+  designer/QA delegation; do not resume those agents automatically. Use a data
+  agent only when collection work requires it. Keep design unchanged unless the
+  user requests design changes. Avoid repeated repository-wide analysis.
 - Read related files and the current directive rather than repeating whole-repo
   research or old plans. Reuse working code. Do not add unsolicited features,
   plans, documents, screenshots or repeated searches.

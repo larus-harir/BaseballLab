@@ -75,6 +75,10 @@ def _select_model(catalog,b,p,requested):
 def analyze(root,project,options):
     _project(project)
     if not isinstance(options,dict):raise ValueError('대결 설정이 필요합니다.')
+    if options.get('data_mode')=='common':
+        if project!='eramatch':raise ValueError('리그 공통 비교는 EraMatch에서 실행하세요.')
+        from .shared import analyze as common_analyze
+        return common_analyze(root,options)
     if not isinstance(options.get('batter'),str) or not isinstance(options.get('pitcher'),str):
         raise ValueError('타자와 투수를 모두 선택하세요.')
     year=_options_year(project,options)

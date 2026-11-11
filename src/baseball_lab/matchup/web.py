@@ -6,6 +6,8 @@ from baseball_lab.data.protection import public_view
 
 def render(project,token='',analysis=None):
     if project not in ('baseball','eramatch'):raise ValueError('알 수 없는 프로젝트')
+    if analysis and analysis.get('model',{}).get('model')=='common':
+        return render_common(token,analysis)
     body=Path(__file__).parents[1].joinpath('web/matchup.html').read_text(encoding='utf-8')
     body=body.replace('__PRINCIPLES_SCRIPT__',Path(__file__).parents[1].joinpath('web/principles.js').read_text(encoding='utf-8'))
     body=body.replace('__OBSERVATIONS_SCRIPT__',Path(__file__).parents[1].joinpath('web/observations.js').read_text(encoding='utf-8'))
@@ -18,3 +20,10 @@ def render(project,token='',analysis=None):
         display['model_status']='PERIOD_CHECK_SUPERSEDED'
     initial=json.dumps(display,ensure_ascii=False,allow_nan=False).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
     return body.replace('__PROJECT__',project).replace('__SESSION_TOKEN__',token).replace('__ANALYSIS__',initial)
+
+
+def render_common(token='',analysis=None):
+    directory=Path(__file__).parents[1]/'web'
+    css=(directory/'matchup.html').read_text().split('<style>',1)[1].split('</style>',1)[0]
+    initial=json.dumps(public_view(analysis),ensure_ascii=False,allow_nan=False).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
+    return (directory/'common.html').read_text().replace('__STYLE__',css).replace('__SESSION_TOKEN__',token).replace('__ANALYSIS__',initial)

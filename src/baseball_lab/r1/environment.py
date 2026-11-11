@@ -149,7 +149,9 @@ def diagnostic(train, rows):
 
 def fit(dataset, start, end):
     first, last = date.fromisoformat(start), date.fromisoformat(end)
-    if first.year not in RELEASES or last.year != first.year or first > last:
+    collected=dataset['manifest'].get('schema')=='collected-training-window-v1'
+    supported=all(y in dataset['manifest'].get('selected_seasons',[]) for y in range(first.year,last.year+1)) if collected else first.year in RELEASES and last.year==first.year
+    if not supported or first > last:
         raise ValueError('개별 검증한 2023·2024년 중 한 시즌의 날짜 범위를 선택하세요.')
     rows = [r for r in dataset['records'] if start <= r['date'] <= end]
     dates = sorted({r['date'] for r in rows})
@@ -175,7 +177,8 @@ def fit(dataset, start, end):
     if any(game_sets[i] & game_sets[j] for i in range(3) for j in range(i+1, 3)):
         raise ValueError('Game leakage between partitions')
     return envs, {'dataset_id': dataset['manifest']['dataset_id'], 'selected_dates': [start, end],
-                  'date_semantics': 'Retrosheet game ID scheduled date; resumed games remain grouped with original game.',
+                  'date_semantics': dataset['manifest'].get('date_semantics','Retrosheet game ID scheduled date; resumed games remain grouped with original game.'),
+                  'source_window':{k:dataset['manifest'][k] for k in ('selected_seasons','source_dataset_ids','source_sha256','mixture_policy') if k in dataset['manifest']},
                   'split': {name: {'dates': [min(r['date'] for r in records), max(r['date'] for r in records)],
                                    'n': len(records), 'games': len({r['game_id'] for r in records}),
                                    'record_ids_hash': content_hash([r['record_id'] for r in records])} for name, records in parts.items()},

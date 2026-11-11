@@ -71,6 +71,8 @@ class Workbench:
                            'cached_seasons':{str(k):(self.root/f'data/local/retrosheet/official-{k}/dataset.json').is_file() for k in PERIODS},'available':True,'cached':(self.root/'data/local/retrosheet/official-2024/dataset.json').exists(),
                            'title':'실제 Retrosheet 기록으로 득점 상황 학습',
                            'reason':'선택한 시즌의 공식 배포 자료를 자동 준비하고 재사용합니다. 처음 받을 때만 인터넷이 필요합니다.'}
+        from baseball_lab.data.training_window import periods
+        result['scoring']['collected_periods']=periods(self.root)
         return result
 
     def state(self,project=None):
@@ -181,6 +183,7 @@ class Workbench:
             sources=Path(__file__).parents[1]/'matchup'
             versions={p.name:checksum(p) for p in sorted(sources.glob('*.py'))}
             versions.update({'matchup.html':checksum(Path(__file__).with_name('matchup.html')),
+                             'common.html':checksum(Path(__file__).with_name('common.html')),
                              'principles.js':checksum(Path(__file__).with_name('principles.js')),
                              'observations.js':checksum(Path(__file__).with_name('observations.js')),
                              'server.py':checksum(Path(__file__)),
@@ -232,7 +235,13 @@ class Workbench:
                 if source=='retrosheet':
                     from baseball_lab.data.retrosheet_releases import validate_period
                     minimum=1 if kind=='simulate' and options.get('observation_source')=='observed' else 3
-                    start,end=validate_period(options.get('start'),options.get('end'),min_days=minimum)
+                    collected=options.get('collected_window',False)
+                    if type(collected) is not bool:raise ValueError('수집 기간 선택을 확인하세요.')
+                    if collected:
+                        if kind=='simulate':raise ValueError('수집 기간은 AI 전략 학습에서 선택하세요.')
+                        from baseball_lab.data.training_window import validate_window
+                        start,end=validate_window(self.root,options.get('start'),options.get('end'))
+                    else:start,end=validate_period(options.get('start'),options.get('end'),min_days=minimum)
                 else:
                     from baseball_lab.research.pipeline import Plan
                     plan=Plan(str(options.get('start','')),str(options.get('end','')))
@@ -241,6 +250,7 @@ class Workbench:
                 if type(episodes) is not int or not 20<=episodes<=100000:raise ValueError('학습 타석 수는 20~100,000 사이의 정수입니다.')
                 if type(seed) is not int or not 0<=seed<=2**31-1:raise ValueError('재현 번호 범위를 확인하세요.')
                 extra=['--mode','scoring' if source=='retrosheet' else 'run','--start',start,'--end',end,'--episodes',str(episodes),'--seed',str(seed)]
+                if source=='retrosheet' and collected:extra.append('--collected-window')
                 if source=='retrosheet' and study=='half_inning':extra[1]='inning'
                 if source=='retrosheet' and kind=='run':
                     if seed>2**31-3:raise ValueError('여러 재현 번호를 만들기 위해 seed는 2,147,483,645 이하여야 합니다.')
@@ -388,6 +398,9 @@ def make_handler(workbench):
                    '/match/at-bat':'workbench.html','/simulation':'simulation.html','/lab/data':'data.html'}
             if path in ('/baseball','/eramatch'):
                 from baseball_lab.matchup.web import render
+                if path=='/eramatch' and parse_qs(urlparse(self.path).query).get('mode')==['common']:
+                    from baseball_lab.matchup.web import render_common
+                    self._html(render_common(workbench.token));return
                 league=parse_qs(urlparse(self.path).query).get('league',['KBO'])[0]
                 self._html(render('baseball' if path=='/baseball' or league=='MLB' else 'eramatch',workbench.token))
             elif path in pages:
@@ -416,6 +429,12 @@ def make_handler(workbench):
                     self._json(public_view(result))
                 except (ValueError,KeyError,TypeError,OSError,csv.Error) as exc:
                     self._json({'error':public_text(exc)},400)
+            elif path=='/api/shared/catalog':
+                try:
+                    from baseball_lab.matchup.shared import overview
+                    query=parse_qs(urlparse(self.path).query)
+                    self._json(public_view(overview(workbench.root,**{k:query.get(k,[None])[0] for k in ('role','league','season')},query=query.get('query',[''])[0])))
+                except (ValueError,KeyError,TypeError,OSError) as exc:self._json({'error':public_text(exc)},400)
             elif path=='/api/matchup/catalog':
                 try:
                     from baseball_lab.matchup.service import overview

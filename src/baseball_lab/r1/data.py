@@ -66,7 +66,7 @@ def walk(bases):
     return int(True)+2*int(first or second)+4*int(third or(first and second)),int(first and second and third)
 
 
-def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty_no_play=False):
+def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty_no_play=False,persist=True):
     csv_path=Path(csv_path);output=Path(output)
     records=[];pending=[];last_half=None;seen=set();errors=Counter();total=0;sequence_bad=0
     previous=None;score_mismatches=0;official_stats=Counter();source_exclusions=[]
@@ -130,7 +130,7 @@ def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty
               'records_checksum':content_hash(records)}
     manifest['source_status']='MOCK_TEST_ONLY' if test_only else 'REAL_OBSERVED'
     manifest['dataset_id']=content_hash({k:manifest[k] for k in ('schema','records_checksum','parsed_csv_sha256')})
-    write_json(output/'dataset.json',{'manifest':manifest,'records':records})
+    if persist:write_json(output/'dataset.json',{'manifest':manifest,'records':records})
     return {'manifest':manifest,'records':records}
 
 

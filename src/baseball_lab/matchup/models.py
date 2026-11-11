@@ -102,6 +102,7 @@ def simulate(model,n=25,seed=41,repetitions=200):
     if type(n) is not int or not 1<=n<=10000 or type(repetitions) is not int or not 1<=repetitions<=200 or n*repetitions>2000000:raise ValueError('대결은 1~10,000타석, 반복은 1~200회입니다.')
     if type(seed) is not int or not 0<=seed<=2**31-1:raise ValueError('재현 번호를 확인하세요.')
     q=model['probabilities'];validate_probability_distribution(q)
+    keys=tuple(q)
     def draw(rng):
         u=rng.random()
         if model['model']=='legacy':
@@ -113,20 +114,20 @@ def simulate(model,n=25,seed=41,repetitions=200):
                 h=rng.random();return 'single' if h<x['single'] else 'double' if h<x['single']+x['double'] else 'triple'
             return 'other'
         cumulative=0.
-        for event in EVENTS:
+        for event in keys:
             cumulative+=q[event]
             if u<cumulative:return event
-        return EVENTS[-1]  # Floating rounding only, not discarded event mass.
-    rng=Random(seed);events=[draw(rng) for _ in range(n)];counts={e:events.count(e) for e in EVENTS}
+        return keys[-1]  # Floating rounding only, not discarded event mass.
+    rng=Random(seed);events=[draw(rng) for _ in range(n)];counts={e:events.count(e) for e in keys}
     experiments=[]
     for repeat in range(repetitions):
-        r=Random(seed+100000+repeat);c={e:0 for e in EVENTS}
+        r=Random(seed+100000+repeat);c={e:0 for e in keys}
         for _ in range(n):c[draw(r)]+=1
         experiments.append(c)
     bands={}
-    for e in EVENTS:
+    for e in keys:
         values=sorted(c[e] for c in experiments)
         bands[e]={'mean':sum(values)/len(values),'range_95':[values[int((len(values)-1)*.025)],values[int((len(values)-1)*.975)]]}
     return {'n':n,'seed':seed,'repetitions':repetitions,'events':events,'counts':counts,
-            'expected':{e:n*q[e] for e in EVENTS},'sampling_bands':bands,
+            'expected':{e:n*q[e] for e in keys},'sampling_bands':bands,
             'uncertainty':'반복 범위는 계산된 확률을 고정한 난수 변동만 보여줍니다. 자료·모델 불확실성은 포함하지 않습니다.'}

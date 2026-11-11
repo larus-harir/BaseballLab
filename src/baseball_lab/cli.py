@@ -18,6 +18,7 @@ def main():
     parser.add_argument('--data-dir',type=Path,default=REPOSITORY_ROOT/'data/local/statcast')
     parser.add_argument('--model',type=Path,help='실제 데이터로 보정·독립 검증한 model.json')
     parser.add_argument('--start');parser.add_argument('--end')
+    parser.add_argument('--collected-window',action='store_true',help='확보한 여러 시즌의 실제 플레이로 학습')
     parser.add_argument('--train-before',default='2024-05-04');parser.add_argument('--test-from',default='2024-05-05')
     parser.add_argument('--usage-note',default='Local exploratory research; terms not independently verified by software; no redistribution grant')
     parser.add_argument('--csv',type=Path,action='append',help='사용자가 공식 사이트에서 내보낸 원본 CSV')
@@ -56,7 +57,11 @@ def main():
         if args.mode in ('scoring','inning','simulate'):
             from baseball_lab.data.retrosheet_releases import validate_period
             minimum=1 if args.mode=='simulate' and args.observation_source=='observed' else 3
-            args.start,args.end=validate_period(args.start,args.end,min_days=minimum)
+            if args.collected_window:
+                if args.mode=='simulate':raise ValueError('수집 기간 연결은 득점 전략 학습에 사용합니다.')
+                from baseball_lab.data.training_window import validate_window
+                args.start,args.end=validate_window(REPOSITORY_ROOT,args.start,args.end)
+            else:args.start,args.end=validate_period(args.start,args.end,min_days=minimum)
         from baseball_lab.data.statcast import acquire,audit,manual_source,load_dataset
         from baseball_lab.outcome.empirical import fit,load_model
         from baseball_lab.tracking.evidence_report import write_report
@@ -72,17 +77,25 @@ def main():
             seeds=tuple(int(s.strip()) for s in args.seeds.split(',')) if args.seeds else (args.seed,args.seed+1,args.seed+2)
             config=Config(args.episodes,seeds,args.evaluate_every,args.evaluation_n)
             config.validate()
-            dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
+            if args.collected_window:
+                from baseball_lab.data.training_window import acquire as acquire_window
+                dataset=acquire_window(REPOSITORY_ROOT,args.start,args.end)
+            else:dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
             print('단계 2 · 경기와 날짜를 나눠 실제 전이 분포를 검사합니다.',flush=True)
             if args.mode=='inning':
                 from baseball_lab.experiments.match.team_win.half_inning import train,completion_aligned
                 from baseball_lab.matchup.outcome_details import index
-                details=index(REPOSITORY_ROOT,datetime.fromisoformat(args.start).year)
-                dataset=completion_aligned(dataset,details['game_completion_dates'])
-                codes=details['pitch_codes'];evidence={'source_sha256':details['source_sha256'],
-                    'completed_pa_n':details['pa_n'],'pitchout':codes.get('P',0),
-                    'swing_on_pitchout':sum(codes.get(k,0) for k in 'QRY')}
-                evidence['reason']=f"실제 {details['pa_n']:,}타석에서 피치아웃 P {evidence['pitchout']}개, 이에 대한 스윙·접촉 Q/R/Y {evidence['swing_on_pitchout']}개입니다. 현재 원천에는 구종·구속·위치가 없고, 피치아웃에 스윙했을 때의 결과 표본도 부족합니다. 던지지 않은 공의 결과를 만들어내지 않고, 실제로 확인 가능한 아웃·주자 전이와 번트·고의볼넷 선택으로 총득점을 학습합니다."
+                if args.collected_window:
+                    evidence={'source_sha256':dataset['manifest']['source_sha256'],
+                        'reason':'수집한 실제 경기의 완결된 1~8회 주자·아웃 전이를 사용합니다. 구종·구속·위치·피치아웃 빈도는 이 연결에서 추정하지 않습니다.',
+                        'selected_seasons':dataset['manifest']['selected_seasons'],'mixture_policy':dataset['manifest']['mixture_policy']}
+                else:
+                    details=index(REPOSITORY_ROOT,datetime.fromisoformat(args.start).year)
+                    dataset=completion_aligned(dataset,details['game_completion_dates'])
+                    codes=details['pitch_codes'];evidence={'source_sha256':details['source_sha256'],
+                        'completed_pa_n':details['pa_n'],'pitchout':codes.get('P',0),
+                        'swing_on_pitchout':sum(codes.get(k,0) for k in 'QRY')}
+                    evidence['reason']=f"실제 {details['pa_n']:,}타석에서 피치아웃 P {evidence['pitchout']}개, 이에 대한 스윙·접촉 Q/R/Y {evidence['swing_on_pitchout']}개입니다. 현재 원천에는 구종·구속·위치가 없고, 피치아웃에 스윙했을 때의 결과 표본도 부족합니다. 던지지 않은 공의 결과를 만들어내지 않고, 실제로 확인 가능한 아웃·주자 전이와 번트·고의볼넷 선택으로 총득점을 학습합니다."
                 print('단계 3 · 세 아웃까지 총득점 최대화·실점 최소화를 학습합니다.',flush=True)
                 train(dataset,args.start,args.end,output,config,evidence=evidence)
             else:
