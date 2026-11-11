@@ -27,6 +27,8 @@ User instructions take precedence over this file and archived plans.
 - Do not move storage directories just to match a new architecture.
 - Never invent player profiles, seasons, missing event counts or research wins.
   Test fixtures must say MOCK_TEST_ONLY and never enter the production catalog.
+- Keep slow source/model I/O outside the shared state lock; reserve conflicting
+  writes explicitly. Reject unsupported training dates before acquisition/jobs.
 - Keep actual observations, fitted probabilities, virtual events, assumptions
   and validation conclusions distinct. Independent PA simulation is not 9 innings.
 - A predictive test is not proof of causal strategy effects, scientific validity
@@ -42,9 +44,10 @@ User instructions take precedence over this file and archived plans.
   model selection and data inspection settings under optional advanced details.
 - Reuse `matchup`, the existing providers, catalog paths, Match training and
   reports. Do not create a second app or duplicate probability implementations.
-- Use exactly the main developer/integrator/QA and one designer agent.
-  Designer owns assigned visual files only; do not create QA/data/statistics
-  subagents. Main owns models, API integration, security and final checks.
+- Main owns integration and final review. Use the separately requested designer
+  and QA agents with assigned files; a data agent may collect/audit trustworthy
+  sources when requested. This supersedes the archived designer-only rule.
+  Avoid repeated repository-wide analysis or unrequested parallel agents.
 - Read related files and the current directive rather than repeating whole-repo
   research or old plans. Reuse working code. Do not add unsolicited features,
   plans, documents, screenshots or repeated searches.

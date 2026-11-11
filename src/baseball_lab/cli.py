@@ -53,6 +53,10 @@ def main():
     output=args.output or REPOSITORY_ROOT/'outputs/E01'/('research_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
     model_path=args.model or args.data_dir/'model.json'
     try:
+        if args.mode in ('scoring','inning','simulate'):
+            from baseball_lab.data.retrosheet_releases import validate_period
+            minimum=1 if args.mode=='simulate' and args.observation_source=='observed' else 3
+            args.start,args.end=validate_period(args.start,args.end,min_days=minimum)
         from baseball_lab.data.statcast import acquire,audit,manual_source,load_dataset
         from baseball_lab.outcome.empirical import fit,load_model
         from baseball_lab.tracking.evidence_report import write_report

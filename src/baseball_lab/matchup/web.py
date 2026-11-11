@@ -8,6 +8,7 @@ def render(project,token='',analysis=None):
     if project not in ('baseball','eramatch'):raise ValueError('알 수 없는 프로젝트')
     body=Path(__file__).parents[1].joinpath('web/matchup.html').read_text(encoding='utf-8')
     body=body.replace('__PRINCIPLES_SCRIPT__',Path(__file__).parents[1].joinpath('web/principles.js').read_text(encoding='utf-8'))
+    body=body.replace('__OBSERVATIONS_SCRIPT__',Path(__file__).parents[1].joinpath('web/observations.js').read_text(encoding='utf-8'))
     display=public_view(analysis)
     if display and 'simulation' in display and 'model' in display:
         from .reading import interpret

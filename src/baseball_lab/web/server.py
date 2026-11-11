@@ -1,6 +1,7 @@
 """Loopback-only research workbench. Fixed task API, no shell commands from clients."""
 import argparse
 import csv
+from contextlib import contextmanager
 import json
 import mimetypes
 import os
@@ -36,7 +37,7 @@ class Workbench:
         self.catalog=DatasetCatalog(self.root)
         self.token=secrets.token_urlsafe(32)
         self.lock=threading.RLock()
-        self.job=None; self.process=None
+        self.job=None; self.process=None; self._operation=None
         self._cache=(0,None)
 
     def readiness(self, refresh=False):
@@ -65,7 +66,9 @@ class Workbench:
         self._cache=(now,result)
         # This provider can prepare its public distribution on the first run;
         # a missing cache is not a request for users to find/upload a CSV.
-        result['scoring']={'available':True,'cached':(self.root/'data/local/retrosheet/official-2024/dataset.json').exists(),
+        from baseball_lab.data.retrosheet_releases import PERIODS
+        result['scoring']={'periods':{str(k):v for k,v in PERIODS.items()},
+                           'cached_seasons':{str(k):(self.root/f'data/local/retrosheet/official-{k}/dataset.json').is_file() for k in PERIODS},'available':True,'cached':(self.root/'data/local/retrosheet/official-2024/dataset.json').exists(),
                            'title':'실제 Retrosheet 기록으로 득점 상황 학습',
                            'reason':'선택한 시즌의 공식 배포 자료를 자동 준비하고 재사용합니다. 처음 받을 때만 인터넷이 필요합니다.'}
         return result
@@ -75,6 +78,7 @@ class Workbench:
         with self.lock:
             current=dict(self.job) if self.job else None
             if current:current['logs']=list(current['logs'])
+            operation=self._operation
         runs=[]
         for p in sorted(self.outputs.glob('*/task.json'),reverse=True):
             try:
@@ -97,41 +101,48 @@ class Workbench:
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
                 if len(runs)>=30:break
             except (OSError,ValueError,KeyError):continue
-        return public_view({'readiness':self.readiness(),'job':current,'runs':runs})
+        return public_view({'readiness':self.readiness(),'job':current,'operation':operation,'runs':runs})
+
+    @contextmanager
+    def operation(self,label):
+        # Reserve conflicting mutations briefly; never hold the state lock over
+        # source reads, hashing, model computation or disk/report rendering.
+        with self.lock:
+            self._idle();self._operation=label
+        try:yield
+        finally:
+            with self.lock:self._operation=None
 
     def _idle(self):
+        if self._operation:raise ValueError('진행 중인 작업: '+self._operation+' · 잠시 후 다시 실행하세요.')
         if self.job and self.job['status'] in ('queued','running','cancelling'):
             raise ValueError('이미 작업 중입니다. 끝날 때까지 기다리거나 중지해 주세요.')
 
     def matchup_prepare(self, archive=None, *, project='baseball',season=2024):
+        from baseball_lab.matchup.service import PROJECTS
+        if not isinstance(project,str) or project not in PROJECTS:
+            raise ValueError('선수 가상 대결을 선택하세요.')
+        self.catalog.source_id(project,season)
         with self.lock:
-            from baseball_lab.matchup.service import PROJECTS
-            if not isinstance(project,str) or project not in PROJECTS:
-                raise ValueError('선수 대결 또는 역대 선수 대결을 선택하세요.')
+            if archive is None and self.job and self.job.get('kind')=='prepare_catalog' and self.job.get('project')==project and self.job.get('season')==season and self.job['status'] in ('queued','running'):
+                return {'id':self.job['id'],'status':self.job['status'],'ready':False,'reused':True}
+        with self.operation('선수 기록 확인'):
             if archive is not None:
-                self._idle()
                 from baseball_lab.matchup.catalog import import_assignment
                 result=import_assignment(self.root,archive)
-                return {'ready':True,'status':'completed','dataset_id':result['dataset_id'],
-                        'message':'보관한 과제 기록을 연결했습니다.'}
-            # Validate requested season before scheduling or creating any files.
-            self.catalog.source_id(project,season)
-            if self.job and self.job.get('kind')=='prepare_catalog' and self.job.get('project')==project and self.job.get('season')==season and self.job['status'] in ('queued','running'):
-                return {'id':self.job['id'],'status':self.job['status'],'ready':False,'reused':True}
-            self._idle()
+                return {'ready':True,'status':'completed','dataset_id':result['dataset_id'],'message':'보관한 과제 기록을 연결했습니다.'}
             existing=self.catalog.get(project,season)
             if existing is not None:
-                return {'id':None,'ready':True,'status':'completed','dataset_id':existing['dataset_id'],
-                        'message':'보관한 선수 기록을 확인했습니다.'}
+                return {'id':None,'ready':True,'status':'completed','dataset_id':existing['dataset_id'],'message':'보관한 선수 기록을 확인했습니다.'}
             descriptor=self.catalog.describe(project,season)
             if descriptor['needs_connection']:raise ValueError(descriptor['message'])
             job_id=time.strftime('%Y%m%d_%H%M%S')+'_'+secrets.token_hex(4)
             private(self.outputs/job_id,directory=True)
-            self.job={'id':job_id,'kind':'prepare_catalog','project':project,'season':season,
-                      'status':'queued','started_at':utc_now(),'logs':[],'report':None,
-                      'message':'선수 기록을 확인하고 있어요.'}
-            self._persist()
-            threading.Thread(target=self._catalog_worker,args=(job_id,project,season),daemon=True).start()
+            with self.lock:
+                self.job={'id':job_id,'kind':'prepare_catalog','project':project,'season':season,
+                          'status':'queued','started_at':utc_now(),'logs':[],'report':None,'message':'선수 기록을 확인하고 있어요.'}
+                self._persist()
+                threading.Thread(target=self._catalog_worker,args=(job_id,project,season),daemon=True).start()
             return {'id':job_id,'status':'queued','ready':False}
 
     def _catalog_worker(self,job_id,project,season):
@@ -162,8 +173,7 @@ class Workbench:
                 self._persist()
 
     def matchup_analyze(self,project,options):
-        with self.lock:
-            self._idle()
+        with self.operation('타석 대결 계산'):
             from baseball_lab.matchup.service import analyze
             from baseball_lab.matchup.web import render
             from baseball_lab.data.lineage import checksum,content_hash
@@ -172,6 +182,7 @@ class Workbench:
             versions={p.name:checksum(p) for p in sorted(sources.glob('*.py'))}
             versions.update({'matchup.html':checksum(Path(__file__).with_name('matchup.html')),
                              'principles.js':checksum(Path(__file__).with_name('principles.js')),
+                             'observations.js':checksum(Path(__file__).with_name('observations.js')),
                              'server.py':checksum(Path(__file__)),
                              'simulation/contracts.py':checksum(Path(__file__).parents[1]/'simulation/contracts.py'),
                              'data/catalog.py':checksum(Path(__file__).parents[1]/'data/catalog.py')})
@@ -190,8 +201,7 @@ class Workbench:
             return public_view({'analysis':analysis,'report':report})
 
     def upload(self, filename, content, source_url, acquired_at, usage_note):
-        with self.lock:
-            self._idle()
+        with self.operation('상세 기록 검사'):
             if not filename.lower().endswith('.csv') or len(content)>32*1024*1024:
                 raise ValueError('CSV 파일 한 개는 최대 32MB입니다.')
             from baseball_lab.data.statcast import manual_source, audit
@@ -209,8 +219,7 @@ class Workbench:
                     'message':'파일 확인 완료. 날짜를 나누고 모델 검사를 진행하세요.'}
 
     def start(self, kind, options):
-        with self.lock:
-            self._idle()
+        with self.operation('학습 작업 준비'):
             from datetime import date
             if not isinstance(options,dict):raise ValueError('작업 설정은 객체여야 합니다.')
             if kind not in ('fit','train','run','simulate'):raise ValueError('지원하지 않는 작업')
@@ -221,10 +230,9 @@ class Workbench:
                 if study not in ('one_run','half_inning'):raise ValueError('학습 목표를 확인하세요.')
                 if study=='half_inning' and source!='retrosheet':raise ValueError('이닝 득점 학습은 공식 경기 기록으로 실행합니다.')
                 if source=='retrosheet':
-                    first=date.fromisoformat(str(options.get('start','')));last=date.fromisoformat(str(options.get('end','')))
-                    from baseball_lab.data.retrosheet_releases import RELEASES
-                    if first.year not in RELEASES or last.year!=first.year or first>last:raise ValueError('2023·2024년 중 한 시즌의 날짜 범위를 선택하세요.')
-                    start,end=str(first),str(last)
+                    from baseball_lab.data.retrosheet_releases import validate_period
+                    minimum=1 if kind=='simulate' and options.get('observation_source')=='observed' else 3
+                    start,end=validate_period(options.get('start'),options.get('end'),min_days=minimum)
                 else:
                     from baseball_lab.research.pipeline import Plan
                     plan=Plan(str(options.get('start','')),str(options.get('end','')))
@@ -264,14 +272,15 @@ class Workbench:
                 extra=['--mode','train','--episodes',str(episodes),'--seed',str(seed),'--evaluate-every',str(min(episodes,200))]
             job_id=time.strftime('%Y%m%d_%H%M%S')+'_'+secrets.token_hex(4)
             output=self.outputs/job_id;private(output,directory=True)
-            self.job={'id':job_id,'kind':kind,'status':'queued','started_at':utc_now(),'logs':[],
+            job={'id':job_id,'kind':kind,'status':'queued','started_at':utc_now(),'logs':[],
                       'report':None,'message':'작업을 준비하고 있어요.'}
-            if kind in ('run','simulate') and source=='retrosheet':self.job['source_year']=start[:4]
-            if kind=='run':self.job['study']=study
-            self._persist()
+            if kind in ('run','simulate') and source=='retrosheet':job['source_year']=start[:4]
+            if kind=='run':job['study']=study
             command=[sys.executable,'-u',str(self.root/'scripts/quickstart.py'),'--data-dir',str(self.data),
                      '--output',str(output/'result'),*extra]
-            threading.Thread(target=self._worker,args=(job_id,command,output),daemon=True).start()
+            with self.lock:
+                self.job=job;self._persist()
+                threading.Thread(target=self._worker,args=(job_id,command,output),daemon=True).start()
             return {'id':job_id}
 
     def _persist(self):
@@ -306,10 +315,12 @@ class Workbench:
                         self.job['logs']=self.job['logs'][-120:]
                         self._persist()
             code=process.wait()
+            # Model verification can read large legacy datasets; leave status
+            # and cancellation responsive while it finishes.
+            invalid_fit=self.job['kind']=='fit' and code==0 and not self.readiness(refresh=True)['ready']
             with self.lock:
                 cancelled=self.job['status']=='cancelling'
                 self._cache=(0,None)
-                invalid_fit=self.job['kind']=='fit' and code==0 and not self.readiness(refresh=True)['ready']
                 status='cancelled' if cancelled else 'failed' if code or invalid_fit else 'completed'
                 message='작업을 중지했습니다.' if cancelled else '검사를 통과하지 못했어요. 아래 이유를 확인하세요.' if invalid_fit else '문제가 생겼어요. 아래 기록과 도움말을 확인하세요.' if code else '완료했어요. 결과 보기를 눌러 주세요.'
                 report=output/'result/report.html'
@@ -395,6 +406,16 @@ def make_handler(workbench):
                     key=parse_qs(urlparse(self.path).query).get('metric',[None])[0]
                     self._json(get_knowledge(key))
                 except (ValueError,KeyError,TypeError) as exc:self._json({'error':public_text(exc)},400)
+            elif path=='/api/observations':
+                try:
+                    from baseball_lab.data.contact_observations import summarize
+                    query=parse_qs(urlparse(self.path).query)
+                    year=int(query.get('season',[''])[0])
+                    result=summarize(workbench.root,year,role=query.get('role',['batter'])[0],
+                                     player_id=query.get('player',[''])[0])
+                    self._json(public_view(result))
+                except (ValueError,KeyError,TypeError,OSError,csv.Error) as exc:
+                    self._json({'error':public_text(exc)},400)
             elif path=='/api/matchup/catalog':
                 try:
                     from baseball_lab.matchup.service import overview
@@ -471,8 +492,7 @@ def make_handler(workbench):
                 elif path in ('/api/storage/preview','/api/storage/delete','/api/storage/verify'):
                     payload=json.loads(body)
                     if not isinstance(payload,dict):raise ValueError('올바른 자료 관리 요청이 아닙니다.')
-                    with workbench.lock:
-                        workbench._idle()
+                    with workbench.operation('자료 관리'):
                         if path.endswith('/preview'):result=workbench.storage.preview(payload['id'])
                         elif path.endswith('/verify'):result=workbench.storage.verify(payload['id'])
                         else:result=workbench.storage.delete(payload['confirmation'],payload.get('confirmed'))
@@ -488,7 +508,7 @@ def serve(root,port=8765,open_browser=False):
     server.daemon_threads=True
     address=f'http://127.0.0.1:{server.server_port}'
     print('야구 AI 연구실을 열었습니다: '+address,flush=True)
-    print('BaseballLab 통계 대결 · Match AI 학습 · EraMatch 시대 대결을 선택하세요. 종료: Ctrl+C',flush=True)
+    print('선수 가상 대결(MLB/KBO) · AI 전략 연구. 종료: Ctrl+C',flush=True)
     if open_browser:
         import webbrowser
         threading.Timer(.3,lambda:webbrowser.open(address)).start()
