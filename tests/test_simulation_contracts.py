@@ -9,7 +9,7 @@ from baseball_lab.simulation.contracts import validate_outcomes,validate_player_
 
 def test_statistical_programs_emit_same_contract_and_legacy_identity(mock_catalog):
     root,c=mock_catalog;b=c['profiles']['KBO:batter:b1:1982'];p=c['profiles']['KBO:pitcher:p1:2024']
-    options={'batter':b['id'],'pitcher':p['id'],'n':25,'repetitions':2}
+    options={'batter':b['id'],'pitcher':p['id'],'n':25,'repetitions':2,'seed':41}
     automatic=analyze(root,'eramatch',options)
     explicit=analyze(root,'eramatch',{**options,'model':'legacy'})
     assert automatic['simulation']==explicit['simulation']

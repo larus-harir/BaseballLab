@@ -177,6 +177,7 @@ class Workbench:
             analysis['execution']={'engine_files':versions,'engine_id':content_hash(versions),'python':sys.version.split()[0]}
             job_id=time.strftime('%Y%m%d_%H%M%S')+'_'+secrets.token_hex(4)
             directory=self.outputs/job_id;private(directory,directory=True)
+            analysis['execution']['execution_id']=job_id
             result=directory/'result';private(result,directory=True)
             report=f'/reports/{job_id}/result/report.html'
             write_json(result/'analysis.json',analysis)
@@ -409,7 +410,7 @@ def make_handler(workbench):
                     try:
                         from baseball_lab.matchup.web import render
                         data=json.loads((resolved.parent/'analysis.json').read_text(encoding='utf-8'))
-                        return self._html(render(data['project'],analysis=data))
+                        return self._html(render(data['project'],token=workbench.token,analysis=data))
                     except (OSError,ValueError,KeyError,TypeError) as exc:return self._json({'error':public_text(exc)},409)
                 if resolved.name=='report.html' and (resolved.parent/'research.json').is_file():
                     try:

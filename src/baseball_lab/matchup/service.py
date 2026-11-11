@@ -104,7 +104,9 @@ def analyze(root,project,options):
             raise ValueError('표본 보정 강도는 0~2,000입니다.')
         model=normalized(b,p,b['league_rates'],strength=strength,
                          neutral=catalog['neutral_rates'] if project=='eramatch' else None)
-    simulation=simulate(model,options.get('n',25),options.get('seed',41),options.get('repetitions',200))
+    import secrets
+    seed=options['seed'] if 'seed' in options else secrets.randbelow(2**31)
+    simulation=simulate(model,options.get('n',25),seed,options.get('repetitions',200))
     alternative=None;comparison_error=None
     if project=='eramatch':
         try:
@@ -133,6 +135,8 @@ def analyze(root,project,options):
     result['run_id']=content_hash({'dataset_id':catalog['dataset_id'],'batter':b['id'],'pitcher':p['id'],
                                    'model':model,'n':simulation['n'],'seed':simulation['seed'],
                                    'repetitions':simulation['repetitions']})
+    if 'expected_run_id' in options and options['expected_run_id']!=result['run_id']:
+        raise ValueError('당시 자료 또는 계산 조건과 달라 같은 결과를 재현할 수 없습니다. 저장한 원래 결과는 그대로 볼 수 있습니다.')
     from .outcome_details import attach
     from .reading import interpret
     attach(root,result)

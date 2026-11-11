@@ -1,7 +1,7 @@
 # BaseballLab development contract
 
 Keep this repository and the working application; improve it incrementally.
-The current product directive is `docs/specs/BaseballLab_Codex_Product_Completion_Ultimatum.md`.
+The current product directive is `docs/specs/BaseballLab_Codex_Strict_Product_Regression_Fix.md`.
 User instructions take precedence over this file and archived plans.
 
 ## Stable responsibilities
