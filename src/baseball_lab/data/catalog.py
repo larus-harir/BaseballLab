@@ -9,7 +9,7 @@ from pathlib import Path
 
 from baseball_lab.data.lineage import checksum,utc_now
 from baseball_lab.data.retrosheet_releases import RELEASES
-from baseball_lab.matchup.catalog import read_catalog,source_directory,import_assignment,LEGACY_SHA,catalog_verification
+from baseball_lab.matchup.catalog import read_catalog,source_directory,LEGACY_SHA,catalog_verification
 
 _RAW_CACHE={}
 
@@ -20,7 +20,7 @@ class DatasetCatalog:
     def supported_seasons(self,project):
         if project in ('baseball','match'):return sorted(RELEASES)
         if project=='eramatch':
-            data=read_catalog(self.root,'kbo-assignment')
+            data=self.get('eramatch')
             return sorted({p['season'] for p in data['profiles'].values()}) if data else []
         raise ValueError('지원하는 프로젝트를 선택하세요.')
 
@@ -35,7 +35,14 @@ class DatasetCatalog:
 
     def get(self,project,season=2024):
         source=self.source_id(project,season)
-        if project!='match':return read_catalog(self.root,source)
+        if project!='match':
+            data=read_catalog(self.root,source)
+            if data is not None or project!='eramatch':return data
+            archive=source_directory(self.root,source)/'assignment-original.zip'
+            if archive.is_file() and checksum(archive)!=LEGACY_SHA:
+                raise ValueError('보관한 과제 원본 ZIP이 검토한 버전과 다릅니다.')
+            from baseball_lab.experiments.eramatch.builtin import load_builtin
+            return load_builtin()
         directory=self._raw_directory(season)
         path=directory/'dataset.json'
         if path.is_symlink():raise ValueError('공식 자료 경로에 링크를 사용할 수 없습니다.')
@@ -56,12 +63,8 @@ class DatasetCatalog:
             from baseball_lab.r1.provider import acquire
             if progress:progress(f'{season}년 공식 경기 기록을 준비하고 있어요.')
             return acquire(self.root/'data/local/retrosheet',year=season)
-        # Only the known private store is inspected; no arbitrary filesystem
-        # search, archive execution, network scraping, or silent replacement.
-        archive=source_directory(self.root,'kbo-assignment')/'assignment-original.zip'
-        if not archive.is_file():raise ValueError('처음 한 번만 보관한 과제 code.zip을 연결하세요. 이후에는 자동으로 재사용합니다.')
-        if progress:progress('보관한 과제 원본을 선수 기록에 연결하고 있어요.')
-        return import_assignment(self.root,archive)
+        from baseball_lab.experiments.eramatch.builtin import load_builtin
+        return load_builtin()
 
     def describe(self,project,season=2024):
         source_id=self.source_id(project,season)
@@ -72,13 +75,14 @@ class DatasetCatalog:
               'supported_seasons':seasons,'seasons':seasons,'ready':data is not None,
               'needs_connection':False,'automatic_preparation':project=='baseball','metadata':None}
         if data is None:
-            archive=source_directory(self.root,source_id)/'assignment-original.zip' if project=='eramatch' else None
-            if archive and archive.is_file() and checksum(archive)!=LEGACY_SHA:raise ValueError('보관한 과제 원본 ZIP이 검토한 버전과 다릅니다.')
-            base['needs_connection']=project=='eramatch' and not archive.is_file()
-            base['automatic_preparation']=not base['needs_connection']
-            base['message']='보관한 원본을 자동으로 연결할 수 있어요.' if project=='eramatch' and not base['needs_connection'] else '처음 한 번만 과제 code.zip을 연결하면 계속 재사용합니다.' if project=='eramatch' else f'{season}년 공식 선수 기록을 자동으로 준비합니다.'
+            base['message']='EraMatch 기본 기록이 없습니다. 프로그램을 업데이트하거나 다시 설치하세요.' if project=='eramatch' else f'{season}년 공식 선수 기록을 자동으로 준비합니다.'
             return base
         profiles=list(data['profiles'].values());source=data['source']
+        included=project=='eramatch' and not (source_directory(self.root,source_id)/'catalog.json').is_file()
+        if included:
+            from baseball_lab.experiments.eramatch.builtin import verification
+            verified=verification()
+        else:verified=catalog_verification(self.root,source_id)
         actual_seasons=sorted({p['season'] for p in profiles})
         original_rows=data.get('audit',{}).get('rows')
         fields=('PA','TBF','AB','H','SO','BB','HBP','HP','HR','2B','3B','SF','SH','IP_OUTS')
@@ -88,16 +92,18 @@ class DatasetCatalog:
                   'league':base['league'],'seasons':actual_seasons,'granularity':['season','PA'] if project=='baseball' else ['season'],
                   'source_schema':data['schema'],'units':{'counts':'events','PA':'completed plate appearances','TBF':'batters faced','AB':'official at bats','IP_OUTS':'outs; three per inning','rates':'event count / stated denominator'},
                   'license':source.get('license'),'source_url':source.get('source_url'),
-                  'acquisition_method':'user supplied pinned archive' if project=='eramatch' else 'official downloadable distribution; verified local cache reused',
-                  'acquired_at':source.get('acquired_at'),'cache_checked_at':utc_now(),'verified_at':catalog_verification(self.root,source_id)['verified_at'],'version':data['dataset_id'],
-                  'sha256':source.get('files',[]),'row_count':sum(original_rows.values()) if original_rows else sum(data['league_counts'][str(season)].values()),
+                  'acquisition_method':'application-included assignment season aggregates' if included else 'user supplied pinned archive' if project=='eramatch' else 'official downloadable distribution; verified local cache reused',
+                  'acquired_at':source.get('acquired_at'),'cache_checked_at':utc_now(),'verified_at':verified['verified_at'],'version':data['dataset_id'],
+                  'sha256':[{'name':verified['name'],'sha256':verified['sha256']}] if included else source.get('files',[]),
+                  'included_with_application':included,'original_input_hashes':source.get('files',[]) if included else [],
+                  'row_count':sum(original_rows.values()) if original_rows else sum(data['league_counts'][str(season)].values()),
                   'row_counts_by_role':original_rows,'profile_count':len(profiles),'missingness':missing,'entity_ids':{'keys':['league','role','player_id','season'],'names_are_identifiers':False},
                   'known_biases':source.get('field_assumptions',[])+(['시대·팀·구장·수비와 관측 선택이 섞인 시즌 집계입니다.'] if project=='eramatch' else ['정규시즌 완료 타석만 포함합니다. 구장·수비·상대 선택의 인과 효과를 분리하지 않습니다.']),
                   'allowed_uses':['local assignment reproduction','unvalidated normalized comparison'] if project=='eramatch' else ['statistical PA exploration','predictive comparison','source observations'],
                   'status':source['status'],'capabilities':{'independent_pa':True,'normalized_comparison_profiles':sum(p['normalized_eligible'] for p in profiles),'pitch_actions':False,'full_game':False},
                   'readiness':{'ready':True,'needs_connection':False},
                   'coverage':{'profile_count':len(profiles),'selected_season':season,'profiles_in_selected_season':sum(p['season']==season for p in profiles)},
-                  'verification_scope':'catalog content identity and registered original file checksums; causal validity and licensing are distinct'}
+                  'verification_scope':verified['scope'] if included else 'catalog content identity and registered original file checksums; causal validity and licensing are distinct'}
         base.update(message='보관한 기록을 확인했습니다. 선수를 고르고 바로 대결하세요.',metadata=metadata)
         if season not in actual_seasons:
             base.update(ready=False,message='이 시즌의 선수 기록은 없습니다. 포함된 다른 시즌을 선택하세요.')

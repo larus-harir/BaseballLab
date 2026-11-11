@@ -1,0 +1,11 @@
+{
+  "archive_sha256": "57ab8411a07b901206b0af798d9f55a00cab79ea1d61adac492e86571b2a1058",
+  "original_code_sha256": "b045c1d897d604724691230731d656a9cb0c3990c67e7ca9f96445bf4d41b3da",
+  "dataset_id": "b2338599235c8707566afed1fed7f68ef0852a9758c8fb9ee350cf7e2f3da135",
+  "real_profile_pairs": 40,
+  "mock_edge_pairs": 2,
+  "seeds_per_pair": 5,
+  "exact_25pa_count_comparisons": 210,
+  "passed": true,
+  "scope": "Counts and rounded binary probabilities match reviewed original simulate(); not validation of KBO accuracy, causal effects, era fairness or licenses."
+}

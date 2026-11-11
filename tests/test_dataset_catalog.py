@@ -33,7 +33,8 @@ def test_missing_sources_have_explicit_readiness_without_creation(tmp_path):
     with patch('urllib.request.OpenerDirector.open',side_effect=AssertionError('no network during readiness')):
         b=c.describe('baseball',2023);k=c.describe('eramatch');m=c.describe('match',2024)
     assert not b['ready'] and b['automatic_preparation'] and b['supported_seasons']==[2023,2024]
-    assert not k['ready'] and k['needs_connection'] and not k['supported_seasons']
+    assert k['ready'] and not k['needs_connection'] and k['supported_seasons']==list(range(1982,2026))
+    assert k['metadata']['included_with_application']
     assert not m['ready'] and m['automatic_preparation']
     assert not list(tmp_path.rglob('*'))
     for invalid in (2025,'2024',True):
@@ -97,7 +98,7 @@ def test_unknown_original_archive_never_looks_connected(tmp_path):
     directory=source_directory(tmp_path,'kbo-assignment');directory.mkdir(parents=True)
     (directory/'assignment-original.zip').write_bytes(b'MOCK_TEST_ONLY not the assignment')
     with pytest.raises(ValueError,match='원본 ZIP'):DatasetCatalog(tmp_path).describe('eramatch')
-    with pytest.raises(ValueError,match='ZIP 버전'):DatasetCatalog(tmp_path).ensure('eramatch')
+    with pytest.raises(ValueError,match='원본 ZIP'):DatasetCatalog(tmp_path).ensure('eramatch')
     assert not (directory/'catalog.json').exists()
 
 

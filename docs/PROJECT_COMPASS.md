@@ -1,5 +1,7 @@
 # BaseballLab — 프로젝트 길잡이 (Project Compass)
 
+> EraMatch는 제공 과제를 기본 자료로 포함해 실행합니다. 새 PC 사용자에게 ZIP/CSV 업로드를 요구하지 않습니다. [검증](eramatch-default-data.md).
+
 > **2026-11-11 실행 기준:** [기존 앱 보존형 개선 지시](specs/BaseballLab_Incremental_Redesign_Codex_Directive.md). 세 역할은 유지하고, 자동 자료 준비·공통 계약·실행 동선을 단계적으로 개선합니다. [현재 검증](incremental-redesign-validation.md).
 
 > **프로젝트 전체에서 우선 읽을 방향 문서 — 2026-11-09 역할 개정**

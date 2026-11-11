@@ -78,7 +78,7 @@ def analyze(root,project,options):
     if not isinstance(options.get('batter'),str) or not isinstance(options.get('pitcher'),str):
         raise ValueError('타자와 투수를 모두 선택하세요.')
     year=_options_year(project,options)
-    catalog=DatasetCatalog(root).get(project,year)
+    registry=DatasetCatalog(root);catalog=registry.get(project,year)
     if catalog is None:raise ValueError('선수 기록을 준비하고 있어요. 준비가 끝나면 다시 실행하세요.')
     b=catalog['profiles'].get(options['batter']);p=catalog['profiles'].get(options['pitcher'])
     if not b or not p or b['role']!='batter' or p['role']!='pitcher':
@@ -123,6 +123,12 @@ def analyze(root,project,options):
             'model_selection':{'requested':requested,'selected':mode,'reason':reason},
             'scope':'같은 조건의 독립 타석 반복입니다. 주자·아웃·9이닝 점수·개별 투구 경로는 계산하지 않습니다.'}
     result['contract']=matchup_contract(result)
+    if project=='eramatch':
+        metadata=registry.describe(project,year)['metadata']
+        if metadata['included_with_application']:
+            result['data_delivery']={'kind':'application_included_season_aggregates',
+                'files':metadata['sha256'],'original_files_at_runtime':False,
+                'verification_scope':metadata['verification_scope']}
     # Preserve the original identity inputs for backwards reproducibility.
     result['run_id']=content_hash({'dataset_id':catalog['dataset_id'],'batter':b['id'],'pitcher':p['id'],
                                    'model':model,'n':simulation['n'],'seed':simulation['seed'],

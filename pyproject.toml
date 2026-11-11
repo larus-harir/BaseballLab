@@ -23,4 +23,4 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-baseball_lab = ["tracking/*.html", "web/*.html", "web/*.js", "simulation/*.html", "experiments/match/reporting/*.html"]
+baseball_lab = ["tracking/*.html", "web/*.html", "web/*.js", "simulation/*.html", "experiments/match/reporting/*.html", "experiments/eramatch/resources/*.json", "experiments/eramatch/resources/*.json.gz"]

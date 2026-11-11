@@ -13,6 +13,10 @@ User instructions take precedence over this file and archived plans.
 - EraMatch is the supplied KBO historical-player assignment's web application.
   Reproduction and improved candidates share the same engine, with different
   versions and evidence states. It is not AI-versus-human history research.
+- The user's subsequent correction makes the supplied KBO season statistics
+  application defaults. Ship only whitelisted matchup aggregates as package
+  data; a fresh EraMatch must work offline without upload or manual connection.
+  Do not ship the original ZIP/CSV/code/HWP or biographical CSV columns.
 
 ## Preservation and evidence
 

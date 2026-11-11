@@ -16,7 +16,8 @@ from types import SimpleNamespace
 from zipfile import ZipFile
 import hashlib
 
-from baseball_lab.matchup.catalog import LEGACY_SHA,LEGACY_FILES,read_catalog
+from baseball_lab.matchup.catalog import LEGACY_SHA,LEGACY_FILES
+from baseball_lab.data.catalog import DatasetCatalog
 from baseball_lab.matchup.models import legacy,simulate,LEGACY_CONSTANTS
 from baseball_lab.data.lineage import write_json
 
@@ -31,7 +32,7 @@ def validate_assignment(root,archive):
     namespace={'pd':SimpleNamespace(notna=lambda v:v is not None),'STABILIZATION_CONSTANTS':LEGACY_CONSTANTS}
     exec(compile(ast.Module(body=[definition],type_ignores=[]),'<reviewed-assignment-class>','exec'),namespace)
     original=namespace['KBOSimulator'].__new__(namespace['KBOSimulator'])
-    catalog=read_catalog(root,'kbo-assignment')
+    catalog=DatasetCatalog(root).get('eramatch')
     original.league_stats={int(y):v for y,v in catalog['legacy_yearly'].items()}
     original.league_stats['all']=catalog['legacy_all']
     bs=[p for p in catalog['profiles'].values() if p['role']=='batter' and p['legacy_eligible'] and all(p['legacy_row'].get(k) is not None for k in ('2B','3B','AB','H','SO','BB','HR'))]

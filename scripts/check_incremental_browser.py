@@ -148,7 +148,7 @@ def main():
         original=ROOT/'data/local/catalog/kbo-assignment/catalog.json';before=original.read_bytes()
         with patch('urllib.request.OpenerDirector.open',side_effect=AssertionError('MOCK_TEST_ONLY cached KBO needs no network')):
             page.goto(base+'/eramatch');expect(page.locator('#selectors')).to_be_visible(timeout=30000)
-            expect(page.locator('#importControls')).to_be_hidden()
+            expect(page.locator('input[type=file]')).to_have_count(0)
             page.locator('#bSeason').select_option('1982');page.locator('#pSeason').select_option('2024')
             run_matchup(page,'백인천','원태인')
             page.screenshot(path=str(out/'eramatch.png'),full_page=True)
@@ -198,13 +198,15 @@ def main():
                     page.screenshot(path=str(out/'fresh-install-result.png'),full_page=True)
                 assert fresh.job is None or fresh.job['status']=='completed'
                 assert (Path(freshroot)/'data/local/catalog/mlb-2024/catalog.json').is_file()
-            with tempfile.TemporaryDirectory(prefix='baseball-empty-assignment-') as empty,local_server(empty) as (emptybase,_):
-                page.goto(emptybase+'/eramatch');expect(page.locator('#importControls')).to_be_visible(timeout=20000)
-                expect(page.locator('#selectors')).to_be_hidden()
-                page.locator('#archive').set_input_files({'name':'MOCK_TEST_ONLY.zip','mimeType':'application/zip','buffer':b'not a recognized assignment'})
-                page.locator('#import').click();expect(page.locator('#formError')).to_contain_text('ZIP',timeout=20000)
-                assert not list(Path(empty).glob('outputs/workbench/*/result/analysis.json'))
-            scenarios.append('Fresh install provider failure/retry and actual-distribution normalization; missing assignment and bad ZIP')
+            with tempfile.TemporaryDirectory(prefix='baseball-bundled-eramatch-') as empty,local_server(empty) as (emptybase,_):
+                with patch('urllib.request.OpenerDirector.open',side_effect=AssertionError('Built-in KBO needs no network')):
+                    page.goto(emptybase+'/eramatch');expect(page.locator('#selectors')).to_be_visible(timeout=20000)
+                    expect(page.locator('input[type=file]')).to_have_count(0)
+                    page.locator('#bSeason').select_option('2024');page.locator('#pSeason').select_option('1986')
+                    run_matchup(page,'김도영','선동열')
+                    page.screenshot(path=str(out/'eramatch-built-in.png'),full_page=True)
+                assert not (Path(empty)/'data/local/catalog/kbo-assignment').exists()
+            scenarios.append('Fresh MLB provider retry and normalization; offline built-in EraMatch with no uploaded files')
         browser.close()
     report={'browser_errors':errors,'scenarios':scenarios,'contrast_samples':contrast,'viewport_desktop':1366,'viewport_mobile':390,
             'fresh_install_transport':'skipped' if args.skip_fresh else 'verified local official distribution transport; no invented player data',
