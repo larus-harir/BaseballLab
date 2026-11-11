@@ -50,6 +50,19 @@ MLB 대결 결과의 **선수의 실제 타구·투구 기록 살펴보기**에�
 
 ## 자료는 어디에 있나요?
 
+추가 수집 자료는 기존 대결·학습 모형과 구분해 보관합니다. MLB 2015~2025 플레이 기록, NPB 2015~2025 팀 기록과 2025 선수별 팀 기록을 확보했고, 기존 KBO 1982~2025 자료와 함께 표준화할 수 있습니다. 수집 범위·누락·이용 조건은 [수집 현황](docs/data-collection-status.md)을 확인하세요.
+
+```powershell
+# 공식 원천에서 내려받기 (기존 검증된 자료는 재사용)
+python scripts/collect_league_seasons.py --start-year 2015 --end-year 2025
+python scripts/collect_league_seasons.py --leagues NPB --start-year 2025 --end-year 2025 --npb-players
+# 확보한 전체 기간 / 리그별 최근 5시즌 선택
+python scripts/prepare_league_data.py
+python scripts/prepare_league_data.py --last-seasons 5
+```
+
+다운로드·표준화는 자료 준비 단계입니다. 현재 웹의 선수 선택 범위와 학습 대상을 자동으로 늘리지는 않습니다. 시즌 합계로 구종 선택이나 투구 궤적을 만들지 않습니다. 결측값·최소 요건·리그 간 비교 원칙은 [공통 자료 규칙](docs/league-data-contract.md)을 따릅니다.
+
 EraMatch 기본 자료는 앱 패키지에 포함된 대결용 시즌 집계입니다. 생년월일·학교·드래프트 항목과 원본 CSV/ZIP/코드/HWP는 포함하지 않습니다. [원본 대조·기본 자료 검증](docs/eramatch-default-data.md).
 
 기존 통계 선수 카탈로그·과제 원본은 `data/local/catalog/`, 공식 경기 원본은 `data/local/retrosheet/`, 별도 사용자 투구 자료는 `data/local/statcast/`, 실행 결과는 `outputs/`에 보관합니다. **자료와 신뢰성** 화면에서 용량·분류·연결된 연구·원본 해시를 확인할 수 있습니다. 삭제는 대상과 재현성 영향을 확인하고 다시 동의한 경우에만 진행하며 자동 삭제하지 않습니다.
