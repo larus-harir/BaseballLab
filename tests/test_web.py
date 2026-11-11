@@ -29,7 +29,8 @@ def call(server,path='/',method='GET',data=None,headers=None):
 def test_home_state_and_training_blocked_without_data(web):
     wb,s=web
     code,body=call(s)
-    assert code==200 and '실험 설정하기' in body.decode() and wb.token in body.decode()
+    assert code==200 and all(link in body.decode() for link in ('/baseball','/match','/eramatch'))
+    assert wb.token in call(s,'/match/team')[1].decode()
     code,body=call(s,'/api/state')
     assert not json.loads(body)['readiness']['ready']
     code,body=call(s,'/api/start','POST',json.dumps({'kind':'train'}),{'X-Lab-Token':wb.token})
@@ -117,7 +118,7 @@ def test_real_process_cancel_and_progress_are_recorded(tmp_path):
 
 def test_platform_match_and_observer_are_separate_pages(web):
     wb,s=web
-    for path,label in [('/','야구를 AI는 어떻게 배울까?'),('/match','AI 전략 연구'),('/match/team','득점 전략 연구 시작'),('/match/at-bat','researchSource'),('/simulation','장면 살펴보기'),('/lab/data','자료와 신뢰성')]:
+    for path,label in [('/','야구를 AI는 어떻게 배울까?'),('/match','AI 전략 연구'),('/match/team','AI 학습 시작하기'),('/match/at-bat','researchSource'),('/simulation','장면 살펴보기'),('/lab/data','자료와 신뢰성')]:
         code,body=call(s,path)
         assert code==200 and label in body.decode()
     with pytest.raises(ValueError):wb.start('simulate',{'start':'2024-03-20','end':'2024-09-30','outs':3})

@@ -1,0 +1,220 @@
+{
+  "schema": "product-completion-observed-evidence-v1",
+  "recorded_on": "2026-11-11",
+  "source": "Retrosheet 2024 regular/full official plays",
+  "official_definitions": "https://www.retrosheet.org/downloads/plays.html",
+  "source_manifest_fingerprint": "a260754c3bef7de2e46fdca3a77b4ff9db87f66297821208966280c7830029be",
+  "completed_pa_n": 182449,
+  "residual_pa_n": 84480,
+  "exclusive_observed_residual_counts": {
+    "runner_out": 3477,
+    "ground_out": 30996,
+    "sacrifice_fly": 1261,
+    "line_out": 10413,
+    "fly_out": 32132,
+    "grounded_double_play": 3227,
+    "interference": 100,
+    "reached_error": 1112,
+    "fielders_choice": 702,
+    "double_play": 326,
+    "recorded_out": 280,
+    "sacrifice_bunt": 452,
+    "triple_play": 2
+  },
+  "display_contract": "Conditional empirical display split within unchanged eight-category primary model; not separately validated causal subevent probabilities.",
+  "study": {
+    "schema": "Match-half-inning-research-v1",
+    "run_id": "e9cf0b7ea3bd909885c031333a724e396f0bfd8936f40b46e6c5352b24ece7bb",
+    "source_hash": "b8eb448d5a7012f48dc19a205b7995a695d38f225b3c411728ebf30a1c412b8e",
+    "code_dirty_at_validation": true,
+    "config": {
+      "episodes": 600,
+      "seeds": [
+        851,
+        852,
+        853
+      ],
+      "evaluate_every": 200,
+      "evaluation_n": 500,
+      "batch_size": 32
+    },
+    "dataset_id": "0533059db9bcfec296dc61937fb8345adbbf2ef813eab367f9a6e4ce531bc129",
+    "donor_population": {
+      "version": "completed-regulation-innings-1-to-8-v1",
+      "used_segments": 164751,
+      "excluded_segments": {
+        "ninth_or_extra_inning": 18147,
+        "unfinished_half_inning": 5
+      },
+      "reason": "Exclude ninth/extra innings and incomplete halves to avoid walk-off censoring and automatic-runner transport."
+    },
+    "date_semantics": "whole game aligned to last actual recorded play date",
+    "summary": {
+      "complete": true,
+      "finished_repeats": 3,
+      "choices": [
+        {
+          "label": "공격의 번트 선택",
+          "before": 0.5567525765873264,
+          "after": 0.5503155970746626,
+          "scope": "같은 아웃·주자 상황을 동일 비중으로 비교한 선택 확률입니다. 실제 선택 횟수나 사람의 방문 빈도가 아닙니다."
+        },
+        {
+          "label": "수비의 고의볼넷 선택",
+          "before": 0.44116605347697774,
+          "after": 0.24178077343731216,
+          "scope": "같은 아웃·주자 상황을 동일 비중으로 비교한 선택 확률입니다. 실제 선택 횟수나 사람의 방문 빈도가 아닙니다."
+        }
+      ],
+      "planned_repeats": 3,
+      "current": {
+        "mean": 1.132,
+        "n": 1500,
+        "interval": [
+          1.0467686616999419,
+          1.217231338300058
+        ]
+      },
+      "growth": [
+        {
+          "role": "batter",
+          "label": "공격 AI",
+          "before": {
+            "mean": 0.42533333333333334,
+            "n": 1500,
+            "interval": [
+              0.37758136697396005,
+              0.47308529969270663
+            ]
+          },
+          "after": {
+            "mean": 0.41933333333333334,
+            "n": 1500,
+            "interval": [
+              0.3732083692977231,
+              0.46545829736894356
+            ]
+          },
+          "change": {
+            "mean": -0.006,
+            "n": 1500,
+            "interval": [
+              -0.027830802189020544,
+              0.015830802189020547
+            ]
+          },
+          "by_seed": [
+            {
+              "seed": 851,
+              "mean": 0.014,
+              "n": 500,
+              "interval": [
+                -0.018095219254555588,
+                0.046095219254555585
+              ]
+            },
+            {
+              "seed": 852,
+              "mean": -0.032,
+              "n": 500,
+              "interval": [
+                -0.07630527641530377,
+                0.012305276415303774
+              ]
+            },
+            {
+              "seed": 853,
+              "mean": 0.0,
+              "n": 500,
+              "interval": [
+                -0.03596337482296836,
+                0.03596337482296836
+              ]
+            }
+          ],
+          "verdict": "뚜렷한 개선을 확인하지 못했습니다"
+        },
+        {
+          "role": "pitcher",
+          "label": "수비 AI",
+          "before": {
+            "mean": 2.1853333333333333,
+            "n": 1500,
+            "interval": [
+              2.051647503326393,
+              2.3190191633402737
+            ]
+          },
+          "after": {
+            "mean": 1.1753333333333333,
+            "n": 1500,
+            "interval": [
+              1.082346178434994,
+              1.2683204882316728
+            ]
+          },
+          "change": {
+            "mean": 1.01,
+            "n": 1500,
+            "interval": [
+              0.8817916393164389,
+              1.1382083606835611
+            ]
+          },
+          "by_seed": [
+            {
+              "seed": 851,
+              "mean": 1.166,
+              "n": 500,
+              "interval": [
+                0.9453782657123733,
+                1.3866217342876266
+              ]
+            },
+            {
+              "seed": 852,
+              "mean": 0.774,
+              "n": 500,
+              "interval": [
+                0.5606790612184418,
+                0.9873209387815582
+              ]
+            },
+            {
+              "seed": 853,
+              "mean": 1.09,
+              "n": 500,
+              "interval": [
+                0.859156070212276,
+                1.3208439297877241
+              ]
+            }
+          ],
+          "verdict": "좋아졌습니다"
+        }
+      ],
+      "headline": "학습한 두 AI의 맞대결: 이닝당 1.13점",
+      "growth_headline": "공격 AI 뚜렷한 개선을 확인하지 못했습니다 / 수비 AI 좋아졌습니다",
+      "scope": "무사·주자 없음에서 세 아웃까지의 총득점입니다. 득점만으로 공격·수비의 우열이나 9이닝 승률을 정하지 않습니다.",
+      "uncertainty": "범위는 시뮬레이션 추첨 오차의 근사치입니다. 반복별 차이·실제 자료의 편향·모형 오차는 별도로 봐야 합니다."
+    },
+    "both_networks_updated": [
+      true,
+      true,
+      true
+    ],
+    "scope": "Three-out offensive half inning, not a nine-inning game or pitch-level policy."
+  },
+  "verification": {
+    "full_pytest_passed": 209,
+    "original_reproduction_cases_passed": 210,
+    "preserved_original_files": 678,
+    "actual_browser": "MLB 2023/2024, KBO original/improved, old R1 + new study training, replay, reopen, desktop/mobile, keyboard; no page errors",
+    "fresh_install": "Verified real official cache transport, failure/retry and offline tests; not a new live-source accessibility claim.",
+    "repository_audit": {
+      "tracked_private_artifact_paths": 0,
+      "known_key_pattern_hits": 0,
+      "scope": "Registered private paths and recognized key patterns only; not a full security certification."
+    }
+  }
+}

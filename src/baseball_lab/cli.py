@@ -12,7 +12,7 @@ from baseball_lab.experiments.registry import REPOSITORY_ROOT
 def main():
     if os.name=='posix':os.umask(0o077)
     parser=argparse.ArgumentParser(description='야구 AI 연구실 · 실제 데이터와 실행 근거로 관찰하는 E01')
-    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run','scoring','simulate'),default='web')
+    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run','scoring','inning','simulate'),default='web')
     parser.add_argument('--port',type=int,default=8765,help='웹 연구실 포트')
     parser.add_argument('--authorization-reference',help='자동 수집에 별도로 허용받은 근거 (기본은 수동 내보내기)')
     parser.add_argument('--data-dir',type=Path,default=REPOSITORY_ROOT/'data/local/statcast')
@@ -38,9 +38,9 @@ def main():
     parser.add_argument('--bases',type=int,default=1)
     parser.add_argument('--policy-style',choices=('basic','random'),default='basic')
     args=parser.parse_args()
-    args.start=args.start or ('2024-03-20' if args.mode in ('scoring','simulate') else '2024-05-01')
-    args.end=args.end or ('2024-09-30' if args.mode in ('scoring','simulate') else '2024-05-06')
-    args.evaluate_every=args.evaluate_every or (max(200,args.episodes//3) if args.mode=='scoring' else 200)
+    args.start=args.start or ('2024-03-20' if args.mode in ('scoring','inning','simulate') else '2024-05-01')
+    args.end=args.end or ('2024-09-30' if args.mode in ('scoring','inning','simulate') else '2024-05-06')
+    args.evaluate_every=args.evaluate_every or (max(200,args.episodes//3) if args.mode in ('scoring','inning') else 200)
     if args.list:
         print('E01 · 실제 경기 기록으로 득점·실점 방어를 배우는 상황 실험. 웹에서 AI 학습 시작을 누르세요. 전체 경기 승리는 아직 미지원입니다.')
         return
@@ -62,7 +62,7 @@ def main():
             dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
             observe(dataset,args.start,args.end,output,seed=args.seed,outs=args.outs,bases=args.bases,source=args.observation_source,style=args.policy_style)
             print('관찰 완료 · 정책 학습 없이 실제 기록 또는 모델 전이를 재생합니다.',flush=True)
-        elif args.mode=='scoring':
+        elif args.mode in ('scoring','inning'):
             from baseball_lab.data.catalog import DatasetCatalog
             from baseball_lab.r1.training import train,Config
             seeds=tuple(int(s.strip()) for s in args.seeds.split(',')) if args.seeds else (args.seed,args.seed+1,args.seed+2)
@@ -70,8 +70,20 @@ def main():
             config.validate()
             dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
             print('단계 2 · 경기와 날짜를 나눠 실제 전이 분포를 검사합니다.',flush=True)
-            print('단계 3 · 출루가 아닌 한 점 득점·실점 방어를 학습합니다. 전체 경기 승리는 아닙니다.',flush=True)
-            train(dataset,args.start,args.end,output,config)
+            if args.mode=='inning':
+                from baseball_lab.experiments.match.team_win.half_inning import train,completion_aligned
+                from baseball_lab.matchup.outcome_details import index
+                details=index(REPOSITORY_ROOT,datetime.fromisoformat(args.start).year)
+                dataset=completion_aligned(dataset,details['game_completion_dates'])
+                codes=details['pitch_codes'];evidence={'source_sha256':details['source_sha256'],
+                    'completed_pa_n':details['pa_n'],'pitchout':codes.get('P',0),
+                    'swing_on_pitchout':sum(codes.get(k,0) for k in 'QRY')}
+                evidence['reason']=f"실제 {details['pa_n']:,}타석에서 피치아웃 P {evidence['pitchout']}개, 이에 대한 스윙·접촉 Q/R/Y {evidence['swing_on_pitchout']}개입니다. 현재 원천에는 구종·구속·위치가 없고, 피치아웃에 스윙했을 때의 결과 표본도 부족합니다. 던지지 않은 공의 결과를 만들어내지 않고, 실제로 확인 가능한 아웃·주자 전이와 번트·고의볼넷 선택으로 총득점을 학습합니다."
+                print('단계 3 · 세 아웃까지 총득점 최대화·실점 최소화를 학습합니다.',flush=True)
+                train(dataset,args.start,args.end,output,config,evidence=evidence)
+            else:
+                print('단계 3 · 출루가 아닌 한 점 득점·실점 방어를 학습합니다.',flush=True)
+                train(dataset,args.start,args.end,output,config)
         elif args.mode=='run':
             from baseball_lab.research.pipeline import Plan,run
             run(Plan(args.start,args.end),args.data_dir,output,episodes=args.episodes,seed=args.seed,authorization_reference=args.authorization_reference)

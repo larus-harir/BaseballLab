@@ -101,7 +101,11 @@ def verified_distribution_transport(root):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--skip-fresh',action='store_true')
     parser.add_argument('--screenshots',type=Path,default=ROOT/'docs/images/incremental')
-    args=parser.parse_args();out=args.screenshots;out.mkdir(parents=True,exist_ok=True)
+    parser.add_argument('--no-screenshots',action='store_true',help='검사만 실행하고 기존 이미지를 보존합니다.')
+    args=parser.parse_args();out=args.screenshots
+    if not args.no_screenshots:out.mkdir(parents=True,exist_ok=True)
+    def capture(target,**options):
+        if not args.no_screenshots:target.screenshot(**options)
     errors=[];scenarios=[];contrast=[]
     with sync_playwright() as playwright,local_server(ROOT) as (base,workbench):
         browser=playwright.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox'])
@@ -110,13 +114,16 @@ def main():
         page=context.new_page();page.goto(base+'/')
         page.keyboard.press('Tab')
         assert page.evaluate('document.activeElement.tagName')=='A','keyboard focus did not reach navigation'
-        page.screenshot(path=str(out/'home-desktop.png'),full_page=True)
+        capture(page,path=str(out/'home-desktop.png'),full_page=True)
         page.locator('a[href="/baseball"]').last.click()
         expect(page.locator('#selectors')).to_be_visible(timeout=120000)
         expect(page.locator('#model')).to_be_hidden();expect(page.locator('#seed')).to_be_hidden()
         run_matchup(page,'Aaron Judge','Tarik Skubal')
         contrast=[text_contrast(page,selector) for selector in ('body','#calculate','.fact small')]
-        page.screenshot(path=str(out/'baseball-2024.png'),full_page=True)
+        capture(page,path=str(out/'baseball-2024.png'),full_page=True)
+        expect(page.locator('#eventChart .chartrow')).not_to_have_count(8)
+        page.locator('#eventFilter').select_option('strikeout');page.locator('#firstFiltered').click()
+        expect(page.locator('#replayOutcome')).to_have_text('삼진');page.locator('#eventFilter').select_option('all');page.locator('#firstFiltered').click()
         position=page.locator('#replayPosition').inner_text()
         page.locator('#next').click();expect(page.locator('#replayPosition')).not_to_have_text(position)
         page.locator('#previous').click();expect(page.locator('#replayPosition')).to_have_text(position)
@@ -127,8 +134,8 @@ def main():
         page.locator('#advanced > summary').click();expect(page.locator('#model')).to_be_visible();expect(page.locator('#seed')).to_be_visible()
         page.locator('#advanced > summary').click()
         details=page.locator('#context details').first
-        details.locator('summary').click();page.locator('#explanation').screenshot(path=str(out/'calculation-explanation.png'))
-        report=page.locator('#reportLink a').get_attribute('href')
+        details.locator('summary').first.click();capture(page.locator('#explanation'),path=str(out/'calculation-explanation.png'))
+        report=page.locator('#reportLink a').last.get_attribute('href')
         page.goto(base+report);expect(page.locator('#setup')).to_be_hidden();expect(page.locator('#resultTitle')).to_contain_text('Aaron Judge')
         scenarios.append('MLB2024 default matchup, hidden advanced settings, replay, explanation, saved report')
 
@@ -142,7 +149,7 @@ def main():
         page.locator('#context').get_by_text('이 모델의 실제 예측 검사',exact=True).click()
         expect(page.locator('#context')).to_contain_text('미래 예측이 아닌 회고 검사입니다.')
         page.locator('#context').get_by_text('이 모델의 실제 예측 검사',exact=True).click()
-        page.screenshot(path=str(out/'baseball-2023.png'),full_page=True)
+        capture(page,path=str(out/'baseball-2023.png'),full_page=True)
         scenarios.append('MLB2023 actual-season selection and matchup')
 
         original=ROOT/'data/local/catalog/kbo-assignment/catalog.json';before=original.read_bytes()
@@ -151,7 +158,7 @@ def main():
             expect(page.locator('input[type=file]')).to_have_count(0)
             page.locator('#bSeason').select_option('1982');page.locator('#pSeason').select_option('2024')
             run_matchup(page,'백인천','원태인')
-            page.screenshot(path=str(out/'eramatch.png'),full_page=True)
+            capture(page,path=str(out/'eramatch.png'),full_page=True)
         assert original.read_bytes()==before,'connected assignment catalog was rewritten'
         page.locator('#bQuery').fill('없는선수-MOCK_TEST_ONLY')
         expect(page.locator('#bPlayer')).to_contain_text('없',timeout=20000)
@@ -168,10 +175,11 @@ def main():
         expect(links.first).to_be_visible(timeout=20000)
         with page.expect_popup() as popup:links.first.click()
         research=popup.value;expect(research.locator('#verdict')).not_to_be_empty()
+        if research.locator('#tab-evolution').count():research.locator('#tab-evolution').click()
         slider=research.locator('#evolutionSlider');slider.fill(slider.get_attribute('max'))
         research.locator('#tab-watch').click();expect(research.locator('#bases svg')).to_be_visible()
         if research.locator('#next').is_enabled():research.locator('#next').click()
-        research.locator('#tab-overview').click();research.screenshot(path=str(out/'match-preserved.png'),full_page=True);research.close()
+        research.locator('#tab-overview').click();capture(research,path=str(out/'match-preserved.png'),full_page=True);research.close()
         page.goto(base+'/simulation');expect(page.locator('body')).to_contain_text('장면 살펴보기')
         scenarios.append('Existing Match report, learning stage slider, replay and independent scene route')
 
@@ -182,7 +190,7 @@ def main():
         run_matchup(mobile,'백인천','원태인')
         mobile.locator('#next').click();expect(mobile.locator('#replayPosition')).to_contain_text('2 / 25')
         assert mobile.evaluate('document.documentElement.scrollWidth <= innerWidth'),'mobile horizontal overflow'
-        mobile.screenshot(path=str(out/'mobile-390.png'),full_page=True)
+        capture(mobile,path=str(out/'mobile-390.png'),full_page=True)
         mobile.close();scenarios.append('390px mobile matchup and replay without horizontal overflow')
 
         if not args.skip_fresh:
@@ -191,11 +199,11 @@ def main():
                     page.goto(freshbase+'/baseball');expect(page.locator('#prepare')).to_be_visible(timeout=30000)
                     expect(page.locator('#selectors')).to_be_hidden()
                     assert not list(Path(freshroot).glob('outputs/workbench/*/result/analysis.json'))
-                    page.screenshot(path=str(out/'network-retry.png'),full_page=True)
+                    capture(page,path=str(out/'network-retry.png'),full_page=True)
                 with verified_distribution_transport(ROOT):
                     page.locator('#prepare').click();expect(page.locator('#selectors')).to_be_visible(timeout=120000)
                     run_matchup(page,'Aaron Judge','Tarik Skubal')
-                    page.screenshot(path=str(out/'fresh-install-result.png'),full_page=True)
+                    capture(page,path=str(out/'fresh-install-result.png'),full_page=True)
                 assert fresh.job is None or fresh.job['status']=='completed'
                 assert (Path(freshroot)/'data/local/catalog/mlb-2024/catalog.json').is_file()
             with tempfile.TemporaryDirectory(prefix='baseball-bundled-eramatch-') as empty,local_server(empty) as (emptybase,_):
@@ -204,13 +212,13 @@ def main():
                     expect(page.locator('input[type=file]')).to_have_count(0)
                     page.locator('#bSeason').select_option('2024');page.locator('#pSeason').select_option('1986')
                     run_matchup(page,'김도영','선동열')
-                    page.screenshot(path=str(out/'eramatch-built-in.png'),full_page=True)
+                    capture(page,path=str(out/'eramatch-built-in.png'),full_page=True)
                 assert not (Path(empty)/'data/local/catalog/kbo-assignment').exists()
             scenarios.append('Fresh MLB provider retry and normalization; offline built-in EraMatch with no uploaded files')
         browser.close()
     report={'browser_errors':errors,'scenarios':scenarios,'contrast_samples':contrast,'viewport_desktop':1366,'viewport_mobile':390,
             'fresh_install_transport':'skipped' if args.skip_fresh else 'verified local official distribution transport; no invented player data',
-            'screenshots':[str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else path.name for path in out.glob('*.png')]}
+            'screenshots':[] if args.no_screenshots else [str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else path.name for path in out.glob('*.png')]}
     encoded=json.dumps(report,ensure_ascii=False,indent=2)
     Path('/tmp/baseball-incremental-browser-results.json').write_text(encoded)
     suffix='focused' if args.skip_fresh else 'full'

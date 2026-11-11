@@ -67,7 +67,7 @@ class Workbench:
         # a missing cache is not a request for users to find/upload a CSV.
         result['scoring']={'available':True,'cached':(self.root/'data/local/retrosheet/official-2024/dataset.json').exists(),
                            'title':'실제 Retrosheet 기록으로 득점 상황 학습',
-                           'reason':'2024년 공식 배포 자료를 자동 준비하고 재사용합니다. 최초 실행에는 인터넷이 필요합니다. 전체 경기 승리 학습은 아닙니다.'}
+                           'reason':'선택한 시즌의 공식 배포 자료를 자동 준비하고 재사용합니다. 처음 받을 때만 인터넷이 필요합니다.'}
         return result
 
     def state(self,project=None):
@@ -90,6 +90,10 @@ class Workbench:
                     if data.get('schema')=='E01-R1-research-v1':
                         from baseball_lab.experiments.match.reporting.summary import build_summary
                         reading=build_summary(data)
+                        run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
+                    elif data.get('schema')=='Match-half-inning-research-v1':
+                        from baseball_lab.experiments.match.reporting.inning import summary
+                        reading=summary(data)
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
                 if len(runs)>=30:break
             except (OSError,ValueError,KeyError):continue
@@ -211,6 +215,9 @@ class Workbench:
             if kind in ('run','simulate'):
                 source='retrosheet' if kind=='simulate' else options.get('source','statcast')
                 if source not in ('statcast','retrosheet'):raise ValueError('지원하지 않는 자료 연결입니다.')
+                study=options.get('study','one_run')
+                if study not in ('one_run','half_inning'):raise ValueError('학습 목표를 확인하세요.')
+                if study=='half_inning' and source!='retrosheet':raise ValueError('이닝 득점 학습은 공식 경기 기록으로 실행합니다.')
                 if source=='retrosheet':
                     first=date.fromisoformat(str(options.get('start','')));last=date.fromisoformat(str(options.get('end','')))
                     from baseball_lab.data.retrosheet_releases import RELEASES
@@ -224,6 +231,7 @@ class Workbench:
                 if type(episodes) is not int or not 20<=episodes<=100000:raise ValueError('학습 타석 수는 20~100,000 사이의 정수입니다.')
                 if type(seed) is not int or not 0<=seed<=2**31-1:raise ValueError('재현 번호 범위를 확인하세요.')
                 extra=['--mode','scoring' if source=='retrosheet' else 'run','--start',start,'--end',end,'--episodes',str(episodes),'--seed',str(seed)]
+                if source=='retrosheet' and study=='half_inning':extra[1]='inning'
                 if source=='retrosheet' and kind=='run':
                     if seed>2**31-3:raise ValueError('여러 재현 번호를 만들기 위해 seed는 2,147,483,645 이하여야 합니다.')
                     extra.extend(['--evaluation-n','500'])
@@ -257,6 +265,7 @@ class Workbench:
             self.job={'id':job_id,'kind':kind,'status':'queued','started_at':utc_now(),'logs':[],
                       'report':None,'message':'작업을 준비하고 있어요.'}
             if kind in ('run','simulate') and source=='retrosheet':self.job['source_year']=start[:4]
+            if kind=='run':self.job['study']=study
             self._persist()
             command=[sys.executable,'-u',str(self.root/'scripts/quickstart.py'),'--data-dir',str(self.data),
                      '--output',str(output/'result'),*extra]
@@ -328,6 +337,12 @@ class Workbench:
 def make_handler(workbench):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
+        def handle(self):
+            try:super().handle()
+            except (BrokenPipeError,ConnectionResetError):
+                # Navigation cancels an in-flight status poll; this is not a
+                # failed training job. Keep actual request/worker errors visible.
+                pass
         def _host_ok(self):
             host=self.headers.get('Host','')
             port=self.server.server_port
@@ -403,6 +418,9 @@ def make_handler(workbench):
                             external=[json.loads(p.read_text(encoding='utf-8')) for p in sorted(resolved.parent.glob('external-*.json'))]
                             evidence['external_evaluation']=[r for r in external if r.get('run_id')==evidence['run_id']]
                             from baseball_lab.experiments.match.reporting.report import render
+                            return self._html(render(evidence))
+                        if evidence.get('schema')=='Match-half-inning-research-v1':
+                            from baseball_lab.experiments.match.reporting.inning import render
                             return self._html(render(evidence))
                     except (OSError,ValueError,KeyError,TypeError) as exc:
                         return self._json({'error':public_text(f'결과 근거를 읽을 수 없습니다: {exc}')},409)

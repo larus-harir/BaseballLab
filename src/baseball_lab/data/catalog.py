@@ -5,6 +5,7 @@ player-season catalogs for BaseballLab/EraMatch; the existing observed-turn
 dataset for Match. Inspecting readiness never starts downloads or rewrites data.
 """
 import json
+import csv
 from pathlib import Path
 
 from baseball_lab.data.lineage import checksum,utc_now
@@ -123,6 +124,15 @@ class DatasetCatalog:
                     'automatic_preparation':False,'supported_seasons':[] if project=='eramatch' else self.supported_seasons(project),
                     'seasons':[],'metadata':None,'error':str(exc),'message':f'보관 자료를 확인해야 합니다: {exc}'})
         return result
+
+    def iter_plays(self,season):
+        """Verified official plays, including non-PA events; callers choose units."""
+        self.source_id('match',season)
+        descriptor=self.describe('match',season)
+        if not descriptor['ready']:raise ValueError('이 시즌의 플레이별 원본이 없어 세부 사건을 확인할 수 없습니다.')
+        with (self._raw_directory(season)/f'{season}plays.csv').open(encoding='utf-8-sig',newline='') as file:
+            for row in csv.DictReader(file):
+                if row['gametype']=='regular' and row['pbp']=='full':yield row
 
     def _raw_directory(self,season):
         path=self.root/f'data/local/retrosheet/official-{season}';current=self.root

@@ -1,7 +1,7 @@
 # BaseballLab development contract
 
 Keep this repository and the working application; improve it incrementally.
-The current user directive is `docs/specs/BaseballLab_Incremental_Redesign_Codex_Directive.md`.
+The current product directive is `docs/specs/BaseballLab_Codex_Product_Completion_Ultimatum.md`.
 User instructions take precedence over this file and archived plans.
 
 ## Stable responsibilities
@@ -9,7 +9,7 @@ User instructions take precedence over this file and archived plans.
 - BaseballLab is the executable statistical player matchup program and owner of
   shared data, probability contracts and simulation services.
 - Match owns competitive AI learning, adaptation and comparison with modern and
-  historical human baseball. Its existing one-run experiment remains limited.
+  historical human baseball. Its one-run and three-out run-maximization studies retain explicit observational limits.
 - EraMatch is the supplied KBO historical-player assignment's web application.
   Reproduction and improved candidates share the same engine, with different
   versions and evidence states. It is not AI-versus-human history research.
@@ -41,8 +41,15 @@ User instructions take precedence over this file and archived plans.
   model selection and data inspection settings under optional advanced details.
 - Reuse `matchup`, the existing providers, catalog paths, Match training and
   reports. Do not create a second app or duplicate probability implementations.
-- Delegate independent modules and reviews when useful. Give each agent explicit
-  file ownership; coordinate contract changes before editing shared callers.
+- Use one main agent by default; ordinary fixes, UI, tests and docs are its work.
+  Use subagents only for essential independent specialist validation, maximum
+  two at once, with narrowly assigned files/questions and concise findings.
+- Read related files and the current directive rather than repeating whole-repo
+  research or old plans. Reuse working code. Do not add unsolicited features,
+  plans, documents, screenshots or repeated searches.
+- Report only changed functionality, main files, test results and remaining
+  problems, concisely. Run focused checks during work and full regression for
+  core/data/security changes or final integration.
 
 ## Completion gates
 

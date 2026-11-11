@@ -133,4 +133,8 @@ def analyze(root,project,options):
     result['run_id']=content_hash({'dataset_id':catalog['dataset_id'],'batter':b['id'],'pitcher':p['id'],
                                    'model':model,'n':simulation['n'],'seed':simulation['seed'],
                                    'repetitions':simulation['repetitions']})
+    from .outcome_details import attach
+    from .reading import interpret
+    attach(root,result)
+    result['reading']=interpret(result)
     return result
