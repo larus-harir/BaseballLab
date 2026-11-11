@@ -1,0 +1,105 @@
+{
+  "checked_at": "2026-11-11T01:47:51.360172+00:00",
+  "sources": [
+    {
+      "url": "https://sabr.org/journal/article/matchup-probabilities-in-major-league-baseball/",
+      "status": 200,
+      "sha256": "c0dd9bcb85be05d6ac3efeeb2915b8dca0865d325e636acc48629e85aedd9724",
+      "title": "Matchup Probabilities in Major League Baseball &#8211; Society for American Baseball Research",
+      "definition_excerpt": "The base probability alone is not sufficient, however, because the sum of all possible base probabilities may not equal one. Thus, we must normalize the base probability by dividing it by the sum of the base probabilities of all possible events."
+    },
+    {
+      "url": "https://www.mlb.com/glossary/advanced-stats/babip",
+      "status": 200,
+      "sha256": "47ce0ffe002c5e2da7f46320160ace63e74e4f359983e058c70375cc68fa81eb",
+      "title": "Batting Average on Balls in Play (BABIP) | Glossary | MLB.com",
+      "definition_excerpt": "Definition BABIP measures a player's batting average exclusively on balls hit into the field of play, removing outcomes not affected by the opposing defense (namely home runs and strikeouts). For example, a hitter who goes 2-for-5 with a home run and a strikeout would have a .333 BABIP. He's 1-for-3 on the balls he put in play. The formula (H - HR)"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/advanced-stats/fielding-independent-pitching",
+      "status": 200,
+      "sha256": "4fd0bfa3bedb0bb360f8a48dc234bc045264fac5141e35a438ebaac533b21a5a",
+      "title": "Fielding Independent Pitching (FIP) | Glossary | MLB.com",
+      "definition_excerpt": "Definition FIP is similar to ERA, but it focuses solely on the events a pitcher has the most control over -- strikeouts, walks, hit-by-pitches and home runs. It entirely removes results on balls hit into the field of play. For example: If a pitcher has surrendered a high average on balls in play, his FIP will likely be lower than his ERA. Balls in "
+    },
+    {
+      "url": "https://www.mlb.com/glossary/advanced-stats/strikeout-rate",
+      "status": 200,
+      "sha256": "cb0ce26cf51e778f5b24447bfd0fb9ce8ed338040994e4f0cd87ec6291307a81",
+      "title": "Strikeout Rate (K%) | Glossary | MLB.com",
+      "definition_excerpt": "Definition Strikeout rate represents the frequency with which a pitcher strikes out hitters, as determined by total strikeouts divided by total batters faced. The K rate leaderboards are generally made up of the game's best pitchers. However, plenty of pitchers have succeeded with lower strikeout rates, generally because they are able to induce wea"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/advanced-stats/strikeouts-per-nine-innings",
+      "status": 200,
+      "sha256": "91b0c76c15fa247f3432cfd020f55ce674c8060e84499aee2c090f22541dd55e",
+      "title": "Strikeouts Per Nine Innings (K/9) | Glossary | MLB.com",
+      "definition_excerpt": "Definition K/9 rate measures how many strikeouts a pitcher averages for every nine innings pitched. It is determined by dividing his strikeout total by his innings pitched total and multiplying the result by nine. Because a strikeout is so straightforward -- with no chance of error or bad luck, like on a ball in play -- a pitcher's K/9 rate reveals"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/advanced-stats/walk-rate",
+      "status": 200,
+      "sha256": "40eb4e917c361f708784abf3dd25ff32e2733a39cab138e51c7ecda0825b14a6",
+      "title": "Walk Rate (BB%) | Glossary | MLB.com",
+      "definition_excerpt": "Definition Walk rate represents the frequency with which a pitcher walks hitters, as determined by total walks divided by total batters faced. It's an important tool for assessing a pitcher's capabilities and perhaps the most important in judging a pitcher's tendency to walk batters. Obviously, one of a pitcher's primary goals is to avoid putting h"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/advanced-stats/walks-per-nine-innings",
+      "status": 200,
+      "sha256": "170d89d67bbf8ddbe92ab04b5beaaac3236405bcc6172b9e262fc6d18809ce19",
+      "title": "Walks Per Nine Innings (BB/9) | Glossary | MLB.com",
+      "definition_excerpt": "Definition Walks per nine innings tells us how many walks a given pitcher allows per nine innings pitched -- using the formula walks divided by innings times nine. Obviously, a pitcher's goal is to keep opposing batters off the bases -- and a walk does just the opposite of that. If he allows a ball in play, he at least puts the outcome in the hands"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/advanced-stats/weighted-on-base-average",
+      "status": 200,
+      "sha256": "0df7f517b6c6c69348a68039c39e33db93e2e3cb8de455f0a5f6273ca7953929",
+      "title": "Weighted On-base Average (wOBA) | Glossary | MLB.com",
+      "definition_excerpt": "Definition wOBA is a version of on-base percentage that accounts for how a player reached base -- instead of simply considering whether a player reached base. The value for each method of reaching base is determined by how much that event is worth in relation to projected runs scored (example: a double is worth more than a single). For instance: In"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/advanced-stats/weighted-runs-created-plus",
+      "status": 200,
+      "sha256": "d7af92cd26d56e55f8f44ad2913b4f9a73363877cee18719acbfb9f22fde8df3",
+      "title": "Weighted Runs Created Plus (wRC+) | Glossary | MLB.com",
+      "definition_excerpt": "Definition wRC+ is a stat that measures a hitter's overall offensive value compared to league average. It takes all of a hitter's contributions at the plate and translates that to his impact on runs created for his team. wRC+ attempts to credit the hitter for the appropriate value of each outcome of a plate appearance -- a home run is worth more th"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/advanced-stats/wins-above-replacement",
+      "status": 200,
+      "sha256": "9fb91196fc4372c5babfc286eb7c2b379f7f5000c512b45dfc6bc4519803305d",
+      "title": "Wins Above Replacement (WAR) | Glossary | MLB.com",
+      "definition_excerpt": "Definition WAR measures a player's value in all facets of the game by deciphering how many more wins he's worth than a replacement-level player at his same position (e.g., a Minor League replacement or a readily available fill-in free agent). For example, if a shortstop and a first baseman offer the same overall production (on offense, defense and "
+    },
+    {
+      "url": "https://www.mlb.com/glossary/standard-stats/batting-average",
+      "status": 200,
+      "sha256": "f78cb82756135e610a23fd145f94636937e00d675fa1d9cdb1b24d6a945b4451",
+      "title": "Batting Average | Glossary | MLB.com",
+      "definition_excerpt": "Definition One of the oldest and most universal tools to measure a hitter's success at the plate, batting average is determined by dividing a player's hits by his total at-bats for a number between zero (shown as .000) and one (1.000). In recent years, the league-wide batting average has typically hovered around .250. While batting average is a use"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/standard-stats/on-base-percentage",
+      "status": 200,
+      "sha256": "7a65f2c50b8ad0e4c4c0080c6f4896f54b1c54ec6409cad06bd33b8f1e2848ee",
+      "title": "On-base Percentage (OBP) | Glossary | MLB.com",
+      "definition_excerpt": "Definition OBP refers to how frequently a batter reaches base per plate appearance. Times on base include hits, walks and hit-by-pitches, but do not include errors, times reached on a fielder's choice or a dropped third strike. (Separately, sacrifice bunts are removed from the equation entirely, because it is rarely a hitter's decision to sacrifice"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/standard-stats/on-base-plus-slugging",
+      "status": 200,
+      "sha256": "b36d0c5e3dd94c6a4ef12f9ae101508c93fa1c24e5a4ad4d09fd21c23b6fc9da",
+      "title": "On-base Plus Slugging (OPS) | Glossary | MLB.com",
+      "definition_excerpt": "Definition OPS adds on-base percentage and slugging percentage to get one number that unites the two. It's meant to combine how well a hitter can reach base, with how well he can hit for average and for power. It can also be used in evaluating pitchers; when used in that context, it is referred to as OPS against. \n OPS leaders:   All-time  |  Singl"
+    },
+    {
+      "url": "https://www.mlb.com/glossary/standard-stats/slugging-percentage",
+      "status": 200,
+      "sha256": "fc2bba7ccc394d146b4e894c509bca4b7bba948c0a97aab8287c13d54e469edc",
+      "title": "Slugging Percentage (SLG) | Glossary | MLB.com",
+      "definition_excerpt": "Definition Slugging percentage represents the total number of bases a player records per at-bat. Unlike on-base percentage, slugging percentage deals only with hits and does not include walks and hit-by-pitches in its equation. Slugging percentage differs from batting average in that all hits are not valued equally. While batting average is calcula"
+    }
+  ],
+  "scope": "Human-readable definition pages and headings checked; no player data collection permission or model validity inferred.",
+  "excerpt_scope": "Short page-identification snippets only; no raw player data or full articles redistributed."
+}

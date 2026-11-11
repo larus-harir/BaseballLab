@@ -1,0 +1,689 @@
+{
+  "split": {
+    "fit": {
+      "n": 108740,
+      "games": 1449,
+      "record_hash": "3e74747b88b8b96f905ed83e8fe5f68ef1260aee4d94d85cbe7f8fc152446cb7",
+      "available_dates": [
+        "20240320",
+        "20240714"
+      ]
+    },
+    "validation": {
+      "n": 37403,
+      "games": 496,
+      "record_hash": "1dc50162113a6ffcb5cf67cc340228ed5eac0b2d90317a6482a55e2338db7fd0",
+      "available_dates": [
+        "20240719",
+        "20240824"
+      ]
+    },
+    "test": {
+      "n": 36306,
+      "games": 484,
+      "record_hash": "7c4552c27aa959d2d92af39e4c2121c13ed526098bc1fe9b78fddf55f68e0a13",
+      "available_dates": [
+        "20240825",
+        "20240930"
+      ]
+    }
+  },
+  "strength": 300,
+  "target_season_tuning": false,
+  "validation_used_for_selection": false,
+  "test": {
+    "n": 36306,
+    "games": 484,
+    "record_hash": "7c4552c27aa959d2d92af39e4c2121c13ed526098bc1fe9b78fddf55f68e0a13",
+    "models": {
+      "league": {
+        "n": 36306,
+        "log_loss": 1.4803972134257266,
+        "brier": 0.7062914273956759,
+        "zero_observation_probability_n": 0,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 36306,
+            "predicted_sum": 7907.255821220524,
+            "observed_sum": 7872
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "event_calibration": {
+          "strikeout": {
+            "n": 36306,
+            "predicted_sum": 8084.545558216828,
+            "observed_sum": 8488
+          },
+          "walk": {
+            "n": 36306,
+            "predicted_sum": 2978.8682361621436,
+            "observed_sum": 2963
+          },
+          "hbp": {
+            "n": 36306,
+            "predicted_sum": 410.67114217389656,
+            "observed_sum": 369
+          },
+          "single": {
+            "n": 36306,
+            "predicted_sum": 5153.088136841746,
+            "observed_sum": 5203
+          },
+          "double": {
+            "n": 36306,
+            "predicted_sum": 1552.5372448047622,
+            "observed_sum": 1478
+          },
+          "triple": {
+            "n": 36306,
+            "predicted_sum": 142.90020231746453,
+            "observed_sum": 114
+          },
+          "home_run": {
+            "n": 36306,
+            "predicted_sum": 1058.7302372638278,
+            "observed_sum": 1077
+          },
+          "other": {
+            "n": 36306,
+            "predicted_sum": 16924.659242222413,
+            "observed_sum": 16614
+          }
+        }
+      },
+      "batter": {
+        "n": 36306,
+        "log_loss": 1.4715837661661642,
+        "brier": 0.7028593303479083,
+        "zero_observation_probability_n": 0,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 1874,
+            "predicted_sum": 367.2222292487766,
+            "observed_sum": 375
+          },
+          {
+            "n": 34432,
+            "predicted_sum": 7624.866723923199,
+            "observed_sum": 7497
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "event_calibration": {
+          "strikeout": {
+            "n": 36306,
+            "predicted_sum": 8039.50454711619,
+            "observed_sum": 8488
+          },
+          "walk": {
+            "n": 36306,
+            "predicted_sum": 3004.590350791307,
+            "observed_sum": 2963
+          },
+          "hbp": {
+            "n": 36306,
+            "predicted_sum": 410.62338104895156,
+            "observed_sum": 369
+          },
+          "single": {
+            "n": 36306,
+            "predicted_sum": 5190.097903026462,
+            "observed_sum": 5203
+          },
+          "double": {
+            "n": 36306,
+            "predicted_sum": 1564.041216239478,
+            "observed_sum": 1478
+          },
+          "triple": {
+            "n": 36306,
+            "predicted_sum": 145.93055823027453,
+            "observed_sum": 114
+          },
+          "home_run": {
+            "n": 36306,
+            "predicted_sum": 1092.019275676246,
+            "observed_sum": 1077
+          },
+          "other": {
+            "n": 36306,
+            "predicted_sum": 16859.192767871657,
+            "observed_sum": 16614
+          }
+        }
+      },
+      "log5": {
+        "n": 36306,
+        "log_loss": 1.4680192745215697,
+        "brier": 0.7014730364159936,
+        "zero_observation_probability_n": 0,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 4859,
+            "predicted_sum": 927.9365875118506,
+            "observed_sum": 910
+          },
+          {
+            "n": 31444,
+            "predicted_sum": 7058.538546696515,
+            "observed_sum": 6961
+          },
+          {
+            "n": 3,
+            "predicted_sum": 0.9306019093283484,
+            "observed_sum": 1
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "event_calibration": {
+          "strikeout": {
+            "n": 36306,
+            "predicted_sum": 8096.418376085295,
+            "observed_sum": 8488
+          },
+          "walk": {
+            "n": 36306,
+            "predicted_sum": 2931.7940994013256,
+            "observed_sum": 2963
+          },
+          "hbp": {
+            "n": 36306,
+            "predicted_sum": 402.8215921464836,
+            "observed_sum": 369
+          },
+          "single": {
+            "n": 36306,
+            "predicted_sum": 5192.452002447716,
+            "observed_sum": 5203
+          },
+          "double": {
+            "n": 36306,
+            "predicted_sum": 1556.476994238939,
+            "observed_sum": 1478
+          },
+          "triple": {
+            "n": 36306,
+            "predicted_sum": 146.32084169946032,
+            "observed_sum": 114
+          },
+          "home_run": {
+            "n": 36306,
+            "predicted_sum": 1092.1558977314387,
+            "observed_sum": 1077
+          },
+          "other": {
+            "n": 36306,
+            "predicted_sum": 16887.560196249393,
+            "observed_sum": 16614
+          }
+        }
+      },
+      "binary_normalized_candidate": {
+        "n": 36306,
+        "log_loss": 1.468026239908982,
+        "brier": 0.7014810621306538,
+        "zero_observation_probability_n": 0,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 4857,
+            "predicted_sum": 927.6780428409695,
+            "observed_sum": 918
+          },
+          {
+            "n": 31446,
+            "predicted_sum": 7058.5594611333645,
+            "observed_sum": 6953
+          },
+          {
+            "n": 3,
+            "predicted_sum": 0.9289777197796782,
+            "observed_sum": 1
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "event_calibration": {
+          "strikeout": {
+            "n": 36306,
+            "predicted_sum": 8096.3392257128735,
+            "observed_sum": 8488
+          },
+          "walk": {
+            "n": 36306,
+            "predicted_sum": 2931.9442906878708,
+            "observed_sum": 2963
+          },
+          "hbp": {
+            "n": 36306,
+            "predicted_sum": 402.78118844935,
+            "observed_sum": 369
+          },
+          "single": {
+            "n": 36306,
+            "predicted_sum": 5192.3554783492755,
+            "observed_sum": 5203
+          },
+          "double": {
+            "n": 36306,
+            "predicted_sum": 1556.4431468771554,
+            "observed_sum": 1478
+          },
+          "triple": {
+            "n": 36306,
+            "predicted_sum": 146.28783577732597,
+            "observed_sum": 114
+          },
+          "home_run": {
+            "n": 36306,
+            "predicted_sum": 1092.0800206903425,
+            "observed_sum": 1077
+          },
+          "other": {
+            "n": 36306,
+            "predicted_sum": 16887.768813455757,
+            "observed_sum": 16614
+          }
+        }
+      }
+    },
+    "coverage": {
+      "predicted_n": 36306,
+      "prediction_fraction": 1.0,
+      "both_players_seen_n": 29561,
+      "both_players_seen_fraction": 0.8142180355864045,
+      "cold_start_n": 6745,
+      "small_fit_sample_n": 15677,
+      "cold_start_rule": "Unknown side uses the fit-period league distribution, not future player records.",
+      "small_sample_rule": "At least one fit-period player denominator below 100 PA/TBF; threshold is a reporting group, not a filter."
+    },
+    "subgroups": {
+      "both_seen": {
+        "league": {
+          "n": 29561,
+          "log_loss": 1.4804399370666683,
+          "brier": 0.7065547117468981,
+          "zero_observation_probability_n": 0
+        },
+        "batter": {
+          "n": 29561,
+          "log_loss": 1.4711664222775485,
+          "brier": 0.7028757102166295,
+          "zero_observation_probability_n": 0
+        },
+        "log5": {
+          "n": 29561,
+          "log_loss": 1.466900880021249,
+          "brier": 0.7012621971058434,
+          "zero_observation_probability_n": 0
+        },
+        "binary_normalized_candidate": {
+          "n": 29561,
+          "log_loss": 1.4669094347168112,
+          "brier": 0.7012720540659155,
+          "zero_observation_probability_n": 0
+        }
+      },
+      "cold_start": {
+        "league": {
+          "n": 6745,
+          "log_loss": 1.4802099704966747,
+          "brier": 0.7051375432284408,
+          "zero_observation_probability_n": 0
+        },
+        "batter": {
+          "n": 6745,
+          "log_loss": 1.473412839952656,
+          "brier": 0.7027875430537665,
+          "zero_observation_probability_n": 0
+        },
+        "log5": {
+          "n": 6745,
+          "log_loss": 1.4729208104479354,
+          "brier": 0.7023970721235063,
+          "zero_observation_probability_n": 0
+        },
+        "binary_normalized_candidate": {
+          "n": 6745,
+          "log_loss": 1.4729208104479354,
+          "brier": 0.7023970721235063,
+          "zero_observation_probability_n": 0
+        }
+      },
+      "small_fit_sample": {
+        "league": {
+          "n": 15677,
+          "log_loss": 1.4850748370224658,
+          "brier": 0.7085886458581456,
+          "zero_observation_probability_n": 0
+        },
+        "batter": {
+          "n": 15677,
+          "log_loss": 1.4771600037827635,
+          "brier": 0.7057217662261198,
+          "zero_observation_probability_n": 0
+        },
+        "log5": {
+          "n": 15677,
+          "log_loss": 1.475154643085252,
+          "brier": 0.7048790437331361,
+          "zero_observation_probability_n": 0
+        },
+        "binary_normalized_candidate": {
+          "n": 15677,
+          "log_loss": 1.4751527505556599,
+          "brier": 0.7048777239124556,
+          "zero_observation_probability_n": 0
+        }
+      },
+      "larger_fit_sample": {
+        "league": {
+          "n": 20629,
+          "log_loss": 1.4768424553114174,
+          "brier": 0.7045456571770133,
+          "zero_observation_probability_n": 0
+        },
+        "batter": {
+          "n": 20629,
+          "log_loss": 1.4673461067005178,
+          "brier": 0.7006840233886331,
+          "zero_observation_probability_n": 0
+        },
+        "log5": {
+          "n": 20629,
+          "log_loss": 1.462596754138937,
+          "brier": 0.6988846425669937,
+          "zero_observation_probability_n": 0
+        },
+        "binary_normalized_candidate": {
+          "n": 20629,
+          "log_loss": 1.4626104510967026,
+          "brier": 0.6988997704173792,
+          "zero_observation_probability_n": 0
+        }
+      }
+    }
+  },
+  "uncertainty": {
+    "available": true,
+    "games": 484,
+    "repetitions": 200,
+    "seed": 20261111,
+    "method": "Paired percentile bootstrap of whole games; ratio of resampled summed loss to resampled PA count.",
+    "comparison": {
+      "batter": {
+        "log_loss": {
+          "difference_vs_league": -0.00881344725915566,
+          "paired_game_percentile_95": [
+            -0.010098710934598375,
+            -0.007761417592193705
+          ]
+        },
+        "brier": {
+          "difference_vs_league": -0.0034320970477592404,
+          "paired_game_percentile_95": [
+            -0.0039775698462472964,
+            -0.002965668168561945
+          ]
+        }
+      },
+      "log5": {
+        "log_loss": {
+          "difference_vs_league": -0.01237793890372544,
+          "paired_game_percentile_95": [
+            -0.013878269105085871,
+            -0.010972157476030557
+          ]
+        },
+        "brier": {
+          "difference_vs_league": -0.0048183909796756606,
+          "paired_game_percentile_95": [
+            -0.005388559992334351,
+            -0.004269213395876897
+          ]
+        }
+      },
+      "binary_normalized_candidate": {
+        "log_loss": {
+          "difference_vs_league": -0.012370973516303462,
+          "paired_game_percentile_95": [
+            -0.013866459955843909,
+            -0.01095523924728903
+          ]
+        },
+        "brier": {
+          "difference_vs_league": -0.0048103652650075815,
+          "paired_game_percentile_95": [
+            -0.005373189460313648,
+            -0.004260727478857048
+          ]
+        }
+      }
+    },
+    "log5_vs_binary_normalized_candidate": {
+      "log_loss": {
+        "difference": -6.965387421978468e-06,
+        "paired_game_percentile_95": [
+          -2.492780959438383e-05,
+          6.2186227944831945e-06
+        ]
+      },
+      "brier": {
+        "difference": -8.025714668079046e-06,
+        "paired_game_percentile_95": [
+          -1.628655691346924e-05,
+          -6.405986344940745e-08
+        ]
+      }
+    },
+    "scope": "Sampling variation across observed test games only; no refitting, model-selection, missing-data or causal uncertainty. Games share players and calendar patterns not fully captured by game resampling. Negative differences favor the candidate on these observed games."
+  },
+  "schema": "statistical-same-season-regression-v1",
+  "created_at": "2026-11-11T01:55:32.088081+00:00",
+  "target_year": 2024,
+  "reference_year": 2024,
+  "dataset_ids": [
+    "26f82e19815ec38ed11e8dd2dec6158c240b8c8d5e2ac539c59248983c949394"
+  ],
+  "source": {
+    "id": "mlb-2024",
+    "source_url": "https://www.retrosheet.org/downloads/plays/2024plays.zip",
+    "files": [
+      {
+        "name": "2024plays.zip",
+        "sha256": "a3e8c08876ddf70e1ffb0b20486c2873cf4aae19e0acc8002096e9056107615b"
+      },
+      {
+        "name": "2024eve.zip",
+        "sha256": "5dfd9ed678c9c619f6a216322922c99234c067d0ec15b12790546f620ced2fa4"
+      }
+    ],
+    "license": "The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at 20 Sunset Rd., Newark, DE 19711. https://www.retrosheet.org/"
+  },
+  "parameter_selection": {
+    "source_dataset_id": "26f82e19815ec38ed11e8dd2dec6158c240b8c8d5e2ac539c59248983c949394",
+    "selected_strength": 300,
+    "rule": "Reproduce the recorded MLB2024 settings and held-out data. This is a same-season regression check, not additional independent-season evidence."
+  },
+  "model_versions": {
+    "log5": "categorical-log5-v1",
+    "binary_normalized_candidate": "one-vs-rest-log5-normalized-study-v1"
+  },
+  "code_sha256": {
+    "validation.py": "824264bb384033f4ccf5a6ec6e5c03d5534b5953bb72905ee7b89e2144fc85a7",
+    "models.py": "c5316247576e0f63c383b14a7c9f57c921587a914b58f04772dee9d7f65832b3"
+  },
+  "scope": "Same-season reproduction of existing MLB2024 test metrics. The target and parameter-reference season are both 2024; this artifact is not labeled independent-season validation.",
+  "limitations": [
+    "Matches existing 2024 calculations; no new independent season, prospective forecast or causal validation is implied.",
+    "The candidate comparison and conditional game bootstrap are descriptive additions on these same test games."
+  ],
+  "regression": {
+    "reference_artifact_sha256": "6be70900f67e421139c780edb3c443b631a52548c68ef0a914d35e00b43df874",
+    "differences": {
+      "league": {
+        "log_loss": 0.0,
+        "brier": 0.0
+      },
+      "batter": {
+        "log_loss": 0.0,
+        "brier": 0.0
+      },
+      "log5": {
+        "log_loss": 0.0,
+        "brier": 0.0
+      }
+    },
+    "passed": true
+  }
+}

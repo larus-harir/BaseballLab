@@ -86,7 +86,7 @@ def test_registered_seasons_and_external_evaluation_guard(tmp_path):
         download.assert_not_called()
     data=evidence();path=tmp_path/'research.json';path.write_text(json.dumps(data))
     original=path.read_bytes()
-    with patch('baseball_lab.experiments.match.team_win.external.acquire') as download:
+    with patch('baseball_lab.data.catalog.DatasetCatalog.ensure') as download:
         with pytest.raises(ValueError,match='다른 시즌'):external(path,2024)
         download.assert_not_called()
     assert path.read_bytes()==original

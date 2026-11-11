@@ -57,18 +57,18 @@ def main():
         from baseball_lab.outcome.empirical import fit,load_model
         from baseball_lab.tracking.evidence_report import write_report
         if args.mode=='simulate':
-            from baseball_lab.r1.provider import acquire
+            from baseball_lab.data.catalog import DatasetCatalog
             from baseball_lab.simulation.scoring import observe
-            dataset=acquire(REPOSITORY_ROOT/'data/local/retrosheet',year=datetime.fromisoformat(args.start).year)
+            dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
             observe(dataset,args.start,args.end,output,seed=args.seed,outs=args.outs,bases=args.bases,source=args.observation_source,style=args.policy_style)
             print('관찰 완료 · 정책 학습 없이 실제 기록 또는 모델 전이를 재생합니다.',flush=True)
         elif args.mode=='scoring':
-            from baseball_lab.r1.provider import acquire
+            from baseball_lab.data.catalog import DatasetCatalog
             from baseball_lab.r1.training import train,Config
             seeds=tuple(int(s.strip()) for s in args.seeds.split(',')) if args.seeds else (args.seed,args.seed+1,args.seed+2)
             config=Config(args.episodes,seeds,args.evaluate_every,args.evaluation_n)
             config.validate()
-            dataset=acquire(REPOSITORY_ROOT/'data/local/retrosheet',year=datetime.fromisoformat(args.start).year)
+            dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
             print('단계 2 · 경기와 날짜를 나눠 실제 전이 분포를 검사합니다.',flush=True)
             print('단계 3 · 출루가 아닌 한 점 득점·실점 방어를 학습합니다. 전체 경기 승리는 아닙니다.',flush=True)
             train(dataset,args.start,args.end,output,config)

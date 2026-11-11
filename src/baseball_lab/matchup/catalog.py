@@ -15,12 +15,13 @@ LEGACY_SHA='57ab8411a07b901206b0af798d9f55a00cab79ea1d61adac492e86571b2a1058'
 LEGACY_FILES=('code/KBOsimulator.py','code/kbo_batting_stats_by_season_1982-2025.csv','code/kbo_pitching_stats_by_season_1982-2025.csv')
 FIELDS=('PA','AB','H','2B','3B','HR','SO','BB','HP','SH','SF','TBF')
 SCHEMA='player-season-catalog-v1'
+CATALOG_SOURCES=('kbo-assignment','mlb-2023','mlb-2024')
 _CACHE={}
 _LOCK=threading.RLock()
 
 
 def source_directory(root,source):
-    if source not in ('kbo-assignment','mlb-2024'):raise ValueError('등록되지 않은 자료입니다.')
+    if source not in CATALOG_SOURCES:raise ValueError('등록되지 않은 자료입니다.')
     root=Path(root).resolve();directory=root/'data/local/catalog'/source
     current=root
     for part in directory.relative_to(root).parts:
@@ -118,6 +119,8 @@ def import_assignment(root,archive):
     import hashlib
     if len(content)>8*1024*1024 or hashlib.sha256(content).hexdigest()!=LEGACY_SHA:
         raise ValueError('검토한 과제 ZIP 버전이 아닙니다. 기존 자료를 바꾸지 않았습니다.')
+    existing=read_catalog(root,'kbo-assignment')
+    if existing is not None:return existing
     private(directory,directory=True)
     original=directory/'assignment-original.zip'
     if original.exists() and checksum(original)!=LEGACY_SHA:raise ValueError('보관한 과제 원본이 변경됐습니다.')
@@ -152,5 +155,14 @@ def read_catalog(root,source):
     for file in data['source']['files']:
         p=directory/file['name']
         if p.name!=file['name'] or p.is_symlink() or checksum(p)!=file['sha256']:raise ValueError('선수 원본 파일이 변경됐습니다.')
-    with _LOCK:_CACHE[str(directory)]=(fingerprint,data)
+    with _LOCK:_CACHE[str(directory)]=(fingerprint,data,utc_now())
     return data
+
+
+def catalog_verification(root,source):
+    """Last full content/hash check, distinct from a later fingerprint lookup."""
+    data=read_catalog(root,source)
+    if data is None:return None
+    directory=source_directory(root,source)
+    with _LOCK:cached=_CACHE[str(directory)]
+    return {'verified_at':cached[2],'scope':'catalog identity and registered original hashes; later cache reuse checks file fingerprints'}

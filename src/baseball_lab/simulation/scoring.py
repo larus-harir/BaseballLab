@@ -11,6 +11,7 @@ from baseball_lab.data.lineage import write_json
 from baseball_lab.r1.environment import fit
 from baseball_lab.web.scene_assets import embed
 from baseball_lab.data.protection import public_view
+from .contracts import observation_contract
 
 
 class SessionPolicy:
@@ -49,6 +50,7 @@ def observe(dataset,start,end,output,*,seed=41,outs=0,bases=1,source='model',sty
     if test_only:
         result['source_status']='MOCK_TEST_ONLY'
         for event in result['events']:event['source_status']='MOCK_TEST_ONLY'
+    result['contract']=observation_contract(result)
     output.mkdir(parents=True);write_json(output/'session.json',result)
     (output/'report.html').write_text(render(result),encoding='utf-8')
     return result

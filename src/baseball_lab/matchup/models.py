@@ -2,8 +2,8 @@
 import math
 from random import Random
 from baseball_lab.evaluation.sabermetrics import validate_probability_distribution
+from baseball_lab.simulation.contracts import EVENTS
 
-EVENTS=('strikeout','walk','hbp','single','double','triple','home_run','other')
 LABELS=dict(zip(EVENTS,('삼진','볼넷','사구','단타','2루타','3루타','홈런','기타 타석 결과')))
 MODEL_VERSION='categorical-log5-v1'
 LEGACY_CONSTANTS={'batter_k':150,'batter_bb':200,'batter_hr':300,'batter_babip':800,'p_k':150,'p_bb':200,'p_hr':400}

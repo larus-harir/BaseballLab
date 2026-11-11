@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from baseball_lab.data.lineage import checksum, write_json
 from baseball_lab.experiments.registry import REPOSITORY_ROOT
-from baseball_lab.r1.provider import acquire
+from baseball_lab.data.catalog import DatasetCatalog
 from baseball_lab.r1.environment import Environment, fit, restore, diagnostic
 from .training import evaluate
 
@@ -15,9 +15,10 @@ def external(research,year,*,n=500):
     if n<20:raise ValueError('최소 20회 평가가 필요합니다.')
     start,end=result['model']['selected_dates']
     if start[:4]==str(year) or end[:4]==str(year):raise ValueError('학습과 다른 시즌을 선택하세요.')
-    original=acquire(REPOSITORY_ROOT/'data/local/retrosheet',year=int(start[:4]))
+    catalog=DatasetCatalog(REPOSITORY_ROOT)
+    original=catalog.ensure('match',int(start[:4]))
     envs,model=fit(original,start,end)
-    target=acquire(REPOSITORY_ROOT/'data/local/retrosheet',year=year)
+    target=catalog.ensure('match',year)
     # Legal actions are frozen from original fit/validation, never selected on the new season.
     env=Environment(target['records'],envs['fit'].legal,f'external-season-{year}')
     rows=[]

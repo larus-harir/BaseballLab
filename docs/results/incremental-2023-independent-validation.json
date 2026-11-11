@@ -1,0 +1,674 @@
+{
+  "split": {
+    "fit": {
+      "n": 103668,
+      "games": 1370,
+      "record_hash": "82483c45c126f4073db31339cdf33c073dc221e2646807aa43833a2dab2d2edc",
+      "available_dates": [
+        "20230330",
+        "20230714"
+      ]
+    },
+    "validation": {
+      "n": 41238,
+      "games": 545,
+      "record_hash": "84f67b4b8377432bcf60a9a21a572538133d299aa04f391e1c64d06e4a7d2979",
+      "available_dates": [
+        "20230715",
+        "20230824"
+      ]
+    },
+    "test": {
+      "n": 39198,
+      "games": 515,
+      "record_hash": "2c31b75757603ef585e7c9e7969cd5c086a2839f5aa3b56996c79a326caf96b3",
+      "available_dates": [
+        "20230825",
+        "20231001"
+      ]
+    }
+  },
+  "strength": 300,
+  "target_season_tuning": false,
+  "validation_used_for_selection": false,
+  "test": {
+    "n": 39198,
+    "games": 515,
+    "record_hash": "2c31b75757603ef585e7c9e7969cd5c086a2839f5aa3b56996c79a326caf96b3",
+    "models": {
+      "league": {
+        "n": 39198,
+        "log_loss": 1.5077052618125226,
+        "brier": 0.7124158222550663,
+        "zero_observation_probability_n": 0,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 39198,
+            "predicted_sum": 8688.988308823706,
+            "observed_sum": 8617
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "event_calibration": {
+          "strikeout": {
+            "n": 39198,
+            "predicted_sum": 8895.814967015716,
+            "observed_sum": 8896
+          },
+          "walk": {
+            "n": 39198,
+            "predicted_sum": 3366.3212756087196,
+            "observed_sum": 3440
+          },
+          "hbp": {
+            "n": 39198,
+            "predicted_sum": 436.71808079615863,
+            "observed_sum": 457
+          },
+          "single": {
+            "n": 39198,
+            "predicted_sum": 5566.926669755452,
+            "observed_sum": 5448
+          },
+          "double": {
+            "n": 39198,
+            "predicted_sum": 1774.0963074441893,
+            "observed_sum": 1731
+          },
+          "triple": {
+            "n": 39198,
+            "predicted_sum": 142.16969556657986,
+            "observed_sum": 176
+          },
+          "home_run": {
+            "n": 39198,
+            "predicted_sum": 1205.7956360698142,
+            "observed_sum": 1262
+          },
+          "other": {
+            "n": 39198,
+            "predicted_sum": 17810.157367747786,
+            "observed_sum": 17788
+          }
+        }
+      },
+      "batter": {
+        "n": 39198,
+        "log_loss": 1.498171757984095,
+        "brier": 0.7087375159081212,
+        "zero_observation_probability_n": 0,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 841,
+            "predicted_sum": 161.7682302847274,
+            "observed_sum": 163
+          },
+          {
+            "n": 38357,
+            "predicted_sum": 8615.94889954469,
+            "observed_sum": 8454
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "event_calibration": {
+          "strikeout": {
+            "n": 39198,
+            "predicted_sum": 8808.7525506907,
+            "observed_sum": 8896
+          },
+          "walk": {
+            "n": 39198,
+            "predicted_sum": 3388.8093365449868,
+            "observed_sum": 3440
+          },
+          "hbp": {
+            "n": 39198,
+            "predicted_sum": 434.4374031448787,
+            "observed_sum": 457
+          },
+          "single": {
+            "n": 39198,
+            "predicted_sum": 5595.048059334928,
+            "observed_sum": 5448
+          },
+          "double": {
+            "n": 39198,
+            "predicted_sum": 1798.0810892606585,
+            "observed_sum": 1731
+          },
+          "triple": {
+            "n": 39198,
+            "predicted_sum": 143.13247187251932,
+            "observed_sum": 176
+          },
+          "home_run": {
+            "n": 39198,
+            "predicted_sum": 1241.4555093627796,
+            "observed_sum": 1262
+          },
+          "other": {
+            "n": 39198,
+            "predicted_sum": 17788.283579789037,
+            "observed_sum": 17788
+          }
+        }
+      },
+      "log5": {
+        "n": 39198,
+        "log_loss": 1.4951302686180326,
+        "brier": 0.7073558056964174,
+        "zero_observation_probability_n": 0,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 3313,
+            "predicted_sum": 636.8653564950688,
+            "observed_sum": 612
+          },
+          {
+            "n": 35855,
+            "predicted_sum": 8118.157658137554,
+            "observed_sum": 7993
+          },
+          {
+            "n": 30,
+            "predicted_sum": 9.191003994486875,
+            "observed_sum": 12
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "event_calibration": {
+          "strikeout": {
+            "n": 39198,
+            "predicted_sum": 8877.97573452799,
+            "observed_sum": 8896
+          },
+          "walk": {
+            "n": 39198,
+            "predicted_sum": 3316.968787696271,
+            "observed_sum": 3440
+          },
+          "hbp": {
+            "n": 39198,
+            "predicted_sum": 419.35635855578664,
+            "observed_sum": 457
+          },
+          "single": {
+            "n": 39198,
+            "predicted_sum": 5589.63460683443,
+            "observed_sum": 5448
+          },
+          "double": {
+            "n": 39198,
+            "predicted_sum": 1793.152658689591,
+            "observed_sum": 1731
+          },
+          "triple": {
+            "n": 39198,
+            "predicted_sum": 144.64447416065775,
+            "observed_sum": 176
+          },
+          "home_run": {
+            "n": 39198,
+            "predicted_sum": 1236.7822789426173,
+            "observed_sum": 1262
+          },
+          "other": {
+            "n": 39198,
+            "predicted_sum": 17819.485100592447,
+            "observed_sum": 17788
+          }
+        }
+      },
+      "binary_normalized_candidate": {
+        "n": 39198,
+        "log_loss": 1.4951528001760106,
+        "brier": 0.7073692009735617,
+        "zero_observation_probability_n": 0,
+        "hit_calibration": [
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 3321,
+            "predicted_sum": 638.5219397832658,
+            "observed_sum": 617
+          },
+          {
+            "n": 35850,
+            "predicted_sum": 8117.084021362128,
+            "observed_sum": 7988
+          },
+          {
+            "n": 27,
+            "predicted_sum": 8.27309081638288,
+            "observed_sum": 12
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          },
+          {
+            "n": 0,
+            "predicted_sum": 0.0,
+            "observed_sum": 0
+          }
+        ],
+        "event_calibration": {
+          "strikeout": {
+            "n": 39198,
+            "predicted_sum": 8878.14431731078,
+            "observed_sum": 8896
+          },
+          "walk": {
+            "n": 39198,
+            "predicted_sum": 3317.0656792984423,
+            "observed_sum": 3440
+          },
+          "hbp": {
+            "n": 39198,
+            "predicted_sum": 419.3272264515542,
+            "observed_sum": 457
+          },
+          "single": {
+            "n": 39198,
+            "predicted_sum": 5589.489872180621,
+            "observed_sum": 5448
+          },
+          "double": {
+            "n": 39198,
+            "predicted_sum": 1793.0930142624377,
+            "observed_sum": 1731
+          },
+          "triple": {
+            "n": 39198,
+            "predicted_sum": 144.61499547650735,
+            "observed_sum": 176
+          },
+          "home_run": {
+            "n": 39198,
+            "predicted_sum": 1236.6811700424787,
+            "observed_sum": 1262
+          },
+          "other": {
+            "n": 39198,
+            "predicted_sum": 17819.583724977256,
+            "observed_sum": 17788
+          }
+        }
+      }
+    },
+    "coverage": {
+      "predicted_n": 39198,
+      "prediction_fraction": 1.0,
+      "both_players_seen_n": 31678,
+      "both_players_seen_fraction": 0.8081534772182254,
+      "cold_start_n": 7520,
+      "small_fit_sample_n": 17511,
+      "cold_start_rule": "Unknown side uses the fit-period league distribution, not future player records.",
+      "small_sample_rule": "At least one fit-period player denominator below 100 PA/TBF; threshold is a reporting group, not a filter."
+    },
+    "subgroups": {
+      "both_seen": {
+        "league": {
+          "n": 31678,
+          "log_loss": 1.5100086264409254,
+          "brier": 0.7133353752698576,
+          "zero_observation_probability_n": 0
+        },
+        "batter": {
+          "n": 31678,
+          "log_loss": 1.4993231302362608,
+          "brier": 0.7091802350314863,
+          "zero_observation_probability_n": 0
+        },
+        "log5": {
+          "n": 31678,
+          "log_loss": 1.4958308182506497,
+          "brier": 0.7075718162627159,
+          "zero_observation_probability_n": 0
+        },
+        "binary_normalized_candidate": {
+          "n": 31678,
+          "log_loss": 1.4958586985464208,
+          "brier": 0.7075883914276051,
+          "zero_observation_probability_n": 0
+        }
+      },
+      "cold_start": {
+        "league": {
+          "n": 7520,
+          "log_loss": 1.498002338316897,
+          "brier": 0.708542205179538,
+          "zero_observation_probability_n": 0
+        },
+        "batter": {
+          "n": 7520,
+          "log_loss": 1.4933216023720388,
+          "brier": 0.7068725616007474,
+          "zero_observation_probability_n": 0
+        },
+        "log5": {
+          "n": 7520,
+          "log_loss": 1.4921792032907157,
+          "brier": 0.706445861185871,
+          "zero_observation_probability_n": 0
+        },
+        "binary_normalized_candidate": {
+          "n": 7520,
+          "log_loss": 1.4921792032907157,
+          "brier": 0.706445861185871,
+          "zero_observation_probability_n": 0
+        }
+      },
+      "small_fit_sample": {
+        "league": {
+          "n": 17511,
+          "log_loss": 1.5077829632702537,
+          "brier": 0.7123778498444056,
+          "zero_observation_probability_n": 0
+        },
+        "batter": {
+          "n": 17511,
+          "log_loss": 1.4999394998804172,
+          "brier": 0.7096558807502196,
+          "zero_observation_probability_n": 0
+        },
+        "log5": {
+          "n": 17511,
+          "log_loss": 1.4979645623509739,
+          "brier": 0.708825596208625,
+          "zero_observation_probability_n": 0
+        },
+        "binary_normalized_candidate": {
+          "n": 17511,
+          "log_loss": 1.4979767493644731,
+          "brier": 0.7088331721854102,
+          "zero_observation_probability_n": 0
+        }
+      },
+      "larger_fit_sample": {
+        "league": {
+          "n": 21687,
+          "log_loss": 1.507642522374449,
+          "brier": 0.7124464827830537,
+          "zero_observation_probability_n": 0
+        },
+        "batter": {
+          "n": 21687,
+          "log_loss": 1.4967444084962078,
+          "brier": 0.7079959893368016,
+          "zero_observation_probability_n": 0
+        },
+        "log5": {
+          "n": 21687,
+          "log_loss": 1.4928417401190905,
+          "brier": 0.706169034743344,
+          "zero_observation_probability_n": 0
+        },
+        "binary_normalized_candidate": {
+          "n": 21687,
+          "log_loss": 1.492872624299266,
+          "brier": 0.7061871287694321,
+          "zero_observation_probability_n": 0
+        }
+      }
+    }
+  },
+  "uncertainty": {
+    "available": true,
+    "games": 515,
+    "repetitions": 200,
+    "seed": 20261111,
+    "method": "Paired percentile bootstrap of whole games; ratio of resampled summed loss to resampled PA count.",
+    "comparison": {
+      "batter": {
+        "log_loss": {
+          "difference_vs_league": -0.009533503828748994,
+          "paired_game_percentile_95": [
+            -0.010810708205284968,
+            -0.008510009349868277
+          ]
+        },
+        "brier": {
+          "difference_vs_league": -0.0036783063467366126,
+          "paired_game_percentile_95": [
+            -0.004121968005726798,
+            -0.0032944841598283345
+          ]
+        }
+      },
+      "log5": {
+        "log_loss": {
+          "difference_vs_league": -0.012574993194827275,
+          "paired_game_percentile_95": [
+            -0.014309422944202574,
+            -0.011154354764543196
+          ]
+        },
+        "brier": {
+          "difference_vs_league": -0.005060016558395864,
+          "paired_game_percentile_95": [
+            -0.0056510326798603705,
+            -0.004568069959864685
+          ]
+        }
+      },
+      "binary_normalized_candidate": {
+        "log_loss": {
+          "difference_vs_league": -0.012552461636861086,
+          "paired_game_percentile_95": [
+            -0.014290322883548033,
+            -0.011131177392552233
+          ]
+        },
+        "brier": {
+          "difference_vs_league": -0.005046621281260755,
+          "paired_game_percentile_95": [
+            -0.005636473830047986,
+            -0.004556415023658169
+          ]
+        }
+      }
+    },
+    "log5_vs_binary_normalized_candidate": {
+      "log_loss": {
+        "difference": -2.2531557966191908e-05,
+        "paired_game_percentile_95": [
+          -3.686083321013944e-05,
+          -7.736918290259312e-06
+        ]
+      },
+      "brier": {
+        "difference": -1.3395277135108439e-05,
+        "paired_game_percentile_95": [
+          -1.9933454637494075e-05,
+          -6.293632931276931e-06
+        ]
+      }
+    },
+    "scope": "Sampling variation across observed test games only; no refitting, model-selection, missing-data or causal uncertainty. Games share players and calendar patterns not fully captured by game resampling. Negative differences favor the candidate on these observed games."
+  },
+  "schema": "retrospective-independent-season-validation-v1",
+  "created_at": "2026-11-11T02:05:49.682445+00:00",
+  "target_year": 2023,
+  "reference_year": 2024,
+  "dataset_ids": [
+    "6f79205be5be229a0ca5368f5adc77ec9b2e023af0ab6eec204f2c57c2d0c7c5",
+    "26f82e19815ec38ed11e8dd2dec6158c240b8c8d5e2ac539c59248983c949394"
+  ],
+  "source": {
+    "id": "mlb-2023",
+    "source_url": "https://www.retrosheet.org/downloads/plays/2023plays.zip",
+    "files": [
+      {
+        "name": "2023plays.zip",
+        "sha256": "0129befd7944f60a858e5fdc265a44ed20afaa568679b37fca1083e3c083b20e"
+      },
+      {
+        "name": "2023eve.zip",
+        "sha256": "301e6d36afd58f3c2f9b3dfa546cb7953b24c90a4de57a69565ccc2f2a5eb8d1"
+      }
+    ],
+    "license": "The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at 20 Sunset Rd., Newark, DE 19711. https://www.retrosheet.org/"
+  },
+  "parameter_selection": {
+    "source_dataset_id": "26f82e19815ec38ed11e8dd2dec6158c240b8c8d5e2ac539c59248983c949394",
+    "selected_strength": 300,
+    "rule": "Reuse the reference season validation choice; target validation/test never selects a setting."
+  },
+  "model_versions": {
+    "log5": "categorical-log5-v1",
+    "binary_normalized_candidate": "one-vs-rest-log5-normalized-study-v1"
+  },
+  "code_sha256": {
+    "validation.py": "824264bb384033f4ccf5a6ec6e5c03d5534b5953bb72905ee7b89e2144fc85a7",
+    "models.py": "c5316247576e0f63c383b14a7c9f57c921587a914b58f04772dee9d7f65832b3"
+  },
+  "scope": "Retrospective check of an independent season, with player profiles/prior fitted only on that season early period. 2024-selected settings applied to 2023 are not a prospective forecast.",
+  "limitations": [
+    "Same-season early player observations are required; this does not transfer 2024 player ability into 2023.",
+    "2023 was also used in prior Match work; this statistic-model check is independent of the 2024 tuning but not a preregistered untouched scientific dataset.",
+    "Event prediction does not validate KBO, cross-era fairness, unobserved action effects, or nine-inning outcomes.",
+    "The one-versus-rest normalized binary model is an exploratory comparison and is never automatically selected by this report."
+  ]
+}
