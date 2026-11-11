@@ -1,3 +1,11 @@
+# 현재 자료 계약과 지원 시즌 (2026-11-11)
+
+MLB 2023/2024 선수 대결·Match 원본, KBO 1982~2025 과제는 `DatasetCatalog`에서 공통 관리합니다. [실제 제공원·조건·원본 해시](data-provider-review.md), [현재 독립 검증](model-independent-validation.md), [통합 결과](incremental-redesign-validation.md)를 따릅니다. 기존 카탈로그와 원본은 이동/재생성하지 않았습니다.
+
+아래는 각 원천을 도입한 시점의 이력입니다. 이전의 ‘2024만 지원/새 준비 버튼’ 안내는 현재 자동 준비·2023 확장으로 대체했습니다.
+
+---
+
 # 실제 자료·사용조건·가용성
 
 ## MLB Statcast

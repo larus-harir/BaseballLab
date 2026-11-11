@@ -43,7 +43,11 @@ class Storage:
             if p.exists():targets[f'source:{year}']=(p,f'{year}년 MLB 경기 기록','official')
         p=self.root/'data/local/statcast'
         if p.exists():targets['private:statcast']=(p,'사용자가 연결한 투구 자료','private')
-        for source,label,category in (('mlb-2024','BaseballLab · MLB 2024 선수 기록','official'),('kbo-assignment','EraMatch · 사용자 과제 원본과 선수 기록','private')):
+        from baseball_lab.data.catalog import DatasetCatalog
+        catalog_targets=[(f'mlb-{year}',f'BaseballLab · MLB {year} 선수 기록','official')
+                         for year in DatasetCatalog(self.root).supported_seasons('baseball')]
+        catalog_targets.append(('kbo-assignment','EraMatch · 사용자 과제 원본과 선수 기록','private'))
+        for source,label,category in catalog_targets:
             p=self.root/'data/local/catalog'/source
             if p.exists():targets['catalog:'+source]=(p,label,category)
         output=self.root/'outputs/workbench'

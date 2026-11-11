@@ -1,3 +1,15 @@
+# 2026-11-11 공통 계약과 데이터 준비
+
+`data.catalog.DatasetCatalog`가 기존 물리 저장소 위에서 `describe/get/ensure`를 제공합니다. BaseballLab·EraMatch·Match CLI/외부 평가는 같은 등록 제공원을 사용하며, 유효한 보관 파일은 다시 쓰지 않습니다. `simulation.contracts`는 선수-시즌 분모와 전체 확률·실행 메타데이터를 검증합니다. 독립 타석과 상태가 이어지는 장면 기록은 `mode`로 구분하며, 장면에 없는 확률을 만들지 않습니다.
+
+`web.server`는 공식 기록 준비를 별도 작업으로 실행하고, 상태 조회·진행·취소를 기존 단일 작업 경계 안에 통합합니다. 같은 준비 요청은 하나로 합치며 이미 있는 자료는 무쓰기 반환합니다. Host/Origin/token과 고정 제공원·경로·삭제 확인을 보존합니다. 기록·모델·난수 고급 설정은 기본 화면에서 숨기고 실제 자동 선택 이유를 설명합니다.
+
+[현재 검증](incremental-redesign-validation.md) · [데이터 계약](data-provider-review.md) · [통계 검사](model-independent-validation.md) · [다음 Match 계약](match/next-tactical-study.md).
+
+아래는 2026-11-09까지의 구조 이력입니다. 물리 저장소와 기존 결과 형식은 보존합니다.
+
+---
+
 # 현재 화면·자료 경계
 
 공통 2D 장면 렌더러를 관람과 Match 비교 화면에서 재사용합니다. 연구자의 사적 계보는 디스크에 보존하고 표시용 사본만 가립니다. 자료 관리는 고정된 보관 영역과 두 번 확인하는 삭제 절차로 분리했습니다. [현재 상태](PROJECT_STATUS.md) · [보안 점검](security-audit.md)

@@ -1,5 +1,7 @@
 > 현재의 단일 방향 문서는 [Project Compass](docs/PROJECT_COMPASS.md)입니다. 아래 연구 철학은 유지하며, 구현 상태와 해석의 정정은 [현재 상태](docs/PROJECT_STATUS.md)를 따릅니다.
 
+> 2026-11-11: [보존형 개선 지시](docs/specs/BaseballLab_Incremental_Redesign_Codex_Directive.md)를 현재 실행 기준으로 적용합니다. 역할·연구 철학은 유지하며 기존 앱·원본·결과를 보존하고 자동 자료 준비와 공통 계산/검증을 개선했습니다.
+
 > 2026-11-09 역할 개정: [최신 3프로젝트 요구사항](docs/specs/BaseballLab_Three_Project_Redefinition_Codex.md)을 적용합니다. 아래의 AI 자율 경쟁·인간 야구 비교 철학은 **Match**의 연구 목적입니다. BaseballLab 자체는 통계 선수 대결을 실행하며 EraMatch는 과거 KBO 과제의 웹 버전입니다.
 
 # Baseball AI Lab — 연구 철학 / 프로젝트 헌장 (v4)

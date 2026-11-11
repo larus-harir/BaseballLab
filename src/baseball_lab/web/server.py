@@ -19,6 +19,10 @@ from baseball_lab.data.protection import private,public_text,public_view
 from .storage import Storage
 
 
+class PreparationCancelled(Exception):
+    """Cooperative cancellation between bounded data-provider operations."""
+
+
 class Workbench:
     def __init__(self, root):
         self.root=Path(root).resolve()
@@ -28,6 +32,8 @@ class Workbench:
         private(self.outputs,directory=True)
         private(self.root/'data/local',directory=True)
         self.storage=Storage(self.root)
+        from baseball_lab.data.catalog import DatasetCatalog
+        self.catalog=DatasetCatalog(self.root)
         self.token=secrets.token_urlsafe(32)
         self.lock=threading.RLock()
         self.job=None; self.process=None
@@ -73,9 +79,9 @@ class Workbench:
         for p in sorted(self.outputs.glob('*/task.json'),reverse=True):
             try:
                 run=json.loads(p.read_text(encoding='utf-8'))
-                if project=='match' and run.get('kind')=='matchup':continue
+                if project=='match' and run.get('kind') in ('matchup','prepare_catalog'):continue
                 if project in ('baseball','eramatch') and (run.get('kind')!='matchup' or run.get('project')!=project):continue
-                if run['status'] in ('queued','running') and (not current or run['id']!=current['id']):
+                if run['status'] in ('queued','running','cancelling') and (not current or run['id']!=current['id']):
                     run['status']='interrupted'
                 run.pop('logs',None);runs.append(run)
                 evidence=p.parent/'result/research.json'
@@ -93,16 +99,63 @@ class Workbench:
         if self.job and self.job['status'] in ('queued','running','cancelling'):
             raise ValueError('이미 작업 중입니다. 끝날 때까지 기다리거나 중지해 주세요.')
 
-    def matchup_prepare(self, archive=None):
+    def matchup_prepare(self, archive=None, *, project='baseball',season=2024):
         with self.lock:
-            self._idle()
-            if archive is None:
-                from baseball_lab.matchup.mlb import prepare
-                result=prepare(self.root)
-            else:
+            from baseball_lab.matchup.service import PROJECTS
+            if not isinstance(project,str) or project not in PROJECTS:
+                raise ValueError('선수 대결 또는 역대 선수 대결을 선택하세요.')
+            if archive is not None:
+                self._idle()
                 from baseball_lab.matchup.catalog import import_assignment
                 result=import_assignment(self.root,archive)
-            return {'ready':True,'dataset_id':result['dataset_id'],'message':'선수 기록을 준비했습니다.'}
+                return {'ready':True,'status':'completed','dataset_id':result['dataset_id'],
+                        'message':'보관한 과제 기록을 연결했습니다.'}
+            # Validate requested season before scheduling or creating any files.
+            self.catalog.source_id(project,season)
+            if self.job and self.job.get('kind')=='prepare_catalog' and self.job.get('project')==project and self.job.get('season')==season and self.job['status'] in ('queued','running'):
+                return {'id':self.job['id'],'status':self.job['status'],'ready':False,'reused':True}
+            self._idle()
+            existing=self.catalog.get(project,season)
+            if existing is not None:
+                return {'id':None,'ready':True,'status':'completed','dataset_id':existing['dataset_id'],
+                        'message':'보관한 선수 기록을 확인했습니다.'}
+            descriptor=self.catalog.describe(project,season)
+            if descriptor['needs_connection']:raise ValueError(descriptor['message'])
+            job_id=time.strftime('%Y%m%d_%H%M%S')+'_'+secrets.token_hex(4)
+            private(self.outputs/job_id,directory=True)
+            self.job={'id':job_id,'kind':'prepare_catalog','project':project,'season':season,
+                      'status':'queued','started_at':utc_now(),'logs':[],'report':None,
+                      'message':'선수 기록을 확인하고 있어요.'}
+            self._persist()
+            threading.Thread(target=self._catalog_worker,args=(job_id,project,season),daemon=True).start()
+            return {'id':job_id,'status':'queued','ready':False}
+
+    def _catalog_worker(self,job_id,project,season):
+        def progress(message):
+            with self.lock:
+                if self.job['id']!=job_id or self.job['status']=='cancelling':raise PreparationCancelled()
+                message=public_text(message)
+                self.job.update(status='running',message=message)
+                self.job['logs']=(self.job['logs']+[message])[-120:]
+                self._persist()
+        try:
+            progress('보관한 기록과 공식 자료를 확인하고 있어요.')
+            result=self.catalog.ensure(project,season,progress=progress)
+            with self.lock:
+                if self.job['status']=='cancelling':raise PreparationCancelled()
+                self.job.update(status='completed',completed_at=utc_now(),dataset_id=result['dataset_id'],
+                                message='선수 기록 준비가 끝났습니다. 바로 대결할 수 있어요.')
+                self._persist()
+        except PreparationCancelled:
+            with self.lock:
+                self.job.update(status='cancelled',completed_at=utc_now(),message='자료 준비를 중지했습니다. 확인된 보관 자료는 유지합니다.')
+                self._persist()
+        except Exception as exc:
+            with self.lock:
+                cancelled=self.job['status']=='cancelling'
+                self.job.update(status='cancelled' if cancelled else 'failed',completed_at=utc_now(),
+                                message='자료 준비를 중지했습니다. 확인된 보관 자료는 유지합니다.' if cancelled else public_text(exc))
+                self._persist()
 
     def matchup_analyze(self,project,options):
         with self.lock:
@@ -114,7 +167,9 @@ class Workbench:
             sources=Path(__file__).parents[1]/'matchup'
             versions={p.name:checksum(p) for p in sorted(sources.glob('*.py'))}
             versions.update({'matchup.html':checksum(Path(__file__).with_name('matchup.html')),
-                             'server.py':checksum(Path(__file__))})
+                             'server.py':checksum(Path(__file__)),
+                             'simulation/contracts.py':checksum(Path(__file__).parents[1]/'simulation/contracts.py'),
+                             'data/catalog.py':checksum(Path(__file__).parents[1]/'data/catalog.py')})
             analysis['execution']={'engine_files':versions,'engine_id':content_hash(versions),'python':sys.version.split()[0]}
             job_id=time.strftime('%Y%m%d_%H%M%S')+'_'+secrets.token_hex(4)
             directory=self.outputs/job_id;private(directory,directory=True)
@@ -265,7 +320,7 @@ class Workbench:
     def cancel(self):
         with self.lock:
             if not self.job or self.job['status'] not in ('queued','running'):raise ValueError('중지할 작업이 없습니다.')
-            self.job.update(status='cancelling',message='중지하는 중입니다. 현재 작업 기록은 남겨 둡니다.');self._persist()
+            self.job.update(status='cancelling',message='중지하는 중입니다. 자료 수신 중이면 현재 확인을 마친 뒤 중지합니다.' if self.job.get('kind')=='prepare_catalog' else '중지하는 중입니다. 현재 작업 기록은 남겨 둡니다.');self._persist()
             if self.process and self.process.poll() is None:self.process.terminate()
             return {'message':'중지를 요청했습니다.'}
 
@@ -313,6 +368,15 @@ def make_handler(workbench):
                 try:self._json(workbench.state(parse_qs(urlparse(self.path).query).get('project',[None])[0]))
                 except ValueError as exc:self._json({'error':str(exc)},400)
             elif path=='/api/storage':self._json(workbench.storage.inventory())
+            elif path=='/api/catalog':
+                try:self._json(public_view({'schema':'dataset-index-v1','sources':workbench.catalog.list_sources()}))
+                except (ValueError,KeyError,TypeError,OSError) as exc:self._json({'error':public_text(exc)},400)
+            elif path=='/api/knowledge':
+                try:
+                    from baseball_lab.data.knowledge import get_knowledge
+                    key=parse_qs(urlparse(self.path).query).get('metric',[None])[0]
+                    self._json(get_knowledge(key))
+                except (ValueError,KeyError,TypeError) as exc:self._json({'error':public_text(exc)},400)
             elif path=='/api/matchup/catalog':
                 try:
                     from baseball_lab.matchup.service import overview
@@ -364,7 +428,10 @@ def make_handler(workbench):
                 body=self.rfile.read(length)
                 if len(body)!=length:raise ValueError('전송이 끝나지 않았어요.')
                 path=urlparse(self.path).path
-                if path=='/api/matchup/prepare':result=workbench.matchup_prepare()
+                if path=='/api/matchup/prepare':
+                    payload=json.loads(body)
+                    if not isinstance(payload,dict):raise ValueError('선수 기록 준비 설정을 확인하세요.')
+                    result=workbench.matchup_prepare(project=payload.get('project','baseball'),season=payload.get('season',2024))
                 elif path=='/api/matchup/import':result=workbench.matchup_prepare(body)
                 elif path=='/api/matchup/analyze':
                     payload=json.loads(body)
