@@ -130,7 +130,7 @@ def test_new_learning_updates_both_roles_and_keeps_test_independent(tmp_path):
     from baseball_lab.experiments.match.reporting.inning import summary,render
     reading=summary(a);assert reading['current']['n']==60
     assert all(g['change']['n']==60 for g in reading['growth'])
-    assert '세 아웃까지 득점 쌓기' in render(a)
+    assert '이닝 득점 전략' in render(a)
     with pytest.raises(ValueError,match='덮어쓰지'):
         inning.train(d,'2024-05-01','2024-05-05',tmp_path/'a',config,test_only=True)
 
@@ -165,7 +165,7 @@ def test_new_report_reopens_without_rewriting_research_and_escapes_script(tmp_pa
     server=ThreadingHTTPServer(('127.0.0.1',0),make_handler(wb));worker=threading.Thread(target=server.serve_forever,daemon=True);worker.start()
     try:
         code,body=call(server,'/reports/MOCK_TEST_ONLY/result/report.html')
-        assert code==200 and '세 아웃까지 득점 쌓기' in body.decode()
+        assert code==200 and '이닝 득점 전략' in body.decode()
         assert call(server,'/reports/MOCK_TEST_ONLY/result/research.json')[0]==403
     finally:server.shutdown();server.server_close();worker.join()
     assert (dest/'research.json').read_text()==original

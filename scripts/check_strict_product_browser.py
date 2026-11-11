@@ -41,7 +41,7 @@ def verify_visible_units(page, n):
     expect(page.locator('#distributionTitle')).to_contain_text(str(n)+'타석')
     expect(page.locator('#replayIndex')).to_have_attribute('max', str(n))
     page.locator('#replayIndex').fill(str(n)); page.locator('#replayIndex').press('Tab')
-    expect(page.locator('#replayPosition')).to_contain_text(str(n)+' / '+str(n))
+    expect(page.locator('#replayPosition')).to_contain_text(str(n)+'번째 타석 / '+str(n))
     text = page.locator('body').inner_text()
     assert '25타석은' not in text and '번의 가상 대결' not in text
     assert '사구 후보' not in text and '실제 타수 미수록' not in text
@@ -161,12 +161,12 @@ def main():
         expect(page.locator('#rerun')).to_be_enabled(timeout=30000)
         assert len(sent)==1,sent
         page.remove_listener('request',count_post)
-        page.locator('#advanced > summary').click();page.locator('#reproduceMode').check();page.locator('#seed').fill('4242')
-        fixed=[submit(page,'#calculate'),submit(page,'#calculate')]
+        page.locator('#tab-developer').click();page.locator('#advanced > summary').click();page.locator('#reproduceMode').check();page.locator('#seed').fill('4242')
+        page.locator('#tab-duel').click();fixed=[submit(page,'#calculate'),submit(page,'#calculate')]
         assert fixed[0]['analysis']['simulation']==fixed[1]['analysis']['simulation']
         assert fixed[0]['report']!=fixed[1]['report']
         assert fixed[0]['analysis']['simulation']['seed']==4242
-        page.locator('#advanced > summary').click()
+        page.locator('#tab-developer').click();page.locator('#advanced > summary').click();page.locator('#tab-duel').click()
         # Explicit missing-data label must appear in every user-facing event view.
         expect(page.locator('#eventChart')).to_contain_text('세부 기록 없음')
         page.locator('#eventFilter').select_option('other');page.locator('#firstFiltered').click()
@@ -175,7 +175,7 @@ def main():
         checks.append('Native double click submits once; advanced fixed 4242 seed reproduces exactly; missing-data label in chart/filter/replay')
         page.set_viewport_size({'width':390,'height':844})
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-        page.locator('#previous').focus();assert page.evaluate('document.activeElement.id')=='previous';page.keyboard.press('Enter');expect(page.locator('#replayPosition')).to_contain_text('249 / 250')
+        page.locator('#previous').focus();assert page.evaluate('document.activeElement.id')=='previous';page.keyboard.press('Enter');expect(page.locator('#replayPosition')).to_contain_text('249번째 타석 / 250')
         page.locator('#result').screenshot(path=str(out/'mobile-390.png'))
         page.set_viewport_size({'width':1366,'height':950})
         if not args.skip_training:

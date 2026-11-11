@@ -6,7 +6,7 @@ from .models import EVENTS,LABELS
 def interpret(result):
     simulation=result['simulation'];q=result['model']['probabilities'];n=simulation['n'];counts=simulation['counts']
     detail=result.get('event_display',{});display=detail.get('events',simulation['events']);labels={**LABELS,**detail.get('labels',{})}
-    labels['other']='그 밖의 타석 결과(세부 기록 없음)'
+    labels['other']='기타 결과 (세부 기록 없음)'
     actual=Counter(display);rows=[]
     rates=detail.get('other',{}).get('conditional_rates',{})
     for key in EVENTS:

@@ -84,7 +84,7 @@ def analyze(root,project,options):
     if not b or not p or b['role']!='batter' or p['role']!='pitcher':
         raise ValueError('선택한 시즌의 타자·투수를 다시 확인하세요.')
     if project=='baseball' and (b['season']!=p['season'] or b['season']!=year):
-        raise ValueError('기본 대결은 같은 시즌입니다. 다른 시대는 EraMatch에서 선택하세요.')
+        raise ValueError('MLB 대결은 현재 같은 시즌 기록으로 계산합니다. 두 선수의 시즌을 맞춰주세요.')
     validate_player_season(b);validate_player_season(p)
     requested=options.get('model','auto');mode,reason=_select_model(catalog,b,p,requested)
     if mode=='legacy':

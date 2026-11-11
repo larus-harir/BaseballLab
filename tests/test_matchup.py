@@ -191,7 +191,7 @@ def test_official_rows_partition_and_duplicate_id(tmp_path):
 def test_matchup_http_project_routes_security_and_missing_data(web):
     wb,server=web
     for path in ('/baseball','/eramatch'):
-        status,body=call(server,path);assert status==200 and '선택에 따라 바뀌는 설명' in body.decode()
+        status,body=call(server,path);assert status==200 and 'tab-principles' in body.decode() and 'tab-developer' in body.decode()
     assert json.loads(call(server,'/api/matchup/catalog?project=baseball')[1])['ready'] is False
     assert call(server,'/api/matchup/catalog?project=../../etc')[0]==400
     assert call(server,'/api/matchup/import','POST',b'zip')[0]==403

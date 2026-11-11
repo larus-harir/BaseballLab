@@ -1,14 +1,15 @@
 # BaseballLab · 야구 연구실
 
-실제 기록으로 선수 대결을 실행하고 AI 전략의 변화를 연구하는 세 프로젝트입니다. **BaseballLab 자체도 실행 가능한 통계 시뮬레이터**이며, 공통 기반만을 뜻하지 않습니다.
+실제 기록으로 선수를 맞붙이고, AI가 전략을 바꾸는 과정을 살펴보는 서비스입니다.
 
-| 프로젝트 | 클릭해서 할 수 있는 일 | 현재 한계 |
-|---|---|---|
-| **BaseballLab** `/baseball` | MLB 선수 선택 → 확률 계산 → 반복 타석 → 계산 설명 | 2023·2024 정규시즌, 독립 타석. AI 학습·9이닝 경기 아님 |
-| **Match** `/match` | AI 학습 → 같은 상대 성과·전략 변화·장면 비교 | 현재 3아웃 전 한 점 실험. 인간의 현대·역사 전략 비교는 이 연구의 후속 단계 |
-| **EraMatch** `/eramatch` | KBO 선수·연도 → 시대 보정 → 25타석 → 원본/개선 후보 비교 | 사용자 과제 자료 기반, 원천·권한·시대 보정의 예측 검증 전 |
+| 경험 | 할 수 있는 일 |
+|---|---|
+| **선수 가상 대결 (EraMatch)** `/eramatch` | MLB/KBO 선택 → 시즌·선수·타석 수 → 결과·재생·계산 원리 |
+| **AI 전략 연구 (Match)** `/match` | 학습 시작 → 선택 변화·상대 비교·장면 관찰 |
 
-현재 실행 기준은 [기존 앱 보존형 개선 지시](docs/specs/BaseballLab_Incremental_Redesign_Codex_Directive.md), [길잡이](docs/PROJECT_COMPASS.md), [최신 실행·검증 기록](docs/incremental-redesign-validation.md)을 따릅니다. 세 프로젝트의 역할 정의는 유지합니다. 이전 문서의 ‘부모는 공통 기능만’ 정의는 대체했습니다.
+BaseballLab은 브랜드와 공통 통계 엔진입니다. 기존 `/baseball` 경로와 `project=baseball` 저장 결과는 MLB 대결로 계속 열립니다. MLB는 준비된 2023·2024 동일 시즌, KBO는 1982~2025 서로 다른 시즌 선택을 제공합니다. 기존 확률 모델과 연구 결과는 보존합니다.
+
+현재 기준: [디자인 우선 지시](docs/specs/BaseballLab_Design_First_Codex_Directive.md).
 
 ## 시작하기
 
@@ -20,15 +21,14 @@ python -m pip install -e ".[learning]"
 python scripts/quickstart.py --open
 ```
 
-서버가 이미 켜져 있으면 Ctrl+C로 종료한 뒤 다시 여세요. 브라우저에서 세 프로젝트 중 하나를 선택합니다.
+서버가 이미 켜져 있으면 Ctrl+C로 종료한 뒤 다시 여세요.
 
-- **BaseballLab → 선수 대결 실행:** MLB 시즌(2023·2024)과 선수를 고르고 **대결 시작**을 누르세요. 기록은 자동 확인·준비하고 보관본을 재사용합니다. 모델·재현 번호를 직접 정할 필요가 없습니다. 결과 요약과 타석 재생을 먼저 보고 오른쪽에서 계산 이유를 확인하세요.
-- **Match → 실험 설정하기:** 공식 기록을 자동 준비하고 AI를 학습합니다. 기본은 2024 기록으로 3,000회씩 3회 반복이며 GPU가 필요하지 않습니다. 기존 장면 관찰은 `/simulation`에 보존했습니다.
-- **EraMatch → 역대 선수 대결 실행:** 제공한 과제의 **KBO 1982~2025 기본 기록이 앱에 포함**되어 있습니다. 새 PC에서도 파일 업로드나 인터넷 연결 없이 선수·연도를 고르고 **대결 시작**을 누르세요. 기본 25타석의 요약·재생·원본/개선 후보 비교를 볼 수 있습니다.
+- **선수 가상 대결 → 대결하기:** 같은 화면에서 MLB/KBO를 선택합니다. 결과는 핵심 수치·분포·타석 순서로 볼 수 있습니다. **계산 원리** 탭에서 선택한 선수의 기록과 보정·Log5·추첨 과정을 실제 숫자로 확인합니다. **개발자 정보**에는 설정·원천·재현·검증 근거가 있습니다.
+- **AI 전략 연구 → 학습 시작:** 기간과 목표를 정해 학습하고, 저장 결과에서 선택 변화·성과·장면을 비교합니다. GPU 없이 실행할 수 있습니다. KBO 시즌 자료는 앱에 포함되어 있습니다.
 
 자료가 없으면 실제 준비 단계를 표시하고, 실패하면 이유와 재시도를 안내합니다. 다른 시즌이나 허구 선수로 대체하지 않습니다. 결과는 이 PC에 저장되고 각 프로젝트에서 다시 열 수 있습니다.
 
-Match에서 **세 아웃까지 득점 쌓기** 또는 기존 **한 점 먼저 내기**를 고르고 **AI 학습 시작**을 누릅니다. 새 이닝 연구는 무사·주자 없음에서 세 아웃까지 총득점을 보상으로 사용하며, 결과 요약에서 같은 상대에 대한 학습 전후 성적과 바뀐 선택을 봅니다. 기간의 앞 기록으로 모형을 만들고, 마지막 기록은 학습 종료 후에만 확인합니다.
+Match에서 **이닝 득점 전략** 또는 **득점 기회 전략**를 고르고 **AI 학습 시작**을 누릅니다. 새 이닝 연구는 무사·주자 없음에서 세 아웃까지 총득점을 보상으로 사용하며, 결과 요약에서 같은 상대에 대한 학습 전후 성적과 바뀐 선택을 봅니다. 기간의 앞 기록으로 모형을 만들고, 마지막 기록은 학습 종료 후에만 확인합니다.
 
 선수 대결 결과에는 **예상 개수와 이번 개수 그래프**, 장타·삼진 해석, 결과별 타석 찾기가 있습니다. MLB의 아웃·희생타·실책 세분은 실제 기록 구성에 따른 참고 추정입니다. KBO 시즌 합계로 구분할 수 없는 결과는 아웃으로 단정하지 않습니다.
 
@@ -42,7 +42,7 @@ Match에서 **세 아웃까지 득점 쌓기** 또는 기존 **한 점 먼저 �
 
 새 결과 화면은 **바뀐 선택 / 같은 상대에 대한 바뀐 성과 / 아직 말할 수 없는 것**을 보여줍니다. 상황·학습 시점을 움직이며 선택 확률과 실제 누적 횟수를 구분하고, 같은 출발 상황의 저장 장면을 나란히 볼 수 있습니다. 이전 실행도 웹에서 새 화면으로 열립니다. 기존 JSON·저장 모델·HTML 원문은 덮어쓰지 않습니다.
 
-[최신 첫 화면](docs/images/incremental/home-desktop.png) · [2023 대결](docs/images/incremental/baseball-2023.png) · [이전 세 프로젝트 화면](docs/images/three-projects/portal.png) · [통계 대결](docs/images/three-projects/baseball.png) · [시대 대결](docs/images/three-projects/eramatch.png) · [이전 첫 화면](docs/images/ux-home.png) · [야구 관람](docs/images/ux-field.png) · [AI 선택 변화](docs/images/ux-strategy.png)
+[새 홈](docs/images/design-first/after-home.png) · [새 결과](docs/images/design-first/after-result.png) · [계산 원리](docs/images/design-first/after-principles.png) · [새 Match](docs/images/design-first/after-match.png) · [이전 첫 화면](docs/images/incremental/home-desktop.png) · [2023 대결](docs/images/incremental/baseball-2023.png) · [이전 세 프로젝트 화면](docs/images/three-projects/portal.png) · [통계 대결](docs/images/three-projects/baseball.png) · [시대 대결](docs/images/three-projects/eramatch.png) · [이전 첫 화면](docs/images/ux-home.png) · [야구 관람](docs/images/ux-field.png) · [AI 선택 변화](docs/images/ux-strategy.png)
 
 ## 자료는 어디에 있나요?
 

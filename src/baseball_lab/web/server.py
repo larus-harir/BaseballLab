@@ -171,6 +171,7 @@ class Workbench:
             sources=Path(__file__).parents[1]/'matchup'
             versions={p.name:checksum(p) for p in sorted(sources.glob('*.py'))}
             versions.update({'matchup.html':checksum(Path(__file__).with_name('matchup.html')),
+                             'principles.js':checksum(Path(__file__).with_name('principles.js')),
                              'server.py':checksum(Path(__file__)),
                              'simulation/contracts.py':checksum(Path(__file__).parents[1]/'simulation/contracts.py'),
                              'data/catalog.py':checksum(Path(__file__).parents[1]/'data/catalog.py')})
@@ -376,7 +377,8 @@ def make_handler(workbench):
                    '/match/at-bat':'workbench.html','/simulation':'simulation.html','/lab/data':'data.html'}
             if path in ('/baseball','/eramatch'):
                 from baseball_lab.matchup.web import render
-                self._html(render('eramatch' if path=='/eramatch' else 'baseball',workbench.token))
+                league=parse_qs(urlparse(self.path).query).get('league',['KBO'])[0]
+                self._html(render('baseball' if path=='/baseball' or league=='MLB' else 'eramatch',workbench.token))
             elif path in pages:
                 body=Path(__file__).with_name(pages[path]).read_text(encoding='utf-8').replace('__SESSION_TOKEN__',workbench.token)
                 self._html(body)

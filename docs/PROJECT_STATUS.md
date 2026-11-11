@@ -1,3 +1,22 @@
+# 통합 화면과 계산 원리 · 2026-11-11
+
+선수 가상 대결(EraMatch)에 MLB/KBO 입구를 합쳤습니다. `/baseball`과 기존 `project=baseball` 저장 결과는 유지합니다. 홈은 선수 가상 대결/AI 전략 연구 두 경험, 대결 화면은 대결/계산 원리/개발자 정보 세 탭입니다. 확률 모형·원천·저장 경로는 바꾸지 않았습니다.
+
+계산 원리는 실제 선택의 시즌 기록 → 시대 보정 → 표본 안정화 → BABIP/DIPS → Log5 → 추첨 → 예측 검사를 연결합니다. 사건 선택에 따라 실제 중간값이 바뀌고, 같은 선수에 두 방식을 적용할 수 있으면 확률 차이를 비교합니다. KBO 미확인 원천·외부 검사, 과거 시대의 공정성은 검증 완료로 표시하지 않습니다.
+
+| 화면 | 변경 전 | 변경 후 |
+|---|---|---|
+| 홈 | [이전](images/design-first/before-home.png) | [현재](images/design-first/after-home.png) |
+| 결과 | [이전](images/design-first/before-result.png) | [현재](images/design-first/after-result.png) |
+| 계산 원리 | [이전](images/design-first/before-principles.png) | [현재](images/design-first/after-principles.png) |
+| Match | [이전](images/design-first/before-match.png) | [현재](images/design-first/after-match.png) |
+
+실제 공식 보관 자료의 MLB2023/2024·KBO1982/2024 조합과 25/100/250타석, 리그 빠른 전환, 새 추첨·정확 재현·저장 재열기, 모바일390px·키보드·명도 대비를 검사했습니다. 새 설치 준비 검사는 핀 고정된 실제 공식 보관본을 테스트 전송했으며 새 공식 사이트 접근 성공 주장과 다릅니다. 페이지 오류 0, 가로 넘침 0. 실제 한 점/이닝 연구 각각 400회×3개 난수의 학습·0/200/400단계·가중치·리플레이·저장 원문 보존을 확인했습니다.
+
+전체 pytest 218개, 과제 원본 재현 210조건 통과. 기존 원천·결과·학습 모델 960파일 SHA256 일치. 원본/가중치는 Git에 포함하지 않습니다. 재검사는 `python scripts/check_design_browser.py`이며 단위 검사의 MOCK_TEST_ONLY 입력과 실제 자료 브라우저 검사를 구분합니다. 이번 변경을 되돌릴 때는 해당 커밋을 `git revert`하고 원천·출력 폴더를 삭제하지 않습니다.
+
+---
+
 # 제품 회귀 수정 · 2026-11-11
 
 - 일반 타석 대결은 새 난수를 발급합니다. **다시 대결**과 **같은 대결 재현**을 분리하고, 계산 지문과 저장 실행 ID도 분리했습니다. 저장 당시 자료/모형과 달라진 경우에는 재현 성공으로 표시하지 않습니다.

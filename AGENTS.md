@@ -1,7 +1,7 @@
 # BaseballLab development contract
 
 Keep this repository and the working application; improve it incrementally.
-The current product directive is `docs/specs/BaseballLab_Codex_Strict_Product_Regression_Fix.md`.
+The current product directive is `docs/specs/BaseballLab_Design_First_Codex_Directive.md`.
 User instructions take precedence over this file and archived plans.
 
 ## Stable responsibilities
@@ -10,7 +10,8 @@ User instructions take precedence over this file and archived plans.
   shared data, probability contracts and simulation services.
 - Match owns competitive AI learning, adaptation and comparison with modern and
   historical human baseball. Its one-run and three-out run-maximization studies retain explicit observational limits.
-- EraMatch is the supplied KBO historical-player assignment's web application.
+- EraMatch is the unified MLB/KBO player matchup experience; retain legacy
+  project=baseball identifiers and /baseball compatibility. The supplied KBO assignment remains a distinct calculation mode.
   Reproduction and improved candidates share the same engine, with different
   versions and evidence states. It is not AI-versus-human history research.
 - The user's subsequent correction makes the supplied KBO season statistics
@@ -41,9 +42,9 @@ User instructions take precedence over this file and archived plans.
   model selection and data inspection settings under optional advanced details.
 - Reuse `matchup`, the existing providers, catalog paths, Match training and
   reports. Do not create a second app or duplicate probability implementations.
-- Use one main agent by default; ordinary fixes, UI, tests and docs are its work.
-  Use subagents only for essential independent specialist validation, maximum
-  two at once, with narrowly assigned files/questions and concise findings.
+- Use exactly the main developer/integrator/QA and one designer agent.
+  Designer owns assigned visual files only; do not create QA/data/statistics
+  subagents. Main owns models, API integration, security and final checks.
 - Read related files and the current directive rather than repeating whole-repo
   research or old plans. Reuse working code. Do not add unsolicited features,
   plans, documents, screenshots or repeated searches.
