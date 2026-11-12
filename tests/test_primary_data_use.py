@@ -38,7 +38,7 @@ def test_collected_lookup_preserves_legacy_fallback_when_no_collection(tmp_path)
         data=overview(tmp_path,'eramatch',data_mode='collected',season=2024,league='KBO')
         assert data['ready'] and 'data_mode' not in data and 1982 in data['seasons']
         data=overview(tmp_path,'eramatch',data_mode='collected',league='NPB')
-        assert not data['ready'] and data['league']=='NPB' and data['seasons']==[]
+        assert not data['ready'] and data['league']=='NPB' and data['seasons']==[2025] and data['cached_seasons']==[]
 
 
 def test_team_running_versions_are_not_double_counted_or_repaired(tmp_path):

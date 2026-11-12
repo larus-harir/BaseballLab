@@ -37,7 +37,10 @@ def overview(root,project,*,league=None,role=None,query='',season=None):
     data=shared.catalog(root)
     all_profiles=[p for p in data['profiles'].values() if p['league']==league and shared.usable(p)]
     years=sorted({p['season'] for p in all_profiles},reverse=True)
-    year=int(season) if season is not None else (years[0] if years else None)
+    cached_years=years[:]
+    if league=='MLB':years=sorted(set(years)|set(range(2000,2026)),reverse=True)
+    if league=='NPB' and not years:years=[2025]
+    year=int(season) if season is not None else (cached_years[0] if cached_years else years[0] if years else None)
     roster=names(root) if league=='MLB' else {}
     rows=[profile(p) for p in all_profiles if p['season']==year and (role is None or p['role']==role)
         and (not query or query.casefold() in roster.get(p['player_id'],p['name']).casefold() or query in p['player_id'])]
@@ -47,8 +50,8 @@ def overview(root,project,*,league=None,role=None,query='',season=None):
     source={'id':'collected-'+league.lower(),'label':f'{league} · 수집한 선수 기록','status':'REAL_OBSERVED' if league=='MLB' else 'COMMUNITY_UNVERIFIED',
         'license':'원천별 선언 조건을 유지한 로컬 탐색용 기록','files':[]}
     full=league=='MLB'
-    return {'data_mode':'collected','project':project,'league':league,'ready':bool(rows),'supported_seasons':years,'seasons':years,
-        'selected_season':year,'dataset_id':data['dataset_id'],'source':source,'profiles':rows[:80],'matched':len(rows),
+    return {'data_mode':'collected','project':project,'league':league,'ready':any(p['season']==year and (role is None or p['role']==role) for p in all_profiles),'supported_seasons':years,'seasons':years,
+        'cached_seasons':cached_years,'selected_season':year,'dataset_id':data['dataset_id'],'source':source,'profiles':rows[:80],'matched':len(rows),
         'needs_connection':False,'automatic_preparation':False,
         'models':{'common':{'status':'LEAGUE_RELATIVE_ASSUMPTION'},**({'normalized':{'status':'UNVALIDATED_COMPARISON','strength':300}} if full else {})},
         'default_model':'normalized' if full else 'common','message':'보관한 수집 기록을 사용합니다.' if rows else '이 리그·시즌의 사용할 선수 기록이 없습니다.',

@@ -57,7 +57,7 @@ async function api(path,body){
   if(!response.ok)throw Error(value.error||'요청을 마치지 못했습니다.');return value;
 }
 function error(e,focus=true){$('formError').textContent=e.message||String(e);if(focus){$('catalogStatus').textContent='대결을 시작하지 못했습니다. 아래 안내에 따라 선택을 확인해주세요.';$('formError').focus({preventScroll:true})}}
-function busy(on,message,scope='catalog'){if(scope==='catalog')catalogLoading=on;const blocked=catalogLoading||submitting||!selected.b||!selected.p||$('bPlayer').disabled||$('pPlayer').disabled;$('calculate').disabled=blocked;$('prepare').disabled=blocked;$('rerun').disabled=submitting;$('reproduce').disabled=submitting;$('catalogStatus').classList.toggle('progress-note',blocked);if(message)$('catalogStatus').textContent=message}
+function busy(on,message,scope='catalog'){if(scope==='catalog')catalogLoading=on;const blocked=catalogLoading||submitting||!selected.b||!selected.p||$('bPlayer').disabled||$('pPlayer').disabled;$('calculate').disabled=blocked;$('prepare').disabled=catalogLoading||submitting;$('rerun').disabled=submitting;$('reproduce').disabled=submitting;$('catalogStatus').classList.toggle('progress-note',blocked);if(message)$('catalogStatus').textContent=message}
 
 function updateSelection(){busy(false,null,'selection')}
 function pauseReplay(){clearInterval(replayTimer);replayTimer=null;$('play').textContent='자동 재생'}
@@ -67,9 +67,9 @@ function configureLeague(){ $('league').value=selectedLeague;document.querySelec
 configureLeague();
 $('league').onchange=()=>{loadGeneration++;generation.b++;generation.p++;selectedLeague=$('league').value;if(selectedLeague==='NPB')$('dataSource').value='collected';project=selectedLeague==='MLB'?'baseball':'eramatch';era=project==='eramatch';profiles={b:[],p:[]};selected={b:null,p:null};catalog=null;for(const side of ['b','p']){$(side+'Query').value='';$(side+'Player').replaceChildren();$(side+'Season').replaceChildren()}$('model').value='auto';configureLeague();fillSeasons([]);window.history.replaceState(null,'','/eramatch?league='+selectedLeague);loadCatalog();loadHistory()};
 function sourceNote(source){return source.status==='LEGACY_UNVERIFIED'?'과제의 KBO 시즌 기록을 기본으로 사용합니다. 원천·이용 조건·예측 성능은 독립 검증 전입니다.':'Retrosheet의 실제 정규시즌 기록입니다. 선수별 시즌 전체 기록과 별도 기간으로 검사한 예측 성능을 구분합니다.'}
-function fillSeasons(values){
+function fillSeasons(values,preferred){
   const years=[...new Set(values.map(Number))].filter(Number.isInteger).sort((a,b)=>b-a);
-  for(const side of ['b','p']){const prior=$(side+'Season').value;$(side+'Season').innerHTML=years.map(y=>'<option>'+y+'</option>').join('');if(years.includes(Number(prior)))$(side+'Season').value=prior;else if(!era&&$('dataSource').value==='legacy'&&years.includes(2024))$(side+'Season').value='2024'}
+  for(const side of ['b','p']){const prior=$(side+'Season').value;$(side+'Season').innerHTML=years.map(y=>'<option>'+y+'</option>').join('');if(years.includes(Number(prior)))$(side+'Season').value=prior;else if(years.includes(Number(preferred)))$(side+'Season').value=String(preferred);else if(!era&&$('dataSource').value==='legacy'&&years.includes(2024))$(side+'Season').value='2024'}
 
 }
 function fillModels(data){
@@ -80,7 +80,7 @@ async function prepareRecords(season,version){
   // A preparation already running is shared rather than starting duplicate downloads.
   if(preparation){await preparation;return}
   preparation=(async()=>{
-    const task=await api('/api/matchup/prepare',{project:selectedLeague==='NPB'?'npb':project,season});
+    const task=await api('/api/matchup/prepare',{project:selectedLeague==='NPB'?'npb':selectedLeague==='MLB'&&$('dataSource').value==='collected'?'mlb_collected':project,season});
     if(task.ready||task.status==='completed')return;
     if(!task.id)throw Error('자료 준비 요청을 확인하지 못했습니다. 다시 시도해주세요.');
     while(true){
@@ -98,10 +98,10 @@ async function loadCatalog(allowPrepare=true){
   const version=++loadGeneration,requested=$('bSeason').value;generation.b++;generation.p++;selected={b:null,p:null};busy(true,'선수 목록을 불러오는 중…');$('formError').textContent='';$('prepareControls').classList.add('hidden');invalidateResult();
   try{
     const data=await api('/api/matchup/catalog?'+new URLSearchParams({project,...(requested?{season:requested}:{}),data_mode:$('dataSource').value,league:selectedLeague}));if(version!==loadGeneration)return;catalog=data;
-    fillSeasons(data.supported_seasons||data.seasons||(era?[]:[2024]));
+    fillSeasons(data.supported_seasons||data.seasons||(era?[]:[2024]),data.selected_season);
     const actual=Number($('bSeason').value||requested);if(data.data_mode==='collected'&&actual!==Number(data.selected_season)){await loadCatalog(false);return;}
     $('selectors').classList.toggle('hidden',!data.ready);
-    if(!data.ready&&data.data_mode==='collected'){$('catalogStatus').textContent=data.message;if(selectedLeague==='NPB'){$('prepareControls').classList.remove('hidden');$('prepare').textContent='NPB 기록 내려받고 연결하기'}explain();return}
+    if(!data.ready&&data.data_mode==='collected'){$('catalogStatus').textContent=data.message;$('prepareControls').classList.remove('hidden');$('prepare').textContent=selectedLeague+' 기록 내려받고 연결하기';if(selectedLeague==='MLB'&&allowPrepare){await prepareRecords(actual,version);if(version===loadGeneration)await loadCatalog(false)}explain();return}
     if(!data.ready){
       selected={b:null,p:null};profiles={b:[],p:[]};explain();
       const needsConnection=data.needs_connection??data.readiness?.needs_connection??data.metadata?.readiness?.needs_connection??false;
@@ -119,12 +119,12 @@ async function loadCatalog(allowPrepare=true){
   }catch(e){if(version===loadGeneration){$('catalogStatus').textContent='선택한 기록을 준비하지 못했습니다. 시즌을 바꾸거나 다시 시도할 수 있어요.';$('prepareControls').classList.remove('hidden');error(e,false)}}
   finally{if(version===loadGeneration)busy(false)}
 }
-async function search(side){
+async function search(side,retry=true){
   const gen=++generation[side];$(side+'Player').disabled=true;selected[side]=null;updateSelection();
   try{
     const requestedProject=project,q=new URLSearchParams({project,role:side==='b'?'batter':'pitcher',season:$(side+'Season').value,query:$(side+'Query').value,data_mode:$('dataSource').value,league:selectedLeague});
     const data=await api('/api/matchup/catalog?'+q);if(gen!==generation[side]||requestedProject!==project)return;
-    if(!data.ready){await prepareRecords(Number($(side+'Season').value),loadGeneration);if(gen!==generation[side])return;await search(side);return}
+    if(!data.ready){if(!retry)throw Error('선택한 시즌·역할에 사용할 선수 기록이 없습니다. 다른 시즌을 선택하세요.');await prepareRecords(Number($(side+'Season').value),loadGeneration);if(gen!==generation[side])return;await search(side,false);return}
     profiles[side]=data.profiles;paintPlayers(side);if(data.matched>80)$(side+'Info').textContent+=' · 이름을 입력하면 전체 선수에서 찾습니다.';
   }catch(e){if(gen===generation[side]){profiles[side]=[];paintPlayers(side);error(e,false)}}finally{if(gen===generation[side]){$(side+'Player').disabled=false;updateSelection()}}
 }
@@ -178,7 +178,7 @@ for(const side of ['b','p']){
   $(side+'Season').onchange=()=>{search(side)};
   $(side+'Player').onchange=()=>choose(side);
 }
-$('prepare').onclick=async()=>{if(selectedLeague==='NPB'){busy(true,'NPB 기록을 확인하고 연결합니다. 처음에는 다운로드 시간이 걸립니다.');try{await prepareRecords(2025,loadGeneration);await loadCatalog(false)}catch(e){error(e)}finally{busy(false)}return;}preparationAttempted.delete(project+':'+Number($('bSeason').value||2024));loadCatalog(true)};
+$('prepare').onclick=async()=>{if(selectedLeague==='NPB'||(selectedLeague==='MLB'&&$('dataSource').value==='collected')){busy(true,'기록을 확인하고 연결합니다. 처음에는 다운로드 시간이 걸립니다.');try{await prepareRecords(Number($('bSeason').value||2025),loadGeneration);await loadCatalog(false)}catch(e){error(e)}finally{busy(false)}return;}preparationAttempted.delete(project+':'+Number($('bSeason').value||2024));loadCatalog(true)};
 let submitting=false;
 function updateUnit(n){$('unitHelp').textContent=num(n)+'타석은 같은 두 선수의 조건을 '+num(n)+'번 반복해 추첨한 결과입니다.'}
 $('n').addEventListener('input',()=>updateUnit(Number($('n').value)||0));updateUnit(Number($('n').value));

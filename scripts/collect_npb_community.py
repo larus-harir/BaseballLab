@@ -101,6 +101,7 @@ def collect(root, *, pbp_year=2025, workers=4):
             if hashlib.sha1(f'blob {len(body)}\0'.encode() + body).hexdigest() != entry['sha']:
                 raise ValueError('Pinned Git blob and downloaded original disagree')
             path = save(root, folder, 'raw/' + name, body)
+            print('NPB 파일 확인 · '+name,flush=True)
             del body
             seasons, dates, games, rows = set(), set(), set(), 0
             with path.open(encoding='utf-8-sig', newline='') as stream:

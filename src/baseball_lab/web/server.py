@@ -121,13 +121,16 @@ class Workbench:
             raise ValueError('이미 작업 중입니다. 끝날 때까지 기다리거나 중지해 주세요.')
 
     def matchup_prepare(self, archive=None, *, project='baseball',season=2024):
-        if project=='npb':
-            with self.operation('NPB 수집 기록 연결'):
+        if project in ('npb','mlb_collected'):
+            if type(season) is not int or not 2000<=season<=2025:raise ValueError('2000~2025 시즌을 선택하세요.')
+            league='NPB' if project=='npb' else 'MLB'
+            if league=='NPB' and season!=2025:raise ValueError('NPB 자동 연결은 확인된 2025 정규시즌을 사용합니다.')
+            with self.operation(league+' 수집 기록 연결'):
                 job_id=time.strftime('%Y%m%d_%H%M%S')+'_'+secrets.token_hex(4)
                 output=self.outputs/job_id;private(output,directory=True)
-                command=[sys.executable,'-u',str(self.root/'scripts/prepare_player_sources.py')]
+                command=[sys.executable,'-u',str(self.root/'scripts/prepare_player_sources.py'),'--league',league,'--start',str(season),'--end',str(season)]
                 with self.lock:
-                    self.job={'id':job_id,'kind':'prepare_catalog','project':'eramatch','season':2025,'status':'queued','started_at':utc_now(),'logs':[],'report':None,'message':'NPB 공개 CSV를 확인하고 연결합니다.'};self._persist()
+                    self.job={'id':job_id,'kind':'prepare_catalog','project':'eramatch' if league=='NPB' else 'baseball','season':season,'status':'queued','started_at':utc_now(),'logs':[],'report':None,'message':league+' 공개 기록을 내려받고 연결합니다. 최초 준비에는 시간이 걸립니다.'};self._persist()
                     threading.Thread(target=self._worker,args=(job_id,command,output),daemon=True).start()
                 return {'id':job_id,'ready':False,'status':'queued'}
         from baseball_lab.matchup.service import PROJECTS
@@ -322,7 +325,7 @@ class Workbench:
                 process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
                                          cwd=self.root,env=env,text=True,encoding='utf-8',errors='replace')
                 self.process=process
-                self.job.update(status='running',message='학습 없이 상황을 준비하고 있어요.' if self.job['kind']=='simulate' else '자료 준비부터 순서대로 진행하고 있어요.' if self.job['kind']=='run' else '기록을 검사하고 있어요.' if self.job['kind']=='fit' else '두 AI가 타석 대결을 학습하고 있어요.')
+                self.job.update(status='running',message='공개 기록을 내려받고 검사하고 있어요.' if self.job['kind']=='prepare_catalog' else '학습 없이 상황을 준비하고 있어요.' if self.job['kind']=='simulate' else '자료 준비부터 순서대로 진행하고 있어요.' if self.job['kind']=='run' else '기록을 검사하고 있어요.' if self.job['kind']=='fit' else '두 AI가 타석 대결을 학습하고 있어요.')
                 self._persist()
             with (output/'output.log').open('w',encoding='utf-8') as log:
                 private(output/'output.log')
@@ -332,7 +335,7 @@ class Workbench:
                     with self.lock:
                         self.job['logs'].append(line.rstrip())
                         progress=re.search(r'학습 (\d+)/(\d+)(타석|상황)',line)
-                        if line.startswith('단계 '):self.job['message']=line.strip()
+                        if line.startswith('단계 ') or self.job['kind']=='prepare_catalog':self.job['message']=line.strip()
                         if progress and self.job['kind'] in ('train','run'):
                             done,total=map(int,progress.groups()[:2]);unit=progress.group(3)
                             self.job.update(completed_episodes=done,target_episodes=total,message=line.strip()+' · 현재까지의 결과를 볼 수 있어요.')
@@ -349,6 +352,8 @@ class Workbench:
                 self._cache=(0,None)
                 status='cancelled' if cancelled else 'failed' if code or invalid_fit else 'completed'
                 message='작업을 중지했습니다.' if cancelled else '검사를 통과하지 못했어요. 아래 이유를 확인하세요.' if invalid_fit else '문제가 생겼어요. 아래 기록과 도움말을 확인하세요.' if code else '완료했어요. 결과 보기를 눌러 주세요.'
+                if self.job['kind']=='prepare_catalog' and not cancelled:
+                    message=('자료를 내려받지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도하세요. '+(self.job['logs'][-1] if self.job['logs'] else '')) if code else '자료 연결을 마쳤습니다. 선수와 시즌을 선택할 수 있어요.'
                 report=output/'result/report.html'
                 failure=output/'result/failure.json'
                 if failure.exists() and not cancelled:
