@@ -34,7 +34,7 @@ def test_same_season_guard_and_invalid_profiles(mock_catalog):
     from unittest.mock import patch
     root,catalog=mock_catalog
     with patch('baseball_lab.data.catalog.DatasetCatalog.get',return_value=catalog):
-        with pytest.raises(ValueError,match='같은 시즌'):service.analyze(root,'baseball',{'batter':'KBO:batter:b1:1982','pitcher':'KBO:pitcher:p1:2024','model':'normalized'})
+        with pytest.raises(ValueError,match='시즌'):service.analyze(root,'baseball',{'batter':'KBO:batter:b1:1982','pitcher':'KBO:pitcher:p1:2024','model':'normalized'})
 
 
 def test_project_history_filters_before_limiting(web):

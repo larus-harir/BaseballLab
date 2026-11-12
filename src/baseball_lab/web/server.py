@@ -121,6 +121,15 @@ class Workbench:
             raise ValueError('이미 작업 중입니다. 끝날 때까지 기다리거나 중지해 주세요.')
 
     def matchup_prepare(self, archive=None, *, project='baseball',season=2024):
+        if project=='npb':
+            with self.operation('NPB 수집 기록 연결'):
+                job_id=time.strftime('%Y%m%d_%H%M%S')+'_'+secrets.token_hex(4)
+                output=self.outputs/job_id;private(output,directory=True)
+                command=[sys.executable,'-u',str(self.root/'scripts/prepare_player_sources.py')]
+                with self.lock:
+                    self.job={'id':job_id,'kind':'prepare_catalog','project':'eramatch','season':2025,'status':'queued','started_at':utc_now(),'logs':[],'report':None,'message':'NPB 공개 CSV를 확인하고 연결합니다.'};self._persist()
+                    threading.Thread(target=self._worker,args=(job_id,command,output),daemon=True).start()
+                return {'id':job_id,'ready':False,'status':'queued'}
         from baseball_lab.matchup.service import PROJECTS
         if not isinstance(project,str) or project not in PROJECTS:
             raise ValueError('선수 가상 대결을 선택하세요.')
@@ -440,6 +449,12 @@ def make_handler(workbench):
                     self._json(public_view(result))
                 except (ValueError,KeyError,TypeError,OSError,csv.Error) as exc:
                     self._json({'error':public_text(exc)},400)
+            elif path=='/api/learning-preview':
+                try:
+                    from baseball_lab.data.learning_preview import preview
+                    q=parse_qs(urlparse(self.path).query)
+                    self._json(preview(workbench.root,q.get('start',[''])[0],q.get('end',[''])[0],json.loads(q.get('mixture',['{}'])[0])))
+                except (ValueError,OSError,KeyError,TypeError) as exc:self._json({'error':public_text(exc)},400)
             elif path=='/api/shared/catalog':
                 try:
                     from baseball_lab.matchup.shared import overview

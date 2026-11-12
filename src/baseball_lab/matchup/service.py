@@ -35,7 +35,9 @@ def overview(root,project,*,role=None,query='',season=None,data_mode=None,league
     if data_mode in (None,'collected'):
         from pathlib import Path
         from . import collected
-        if collected.available(Path(root)) or league=='NPB':return collected.overview(root,project,role=role,query=query,season=season,league=league)
+        if collected.available(Path(root)) or league=='NPB':
+            ready=collected.overview(root,project,role=role,query=query,season=season,league=league)
+            if ready['supported_seasons'] or league=='NPB':return ready
     if role not in ('batter','pitcher',None):raise ValueError('선수 역할을 확인하세요.')
     if not isinstance(query,str) or len(query)>80:raise ValueError('검색어는 80자 이내입니다.')
     registry=DatasetCatalog(root);descriptor=registry.describe(project,year)
@@ -97,10 +99,16 @@ def analyze(root,project,options):
     registry=DatasetCatalog(root);catalog=registry.get(project,year)
     if catalog is None:raise ValueError('선수 기록을 준비하고 있어요. 준비가 끝나면 다시 실행하세요.')
     b=catalog['profiles'].get(options['batter']);p=catalog['profiles'].get(options['pitcher'])
+    cross=False
+    if project=='baseball' and p is None:
+        pid=options['pitcher']
+        if pid.startswith('MLB:'):
+            other_year=_year(pid.rsplit(':',1)[-1]);other=registry.get(project,other_year)
+            if other:
+                p=other['profiles'].get(pid);cross=other_year!=year
     if not b or not p or b['role']!='batter' or p['role']!='pitcher':
         raise ValueError('선택한 시즌의 타자·투수를 다시 확인하세요.')
-    if project=='baseball' and (b['season']!=p['season'] or b['season']!=year):
-        raise ValueError('MLB 대결은 현재 같은 시즌 기록으로 계산합니다. 두 선수의 시즌을 맞춰주세요.')
+    if project=='baseball' and b['season']!=year:raise ValueError('타자 시즌과 선택한 시즌이 다릅니다.')
     validate_player_season(b);validate_player_season(p)
     requested=options.get('model','auto');mode,reason=_select_model(catalog,b,p,requested)
     if mode=='legacy':
@@ -141,6 +149,12 @@ def analyze(root,project,options):
             'model_selection':{'requested':requested,'selected':mode,'reason':reason},
             'scope':'같은 조건의 독립 타석 반복입니다. 주자·아웃·9이닝 점수·개별 투구 경로는 계산하지 않습니다.'}
     result['contract']=matchup_contract(result)
+    if cross:
+        result['dataset_id']=content_hash({'batter':catalog['dataset_id'],'pitcher':other['dataset_id']})
+        result['validation']=None;result['model_status']='UNVALIDATED_COMPARISON'
+        result['scope']='서로 다른 시즌의 리그 평균 대비 타석 기록을 비교합니다. 시즌 간 예측 검증이나 실제 경기 승률을 뜻하지 않습니다.'
+        result['source']={**result['source'],'label':f'MLB {year} 타자 · {other_year} 투수','files':catalog['source']['files']+other['source']['files']}
+        result['contract']=matchup_contract(result)
     if project=='eramatch':
         metadata=registry.describe(project,year)['metadata']
         if metadata['included_with_application']:
@@ -148,7 +162,7 @@ def analyze(root,project,options):
                 'files':metadata['sha256'],'original_files_at_runtime':False,
                 'verification_scope':metadata['verification_scope']}
     # Preserve the original identity inputs for backwards reproducibility.
-    result['run_id']=content_hash({'dataset_id':catalog['dataset_id'],'batter':b['id'],'pitcher':p['id'],
+    result['run_id']=content_hash({'dataset_id':result['dataset_id'],'batter':b['id'],'pitcher':p['id'],
                                    'model':model,'n':simulation['n'],'seed':simulation['seed'],
                                    'repetitions':simulation['repetitions']})
     if 'expected_run_id' in options and options['expected_run_id']!=result['run_id']:
