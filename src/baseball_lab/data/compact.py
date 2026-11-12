@@ -44,3 +44,18 @@ def npb_before(cutoff):
             'provider':'armstjc-npb-spaia','source_hashes':source['source_hashes'],'rights_status':source['rights_status'],
             'date_semantics':'provider game_date; historical publication/correction availability is not independently verified',
             'attribution':source['attribution'],'scope':'Only observed regular-season batting games before validation; no NPB runner-transition claim.'}
+
+
+MLB_NAMES_SHA256='9775ba1d28edbdfa131c129aa7933c4888c2b285e31974124ed96ee1731ff616'
+
+
+@lru_cache(maxsize=1)
+def mlb_names():
+    raw=files(__package__).joinpath('resources/mlb-names-v1.json.gz').read_bytes()
+    if len(raw)>1024*1024 or hashlib.sha256(raw).hexdigest()!=MLB_NAMES_SHA256:raise ValueError('MLB 선수 이름 자료의 지문이 다릅니다.')
+    import io
+    with gzip.GzipFile(fileobj=io.BytesIO(raw)) as f:body=f.read(4*1024*1024+1)
+    if len(body)>4*1024*1024:raise ValueError('선수 이름 자료 크기 한도를 넘었습니다.')
+    payload=json.loads(body)
+    if payload['schema']!='retrosheet-player-display-names-v1':raise ValueError('선수 이름 자료 버전이 다릅니다.')
+    return payload['names']

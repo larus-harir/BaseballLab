@@ -9,7 +9,8 @@ from baseball_lab.simulation.contracts import matchup_contract
 
 def names(root):
     from .catalog import read_catalog
-    result={}
+    from baseball_lab.data.compact import mlb_names
+    result=dict(mlb_names())
     for year in (2023,2024):
         try:data=read_catalog(root,f'mlb-{year}')
         except (OSError,ValueError,KeyError):continue  # Never use unverifiable names.
@@ -50,7 +51,7 @@ def overview(root,project,*,league=None,role=None,query='',season=None):
     from baseball_lab.data.compact import index as included_index
     source={'id':'collected-'+league.lower(),'label':f'{league} · 수집한 선수 기록','status':'REAL_OBSERVED' if league=='MLB' else 'COMMUNITY_UNVERIFIED',
         'license':'원천별 선언 조건을 유지한 시즌 집계'+(' · '+included_index()['npb']['attribution'] if league=='NPB' else ''),'files':[]}
-    full=league=='MLB'
+    full=any(p['normalized_eligible'] for p in rows)
     return {'data_mode':'collected','project':project,'league':league,'ready':any(p['season']==year and (role is None or p['role']==role) for p in all_profiles),'supported_seasons':years,'seasons':years,
         'cached_seasons':cached_years,'selected_season':year,'dataset_id':data['dataset_id'],'source':source,'profiles':rows[:80],'matched':len(rows),
         'needs_connection':False,'automatic_preparation':False,
@@ -72,7 +73,11 @@ def analyze(root,project,options):
         roster=names(root)
         for r in (b,p):r['name']=roster.get(r['player_id'],r['name'])
     if requested not in ('auto','normalized','common'):raise ValueError('수집 기록에서 지원하지 않는 계산 방식입니다.')
-    mode=('normalized' if b['normalized_eligible'] and p['normalized_eligible'] else 'common') if requested=='auto' else requested
+    def full_prior(year):
+        rows=[profile(r) for r in data['profiles'].values() if r['league']==b['league'] and r['season']==year and r['role']=='batter']
+        return bool(rows) and all(r['normalized_eligible'] for r in rows)
+    complete=b['normalized_eligible'] and p['normalized_eligible'] and full_prior(b['season']) and full_prior(p['season'])
+    mode=('normalized' if complete else 'common') if requested=='auto' else requested
     target=options.get('reference',f"{b['league']}:{b['season']}")
     if mode=='common':
         result=shared.analyze(root,{**options,'reference':target})

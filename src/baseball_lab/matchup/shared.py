@@ -66,6 +66,8 @@ def catalog(root):
             key=(row['league'],row['season']);ns=row['source_namespace'];providers[key].add(ns);permission[(key,ns)]=usable(row)
     def priority(key,ns):return (not permission[(key,ns)],PROVIDER_PRIORITY.index(ns) if ns in PROVIDER_PRIORITY else len(PROVIDER_PRIORITY),ns)
     selected={key:min(value,key=lambda ns:priority(key,ns)) for key,value in providers.items()}
+    from baseball_lab.data.compact import mlb_names
+    mlb_roster=mlb_names()
     profiles={};baselines={};groups=defaultdict(list)
     for row in rows:
         if row['role'] not in ('batter','pitcher','team_batting'):continue
@@ -76,6 +78,7 @@ def catalog(root):
         groups[(row['league'],row['season'],row['role'])].append((row,events))
         if row['role']=='team_batting':continue
         name=row.get('source_fields',{}).get('Name') or row.get('source_fields',{}).get('選手') or names.get((row['league'],row['season'],row['role'],row['source_player_id'])) or row['source_player_id']
+        if row['league']=='MLB':name=mlb_roster.get(row['source_player_id'],name)
         profiles[row['entity_id']]={**row,'id':row['entity_id'],'player_id':row['source_player_id'],'name':name,'events':events}
     for league,year in sorted({(key[0],key[1]) for key in groups}):
         # Published team totals take priority; never sum team and player totals.
@@ -85,6 +88,7 @@ def catalog(root):
         if not n or any(v<=0 for v in counts.values()):continue
         baselines[f'{league}:{year}']={'counts':counts,'rates':{k:v/n for k,v in counts.items()},
             'source_namespace':selected[(league,year)],
+            'stat_counts':{k:sum(r['counts'][k] for r,_ in pairs) if all(r['counts'].get(k) is not None for r,_ in pairs) else None for k in pairs[0][0]['counts']},
             'use_allowed':all(usable(r) for r,_ in pairs),
             'basis':'team_batting' if (league,year,'team_batting') in groups else 'available_player_batting',
             'rows':len(pairs),'sample_n':n}
@@ -119,21 +123,27 @@ def analyze(root,options):
     if not usable(b) or not usable(p) or not data['baselines'][target]['use_allowed']:raise ValueError(NPB_USE_NOTICE)
     strength=options.get('strength',100)
     if type(strength) not in (int,float) or not math.isfinite(strength) or not 0<=strength<=2000:raise ValueError('평균 보정량은 0~2,000입니다.')
-    ref=data['baselines'][target]['rates'];steps={'reference':ref,'strength':strength,'target':target,'origins':{}}
-    adjusted=[]
-    for role,player in (('batter',b),('pitcher',p)):
-        origin=f"{player['league']}:{player['season']}"
-        if origin not in data['baselines']:raise ValueError('선수의 리그·시즌 기준 기록이 부족합니다.')
-        prior=data['baselines'][origin]['rates'];n=sum(player['events'].values());raw={k:v/n for k,v in player['events'].items()}
-        shrunk={k:(player['events'][k]+strength*prior[k])/(n+strength) for k in LABELS}
-        weights={k:shrunk[k]*ref[k]/prior[k] for k in LABELS};total=sum(weights.values());value={k:v/total for k,v in weights.items()}
-        steps.update({role+'_raw':raw,role+'_adjusted':value,role+'_n':n});steps['origins'][role]=data['baselines'][origin];adjusted.append(value)
-    q,w,total=generalized_log5(*adjusted,ref);steps.update(weights=w,normalizer=total)
-    model={'model':'common','version':'common-four-events-relative-v1','probabilities':q,'steps':steps,
-        'assumptions':['각 리그·시즌 평균 대비 상대 빈도를 선택한 환경으로 옮긴다는 가정입니다. 검증된 리그 실력 환산이 아닙니다.',
-            '같은 평균 대비 성적을 같은 실력으로 취급하는 가정이 남습니다. 구장·상대·수비·규칙 효과는 별도 식별하지 못했습니다.',
-            '사구는 나머지에 포함하고 안타 종류는 통합합니다. 없는 피2루타·피3루타·사구를 추정하지 않습니다.',
-            '시즌 합계는 전략 학습에 사용하지 않습니다. NPB 공개 기록의 학습·재배포 허용은 별도 확인 대상입니다.']}
+    if options.get('event_schema') not in (None,'adaptive','legacy-four'):raise ValueError('지원하지 않는 사건 구성입니다.')
+    event_labels=LABELS;reference=data['baselines'][target]
+    if options.get('event_schema')=='legacy-four':
+        ref=data['baselines'][target]['rates'];steps={'reference':ref,'strength':strength,'target':target,'origins':{}}
+        adjusted=[]
+        for role,player in (('batter',b),('pitcher',p)):
+            origin=f"{player['league']}:{player['season']}"
+            if origin not in data['baselines']:raise ValueError('선수의 리그·시즌 기준 기록이 부족합니다.')
+            prior=data['baselines'][origin]['rates'];n=sum(player['events'].values());raw={k:v/n for k,v in player['events'].items()}
+            shrunk={k:(player['events'][k]+strength*prior[k])/(n+strength) for k in LABELS}
+            weights={k:shrunk[k]*ref[k]/prior[k] for k in LABELS};total=sum(weights.values());value={k:v/total for k,v in weights.items()}
+            steps.update({role+'_raw':raw,role+'_adjusted':value,role+'_n':n});steps['origins'][role]={k:v for k,v in data['baselines'][origin].items() if k!='stat_counts'};adjusted.append(value)
+        q,w,total=generalized_log5(*adjusted,ref);steps.update(weights=w,normalizer=total)
+        model={'model':'common','version':'common-four-events-relative-v1','probabilities':q,'steps':steps,
+            'assumptions':['각 리그·시즌 평균 대비 상대 빈도를 선택한 환경으로 옮긴다는 가정입니다. 검증된 리그 실력 환산이 아닙니다.',
+                '같은 평균 대비 성적을 같은 실력으로 취급하는 가정이 남습니다. 구장·상대·수비·규칙 효과는 별도 식별하지 못했습니다.',
+                '사구는 나머지에 포함하고 안타 종류는 통합합니다. 없는 피2루타·피3루타·사구를 추정하지 않습니다.',
+                '시즌 합계는 전략 학습에 사용하지 않습니다. NPB 공개 기록의 학습·재배포 허용은 별도 확인 대상입니다.']}
+    else:
+        from .event_schema import model as adaptive_model
+        model,event_labels,reference=adaptive_model(data,b,p,target,strength)
     model['assumptions'].append('KBO 제공 자료는 원천 정의를 독립 검증하지 못했습니다. 선수 합계 기준은 확보한 선수 범위의 평균이며 공식 리그 전체 평균과 차이가 남을 수 있습니다.')
     if any(player['source_namespace']=='armstjc-npb-spaia' for player in (b,p)) or data['baselines'][target]['source_namespace']=='armstjc-npb-spaia':
         model['assumptions'].extend(['NPB는 SPAIA 출처의 비공식 배포 CSV 중 정규시즌으로 명시된 관측 경기만 집계했습니다. 공식 시즌 전체와의 일치·누락 여부는 독립 검증 전입니다.',
@@ -146,11 +156,11 @@ def analyze(root,options):
     from baseball_lab.data.compact import index as included_index
     result={'schema':'statistical-matchup-v1','project':'eramatch','project_name':'EraMatch','created_at':utc_now(),
         **{k:v for k,v in identity.items() if k in ('dataset_id',)},'batter':b,'pitcher':p,'model':model,'simulation':simulation,
-        'labels':LABELS,'training_executed':False,'model_status':'LEAGUE_RELATIVE_ASSUMPTION','run_id':content_hash(identity),
+        'labels':event_labels,'training_executed':False,'model_status':'LEAGUE_RELATIVE_ASSUMPTION','run_id':content_hash(identity),
         'source':{'id':'shared-standard-data','label':'수집 기록의 공통 타석 비교','status':'MIXED_PROVENANCE','files':[],
             'license':'원천별 선언 조건 유지 · 앱에는 선별한 시즌 집계만 포함'+(' · '+included_index()['npb']['attribution'] if any(r['source_namespace']=='armstjc-npb-spaia' for r in (b,p)) else '')},
         'scope':'독립 타석 반복입니다. 리그 간 상대 빈도 비교이며 실제 리그 간 승률·절대 실력의 검증이 아닙니다.'}
     if options.get('expected_run_id',result['run_id'])!=result['run_id']:raise ValueError('자료·기준 환경이 달라 같은 결과를 재현할 수 없습니다.')
-    result['data_policy']={'events':list(LABELS),'missing_fill':False,'baseline':data['baselines'][target],
+    result['data_policy']={'events':list(event_labels),'missing_fill':False,'baseline':reference,'field_policy':model.get('field_policy'),
         'policy_learning':False,'absolute_league_strength_validated':False}
     return result

@@ -43,7 +43,7 @@ def normalize_season_row(*,league,season,role,source_player_id,source_namespace,
     c=normalized
     if c['H'] is not None:
         if c['AB'] is not None and c['H']>c['AB']:raise ValueError('안타가 타수보다 큽니다.')
-        if all(c[k] is not None for k in ('2B','3B','HR')) and sum(c[k] for k in ('2B','3B','HR'))>c['H']:
+        if sum(c[k] for k in ('2B','3B','HR') if c[k] is not None)>c['H']:
             raise ValueError('장타 합계가 안타보다 큽니다.')
     denominator=c['PA'] if role in ('batter','team_batting') else c['TBF']
     if denominator is not None:

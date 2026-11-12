@@ -13,7 +13,7 @@ def main():
         root=Path(folder);package=root/'package';resource=package/'resources';resource.mkdir(parents=True)
         originals=ROOT/'src/baseball_lab/data/resources'
         (resource/'index.json').write_bytes((originals/'index.json').read_bytes().replace(b'\n',b'\r\n'))
-        shutil.copyfile(originals/'players.json.gz',resource/'players.json.gz')
+        for filename in ('players.json.gz','mlb-names-v1.json.gz'):shutil.copyfile(originals/filename,resource/filename)
         compact.index.cache_clear();compact.players.cache_clear()
         try:
             with patch.object(compact,'files',return_value=package),patch('urllib.request.OpenerDirector.open',side_effect=AssertionError('MOCK_TEST_ONLY offline')),local_server(root) as (base,wb),sync_playwright() as pw:

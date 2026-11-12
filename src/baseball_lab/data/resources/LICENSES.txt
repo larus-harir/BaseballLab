@@ -15,3 +15,8 @@ This uses data sourced from the Nippon Baseball Data Repository, which can be ac
 https://github.com/armstjc/Nippon-Baseball-Data-Repository
 Changes: only known regular-season player aggregates and dated league PA marginals retained.
 Publisher declarations are distinct from independently verified upstream rights/accuracy.
+
+MLB display names: Retrosheet official biofile0.csv from
+https://www.retrosheet.org/downloads/biodata.zip
+Only player ID and published display name are retained; other personal fields are omitted.
+Source ZIP/CSV SHA-256 and parsing encoding are in mlb-names-v1.json.gz provenance.

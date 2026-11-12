@@ -20,7 +20,8 @@ def main():
         with page.expect_response(lambda r:r.url.endswith('/api/matchup/analyze')) as response:page.locator('#run').click()
         d=response.value.json();assert response.value.ok,d
         r=d['analysis'];assert r['batter']['league']=='KBO' and r['pitcher']['league']==('NPB' if args.npb_comparison else 'MLB')
-        assert set(r['model']['probabilities'])=={'strikeout','walk','hit','other'}
+        assert {'strikeout','walk','home_run','other'}<=set(r['model']['probabilities'])
+        assert abs(sum(r['model']['probabilities'].values())-1)<1e-12
         expect(page.locator('#resultTitle')).to_contain_text('NPB' if args.npb_comparison else 'MLB')
         page.locator('#calculation').locator('..').evaluate('e=>e.open=true')
         expect(page.locator('#calculation')).to_contain_text('검증된 리그 실력 환산이 아닙니다')
@@ -38,7 +39,7 @@ def main():
         expect(page.locator('#trainBtn')).to_be_disabled();expect(page.locator('#periodError')).not_to_be_empty()
         if args.skip_training:
             assert not errors,errors
-            print(json.dumps({'cross_league_report':d['report'],'pitcher_league':r['pitcher']['league'],'checks':['four-event common comparison','publisher-declared community provider selected','saved report reopened','desktop/mobile','all/recent/season date bounds'],'javascript_errors':errors},ensure_ascii=False,indent=2));browser.close();return
+            print(json.dumps({'cross_league_report':d['report'],'pitcher_league':r['pitcher']['league'],'checks':['adaptive observed-event comparison','publisher-declared community provider selected','saved report reopened','desktop/mobile','all/recent/season date bounds'],'javascript_errors':errors},ensure_ascii=False,indent=2));browser.close();return
         # Submit the same validated two-season path from the actual web controls.
         page.locator('#recordSeason').select_option('all')
         page.locator('#periodStart').fill('2024-03-20');page.locator('#periodEnd').fill('2025-09-28')
@@ -58,7 +59,7 @@ def main():
         assert not errors,errors
         print(json.dumps({'cross_league_report':d['report'],'web_learning_job':job['id'],
             'seasons':result['dataset']['selected_seasons'],'source_segments':result['dataset']['used_segments'],
-            'checks':['four shared events','real KBO/MLB reference with NPB use gate','saved report reopen','desktop/mobile width','all/recent/season dates','out-of-range blocked','web neural learning completed'],
+            'checks':['available observed events retained','real KBO/MLB reference with NPB use gate','saved report reopen','desktop/mobile width','all/recent/season dates','out-of-range blocked','web neural learning completed'],
             'javascript_errors':errors},ensure_ascii=False,indent=2))
         browser.close()
 

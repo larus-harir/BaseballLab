@@ -11,7 +11,7 @@ function principles(result){
   const r=result,s=r.model.steps,keys=Object.keys(r.model.probabilities);
   $('calcBody02').innerHTML='<p>원래 리그 평균 대비 빈도를 '+esc(s.target)+' 환경으로 옮겼습니다.</p>'+table(['결과','타자 기록','투수 기록','기준 환경'],keys.map(k=>[labels[k],pct(s.batter_raw[k]),pct(s.pitcher_raw[k]),pct(s.reference[k])]));
   $('calcBody03').innerHTML='<p>타자 '+s.batter_n+'타석 · 투수 '+s.pitcher_n+'명 상대. 원래 리그 평균을 '+s.strength+'타석만큼 섞었습니다. 탐색용 보정이며 검증된 리그 간 실력 환산이 아닙니다.</p>';
-  $('calcBody04').innerHTML='<p>안타 종류·타수·희생플라이가 부족하면 BABIP를 계산하지 않습니다. 현재 대결은 안타 종류를 합친 네 사건만 사용합니다. 사구·실책 출루 등은 나머지에 포함되며 전부 아웃을 뜻하지 않습니다.</p>';
+  $('calcBody04').innerHTML='<p>안타 종류·타수·희생플라이가 부족하면 BABIP를 계산하지 않습니다. 확보된 홈런·장타·사구는 분리하고, 구분할 수 없는 안타만 묶습니다. 나머지 결과를 전부 아웃으로 해석하지 않습니다.</p>';
   $('calcBody05').innerHTML='<p>사건별 보정 타자 × 보정 투수 ÷ 기준 환경의 빈도를 구한 뒤 합계를 100%로 맞춥니다.</p>'+table(['결과','계산 확률'],keys.map(k=>[labels[k],pct(r.model.probabilities[k])]));
   $('calcBody06').innerHTML=table(['결과','예상 개수','이번 개수'],keys.map(k=>[labels[k],r.simulation.expected[k].toFixed(1),r.simulation.counts[k]]));
   $('calcBody07').innerHTML='<p>'+esc(r.simulation.uncertainty)+'</p><p>출처·원래 시즌·관측 타석 수를 보존합니다. 예측·인과 검증을 통과한 모형이라는 뜻은 아닙니다.</p>';
