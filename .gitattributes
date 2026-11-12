@@ -1,0 +1,3 @@
+# Preserve hash-pinned application resources on Windows checkouts.
+src/baseball_lab/data/resources/index.json text eol=lf
+*.gz -text

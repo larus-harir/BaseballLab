@@ -57,7 +57,7 @@ def main():
         checks.append('Real bundled KBO: new sample, fixed probabilities, exact replay and saved reopen')
         page.goto(base+'/match');assert page.locator('a[href="/match/at-bat"]').count()==0
         page.goto(base+'/match/team?study=half_inning');expect(page.locator('#recordSeason')).to_be_visible(timeout=10000)
-        page.locator('#recordSeason').select_option('2023')
+        page.locator('#recordSeason').select_option('collected:2023')
         expect(page.locator('#periodStart')).to_have_value('2023-03-30');expect(page.locator('#periodEnd')).to_have_value('2023-10-01')
         before=len(list(wb.outputs.glob('*/task.json')))
         for first,last in [('2023-03-29','2023-10-01'),('2023-03-30','2023-10-02'),('2023-09-01','2023-08-01'),('2023-05-01','2023-05-02')]:
@@ -65,7 +65,7 @@ def main():
             expect(page.locator('#periodError')).not_to_be_empty()
             assert page.locator('#trainBtn').is_disabled() or page.locator('#periodStart').evaluate('e=>!e.checkValidity()') or page.locator('#periodEnd').evaluate('e=>!e.checkValidity()')
             assert len(list(wb.outputs.glob('*/task.json')))==before
-        page.locator('#recordSeason').select_option('2024');expect(page.locator('#periodStart')).to_have_value('2024-03-20');expect(page.locator('#periodEnd')).to_have_value('2024-09-30')
+        page.locator('#recordSeason').select_option('collected:2024');expect(page.locator('#periodStart')).to_have_value('2024-03-20');expect(page.locator('#periodEnd')).to_have_value('2024-09-30')
         expect(page.locator('#periodError')).to_be_empty()
         page.screenshot(path=str(args.screenshots/'dates-desktop.png'),full_page=True)
         page.set_viewport_size({'width':390,'height':844});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')

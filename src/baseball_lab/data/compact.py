@@ -10,7 +10,9 @@ INDEX_SHA256='cccf559c4c96472847d12cb3abf07ad55f3340f164bd197e8fcafac07f7a81db'
 
 @lru_cache(maxsize=1)
 def index():
-    raw=files(__package__).joinpath('resources/index.json').read_bytes()
+    # Git on Windows may convert LF to CRLF. Verify canonical LF bytes;
+    # all other content changes must still fail the pinned checksum.
+    raw=files(__package__).joinpath('resources/index.json').read_bytes().replace(b'\r\n',b'\n')
     if hashlib.sha256(raw).hexdigest()!=INDEX_SHA256:raise ValueError('앱 포함 자료의 출처 목록이 변경됐습니다.')
     data=json.loads(raw)
     if data['schema']!='compact-source-index-v1':raise ValueError('지원하지 않는 기본 자료 버전입니다.')

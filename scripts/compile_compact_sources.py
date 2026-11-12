@@ -41,7 +41,7 @@ def compile_sources(root,destination):
     index={'schema':'compact-source-index-v1','players_sha256':checksum(destination/'players.json.gz'),'players_rows':len(rows),'source_dataset_id':data['dataset_id'],'mlb':periods,'npb':npb,
       'licenses':{'retrosheet':'https://www.retrosheet.org/downloads/plays.html','kbo':'CC BY-NC-SA 4.0; https://www.kaggle.com/datasets/netsong/kbo-player-stats-19822025, Kaggle version 7','npb':npb['attribution']},
       'scope':'Derived matchup counts and dated NPB PA marginal totals only. No raw games, biographies, trained weights or invented missing values. Upstream NPB rights/accuracy are not independently verified.'}
-    (destination/'index.json').write_text(json.dumps(index,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    (destination/'index.json').write_bytes((json.dumps(index,ensure_ascii=False,indent=2)+'\n').encode('utf-8'))
     print('INDEX SHA256',checksum(destination/'index.json'),'PLAYERS BYTES',len(body),'ROWS',len(rows),flush=True)
 
 
