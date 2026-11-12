@@ -56,6 +56,7 @@ def adapt_snapshot(row,manifest):
     normalized['granularity']=granularity
     normalized['provenance_status']=manifest.get('source_status','UNVERIFIED')
     normalized['rights_status']=row.get('rights_status',manifest.get('rights_status','UNVERIFIED'))
+    if manifest.get('publisher_license'):normalized['publisher_license']=manifest['publisher_license']
     return normalized
 
 
@@ -87,7 +88,7 @@ def play_season_rows(root,manifest):
             yield row
 
 
-def load_snapshots(root,*,leagues=None,start=None,end=None,last_seasons=None):
+def load_snapshots(root,*,leagues=None,start=None,end=None,last_seasons=None,reuse=None):
     base=Path(root).resolve()/'data/local/collections'
     if base.is_symlink():raise ValueError('수집 보관 폴더의 링크는 허용하지 않습니다.')
     sources=[]
@@ -114,6 +115,12 @@ def load_snapshots(root,*,leagues=None,start=None,end=None,last_seasons=None):
         if years and m['season'] not in years[m['league']]:continue
         if m.get('source_status')!='REAL_OBSERVED':raise ValueError('실제 원천으로 확인되지 않은 수집 자료입니다.')
         if m.get('league')=='MLB' and m.get('granularity')=='play':
+            entry=next(x for x in m['files'] if x['path'].endswith('.csv'))
+            cached=(reuse or {}).get((m['season'],entry['sha256']))
+            if cached:
+                path=local_path(root,Path(root).resolve()/entry['path'])
+                if checksum(path)!=entry['sha256']:raise ValueError('캐시와 연결된 원본 지문이 다릅니다.')
+                yield from cached;continue
             yield from play_season_rows(root,m);continue
         if not m.get('rows_file'):continue
         original=file.parent/m['rows_file']
@@ -128,7 +135,24 @@ def load_snapshots(root,*,leagues=None,start=None,end=None,last_seasons=None):
 def build(root,*,leagues=None,start=None,end=None,last_seasons=None,include_builtin=True):
     root=Path(root).resolve()
     select_window([],leagues=leagues,start=start,end=end,last_seasons=last_seasons)
-    rows=list(load_snapshots(root,leagues=leagues,start=start,end=end,last_seasons=last_seasons))
+    reuse={}
+    # Reuse validated prior MLB aggregates instead of rescanning millions of
+    # unchanged play rows on each acquisition. Raw checksums are still checked.
+    if leagues is None or 'MLB' in leagues:
+        candidates=sorted((root/'data/local/standardized').glob('*/manifest.json'),key=lambda p:p.stat().st_mtime,reverse=True)
+        for file in candidates:
+            local_path(root,file);old=json.loads(file.read_text())
+            if old.get('schema')!=SCHEMA:continue
+            if not old.get('coverage',{}).get('MLB'):continue
+            path=local_path(root,file.parent/'rows.jsonl')
+            if checksum(path)!=old['rows_sha256']:raise ValueError('기존 표준 자료의 지문이 다릅니다.')
+            with path.open() as f:
+                for line in f:
+                    row=json.loads(line)
+                    if row.get('league')=='MLB' and row.get('source_namespace')=='retrosheet':
+                        reuse.setdefault((row['season'],row['source_sha256']),[]).append(row)
+            break
+    rows=list(load_snapshots(root,leagues=leagues,start=start,end=end,last_seasons=last_seasons,reuse=reuse))
     if include_builtin and (leagues is None or 'KBO' in leagues):rows.extend(builtin_rows())
     unique={}
     for row in rows:

@@ -14,7 +14,13 @@ from .models import generalized_log5,simulate
 
 LABELS={'strikeout':'삼진','walk':'볼넷','hit':'안타 (종류 통합)','other':'나머지 결과 (사구 포함)'}
 _CACHE={};_LOCK=RLock()
-NPB_USE_NOTICE='NPB 공식 홈페이지(https://npb.jp/)의 2차 이용·무단 전재 금지 고지를 확인했습니다. 별도 허가가 확인되지 않아 새 시뮬레이션·학습에 사용하지 않습니다.'
+NPB_USE_NOTICE='NPB 공식 사이트 수집본은 2차 이용 고지에 따라 차단합니다. 별도 라이선스를 선언한 비공식 CSV는 출처별로 구분해 로컬 탐색 비교에 사용하며 upstream 권리·정확성의 독립 검증과 전략 학습 승인을 뜻하지 않습니다.'
+PROVIDER_PRIORITY=('kaggle-netsong-kbo','armstjc-npb-spaia','retrosheet','supplied-kbo-assignment')
+
+
+def usable(row):
+    if row['league']!='NPB':return True
+    return row['source_namespace']=='armstjc-npb-spaia' and row.get('rights_status')=='PUBLISHER_DECLARED_UPSTREAM_UNVERIFIED'
 
 
 def partition(row):
@@ -50,15 +56,24 @@ def catalog(root):
     for p in load_builtin()['profiles'].values():
         key=('KBO',p['season'],p['role'],p['player_id']);names[key]=p['name']
         if any('팀 분할·합산을 확인할 수 없는 중복' in issue for issue in p.get('issues',[])):ambiguous.add(key)
+    # Select exactly one provider for a league/season, never add overlapping
+    # copies of a player's season to inflate the reference population.
+    providers=defaultdict(set);permission={}
+    for row in rows:
+        if row['role'] in ('batter','team_batting'):
+            key=(row['league'],row['season']);ns=row['source_namespace'];providers[key].add(ns);permission[(key,ns)]=usable(row)
+    def priority(key,ns):return (not permission[(key,ns)],PROVIDER_PRIORITY.index(ns) if ns in PROVIDER_PRIORITY else len(PROVIDER_PRIORITY),ns)
+    selected={key:min(value,key=lambda ns:priority(key,ns)) for key,value in providers.items()}
     profiles={};baselines={};groups=defaultdict(list)
     for row in rows:
         if row['role'] not in ('batter','pitcher','team_batting'):continue
-        if (row['league'],row['season'],row['role'],row['source_player_id']) in ambiguous:continue
+        if row['source_namespace']!=selected.get((row['league'],row['season'])):continue
+        if row['source_namespace']=='supplied-kbo-assignment' and (row['league'],row['season'],row['role'],row['source_player_id']) in ambiguous:continue
         events=partition(row) if row['role']!='team_batting' else partition({**row,'role':'batter'})
         if events is None:continue
         groups[(row['league'],row['season'],row['role'])].append((row,events))
         if row['role']=='team_batting':continue
-        name=row.get('source_fields',{}).get('選手') or names.get((row['league'],row['season'],row['role'],row['source_player_id'])) or row['source_player_id']
+        name=row.get('source_fields',{}).get('Name') or row.get('source_fields',{}).get('選手') or names.get((row['league'],row['season'],row['role'],row['source_player_id'])) or row['source_player_id']
         profiles[row['entity_id']]={**row,'id':row['entity_id'],'player_id':row['source_player_id'],'name':name,'events':events}
     for league,year in sorted({(key[0],key[1]) for key in groups}):
         # Published team totals take priority; never sum team and player totals.
@@ -67,6 +82,8 @@ def catalog(root):
         counts={k:sum(e[k] for _,e in pairs) for k in LABELS};n=sum(counts.values())
         if not n or any(v<=0 for v in counts.values()):continue
         baselines[f'{league}:{year}']={'counts':counts,'rates':{k:v/n for k,v in counts.items()},
+            'source_namespace':selected[(league,year)],
+            'use_allowed':all(usable(r) for r,_ in pairs),
             'basis':'team_batting' if (league,year,'team_batting') in groups else 'available_player_batting',
             'rows':len(pairs),'sample_n':n}
     data={'dataset_id':manifest['dataset_id'],'profiles':profiles,'baselines':baselines}
@@ -86,8 +103,8 @@ def overview(root,role=None,league=None,season=None,query=''):
     rows.sort(key=lambda p:-(sum(p['events'].values())))
     return {'dataset_id':data['dataset_id'],'labels':LABELS,'references':data['baselines'],
         'profiles':rows[:80],'matched':len(rows),
-        'player_sources':{role:sorted({f"{p['league']}:{p['season']}" for p in data['profiles'].values() if p['role']==role and p['league']!='NPB'}) for role in ('batter','pitcher')},
-        'blocked_references':[k for k in data['baselines'] if k.startswith('NPB:')],
+        'player_sources':{role:sorted({f"{p['league']}:{p['season']}" for p in data['profiles'].values() if p['role']==role and usable(p)}) for role in ('batter','pitcher')},
+        'blocked_references':[k for k,v in data['baselines'].items() if not v['use_allowed']],
         'usage_notice':NPB_USE_NOTICE,
         'scope':'공통 기록의 상대 빈도 비교 · 리그 실력 환산 검증 전'}
 
@@ -97,7 +114,7 @@ def analyze(root,options):
     if not b or not p or b['role']!='batter' or p['role']!='pitcher':raise ValueError('공통 기록이 있는 타자와 투수를 선택하세요.')
     target=options.get('reference')
     if target not in data['baselines']:raise ValueError('경기를 가정할 기준 리그·시즌을 선택하세요.')
-    if b['league']=='NPB' or p['league']=='NPB' or target.startswith('NPB:'):raise ValueError(NPB_USE_NOTICE)
+    if not usable(b) or not usable(p) or not data['baselines'][target]['use_allowed']:raise ValueError(NPB_USE_NOTICE)
     strength=options.get('strength',100)
     if type(strength) not in (int,float) or not math.isfinite(strength) or not 0<=strength<=2000:raise ValueError('평균 보정량은 0~2,000입니다.')
     ref=data['baselines'][target]['rates'];steps={'reference':ref,'strength':strength,'target':target,'origins':{}}
@@ -116,6 +133,10 @@ def analyze(root,options):
             '사구는 나머지에 포함하고 안타 종류는 통합합니다. 없는 피2루타·피3루타·사구를 추정하지 않습니다.',
             '시즌 합계는 전략 학습에 사용하지 않습니다. NPB 공개 기록의 학습·재배포 허용은 별도 확인 대상입니다.']}
     model['assumptions'].append('KBO 제공 자료는 원천 정의를 독립 검증하지 못했습니다. 선수 합계 기준은 확보한 선수 범위의 평균이며 공식 리그 전체 평균과 차이가 남을 수 있습니다.')
+    if any(player['source_namespace']=='armstjc-npb-spaia' for player in (b,p)) or data['baselines'][target]['source_namespace']=='armstjc-npb-spaia':
+        model['assumptions'].extend(['NPB는 SPAIA 출처의 비공식 배포 CSV 중 정규시즌으로 명시된 관측 경기만 집계했습니다. 공식 시즌 전체와의 일치·누락 여부는 독립 검증 전입니다.',
+            'This uses data sourced from the Nippon Baseball Data Repository, which can be accessed here: https://github.com/armstjc/Nippon-Baseball-Data-Repository',
+            '게시자는 데이터 사용을 선언했지만 upstream 재배포권은 독립 확인 전입니다. 로컬 탐색과 검증된 전략 학습·데이터 재배포를 구별합니다.'])
     import secrets
     simulation=simulate(model,options.get('n',25),options.get('seed',secrets.randbelow(2**31)),options.get('repetitions',200))
     identity={'dataset_id':data['dataset_id'],'batter':b['id'],'pitcher':p['id'],'model':model,

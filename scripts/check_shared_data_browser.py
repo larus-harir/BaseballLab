@@ -1,5 +1,5 @@
 """Real collected-data UI checks. Creates new reports; no source rewrites."""
-import json
+import json,argparse
 from pathlib import Path
 from time import monotonic
 from check_incremental_browser import ROOT,local_server
@@ -7,20 +7,21 @@ from playwright.sync_api import sync_playwright,expect
 
 
 def main():
+    parser=argparse.ArgumentParser();parser.add_argument("--skip-training",action="store_true");parser.add_argument("--npb-comparison",action="store_true");args=parser.parse_args()
     errors=[]
     with local_server(ROOT) as (base,wb),sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         page=browser.new_page(viewport={'width':1280,'height':950});page.on('pageerror',lambda e:errors.append(str(e)))
         page.goto(base+'/eramatch?mode=common')
         expect(page.locator('#run')).to_be_enabled(timeout=30000)
-        page.locator('#bSource').select_option('KBO:2025');page.locator('#pSource').select_option('MLB:2025')
+        page.locator('#bSource').select_option('KBO:2025');page.locator('#pSource').select_option('NPB:2025' if args.npb_comparison else 'MLB:2025')
         expect(page.locator('#run')).to_be_enabled(timeout=15000)
         page.locator('#reference').select_option('MLB:2025');page.get_by_text('보정·재현 설정',exact=True).click();page.locator('#seed').fill('41')
         with page.expect_response(lambda r:r.url.endswith('/api/matchup/analyze')) as response:page.locator('#run').click()
         d=response.value.json();assert response.value.ok,d
-        r=d['analysis'];assert r['batter']['league']=='KBO' and r['pitcher']['league']=='MLB'
+        r=d['analysis'];assert r['batter']['league']=='KBO' and r['pitcher']['league']==('NPB' if args.npb_comparison else 'MLB')
         assert set(r['model']['probabilities'])=={'strikeout','walk','hit','other'}
-        expect(page.locator('#resultTitle')).to_contain_text('MLB')
+        expect(page.locator('#resultTitle')).to_contain_text('NPB' if args.npb_comparison else 'MLB')
         page.locator('#calculation').locator('..').evaluate('e=>e.open=true')
         expect(page.locator('#calculation')).to_contain_text('검증된 리그 실력 환산이 아닙니다')
         page.goto(base+d['report']);expect(page.locator('#resultTitle')).to_contain_text('KBO')
@@ -30,10 +31,14 @@ def main():
         page.goto(base+'/match/team?study=half_inning')
         expect(page.locator('#recordSeason')).to_have_value('recent:5',timeout=15000)
         expect(page.locator('#periodStart')).to_have_value('2021-04-01')
-        page.locator('#recordSeason').select_option('all');expect(page.locator('#periodStart')).to_have_value('2015-04-05')
+        periods=page.request.get(base+'/api/state?project=match').json()['readiness']['scoring']['collected_periods']
+        page.locator('#recordSeason').select_option('all');expect(page.locator('#periodStart')).to_have_value(min(v['start'] for v in periods.values()))
         page.locator('#recordSeason').select_option('collected:2025');expect(page.locator('#periodStart')).to_have_value('2025-03-18')
         page.locator('#periodEnd').fill('2025-09-29');page.locator('#periodEnd').press('Tab')
         expect(page.locator('#trainBtn')).to_be_disabled();expect(page.locator('#periodError')).not_to_be_empty()
+        if args.skip_training:
+            assert not errors,errors
+            print(json.dumps({'cross_league_report':d['report'],'pitcher_league':r['pitcher']['league'],'checks':['four-event common comparison','publisher-declared community provider selected','saved report reopened','desktop/mobile','all/recent/season date bounds'],'javascript_errors':errors},ensure_ascii=False,indent=2));browser.close();return
         # Submit the same validated two-season path from the actual web controls.
         page.locator('#recordSeason').select_option('all')
         page.locator('#periodStart').fill('2024-03-20');page.locator('#periodEnd').fill('2025-09-28')

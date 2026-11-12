@@ -131,8 +131,9 @@ def mlb(root,year,notice):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,default=ROOT);p.add_argument('--start-year',type=int,default=2015);p.add_argument('--end-year',type=int,default=2025);p.add_argument('--leagues',nargs='+',choices=['MLB','NPB'],default=['MLB','NPB']);p.add_argument('--npb-players',action='store_true',help='NPB 12구단 선수별 시즌 표 추가 수집');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,default=ROOT);p.add_argument('--start-year',type=int,default=2000);p.add_argument('--end-year',type=int,default=2025);p.add_argument('--leagues',nargs='+',choices=['MLB','NPB'],default=['MLB']);p.add_argument('--npb-players',action='store_true',help='보존된 공식 NPB 파서 옵션 · 신규 수집 중단');a=p.parse_args()
     if not 1871<=a.start_year<=a.end_year<=datetime.now(timezone.utc).year:p.error('1871년~현재 연도 범위; 공식 배포 링크가 있는 시즌만 수집')
+    if 'NPB' in a.leagues:p.error('공식 NPB 신규 수집은 중단했습니다. 비공식 CSV는 scripts/collect_npb_community.py를 사용하세요.')
     if 'NPB' in a.leagues and a.start_year<1950:p.error('NPB 양대 리그 수집은 1950년 이후만 지원')
     root=a.root.resolve();results=[];failures=[];jobs=[]
     if 'MLB' in a.leagues:
@@ -148,12 +149,13 @@ def main():
                     for team in ['g','t','db','c','s','d','h','f','m','e','l','b']:
                         jobs.append((npb_players,(root,year,role,team)))
     with ThreadPoolExecutor(max_workers=2) as pool:
-        futures={pool.submit(fn,*args):(fn.__name__,args[1:]) for fn,args in jobs}
+        futures={pool.submit(fn,*args):{'provider':fn.__name__,'season':args[1],
+            'role':args[2] if fn in (npb,npb_players) else 'plays'} for fn,args in jobs}
         for future in as_completed(futures):
             try:
                 result=future.result();results.append(result);print(result['league'],result['season'],result.get('role','plays'),result['row_count'],flush=True)
             except Exception as e:
-                failures.append({'job':str(futures[future]),'error':str(e)});print('FAILED',failures[-1],flush=True)
+                failures.append({'job':futures[future],'error':str(e)});print('FAILED',failures[-1],flush=True)
     summary={'schema':'league-collection-run-v1','finished_at':utc_now(),'acquired':results,'failures':failures}
     output=root/'data/local/collections'/('collection-run-'+secrets.token_hex(4)+'.json');write_json(output,summary)
     print('Manifest:',output,flush=True)

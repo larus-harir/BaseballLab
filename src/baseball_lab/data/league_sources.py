@@ -27,11 +27,13 @@ def fetch(url,path,limit=2*1024*1024):
     if partial.exists() or partial.is_symlink():raise FileExistsError('기존 임시 원본 덮어쓰기 금지')
     try:
         with urllib.request.build_opener(Redirect()).open(url,timeout=45) as response,open_private(partial) as out:
+            expected=response.headers.get('Content-Length')
             n=0
             while chunk:=response.read(1024*1024):
                 n+=len(chunk)
                 if n>limit:raise ValueError('원본 크기 한도 초과')
                 out.write(chunk)
+            if expected is not None and n!=int(expected):raise ValueError('원본 다운로드가 중간에 끊겼습니다.')
         partial.replace(path);private(path)
     finally:partial.unlink(missing_ok=True)
 

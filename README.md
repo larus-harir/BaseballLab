@@ -50,18 +50,19 @@ MLB 대결 결과의 **선수의 실제 타구·투구 기록 살펴보기**에�
 
 ## 자료는 어디에 있나요?
 
-추가 수집 자료는 기존 대결·학습 모형과 구분해 보관합니다. MLB 2015~2025 플레이 기록, NPB 2015~2025 팀 기록과 2025 선수별 팀 기록을 확보했고, 기존 KBO 1982~2025 자료와 함께 표준화할 수 있습니다. 수집 범위·누락·이용 조건은 [수집 현황](docs/data-collection-status.md)을 확인하세요.
+실제 수집 범위는 MLB **2000~2025년 4,925,133플레이**, KBO 공개 배포본 **1982~2026 선수 18,180행**과 팀·수비·주루 CSV, NPB 비공식 **CSV 98개·674,754행**입니다. NPB 2025 정규시즌으로 확인된 858경기는 1,002개 선수·역할·시즌 기록으로 집계했습니다. 중복 제공자를 합쳐 표본을 부풀리지 않습니다. 원본 범위·관측 단위·이용 조건은 [수집 현황](docs/data-collection-status.md)을 확인하세요.
 
 ```powershell
 # 공식 원천에서 내려받기 (기존 검증된 자료는 재사용)
-python scripts/collect_league_seasons.py --start-year 2015 --end-year 2025
-python scripts/collect_league_seasons.py --leagues NPB --start-year 2025 --end-year 2025 --npb-players
+python scripts/collect_league_seasons.py --leagues MLB --start-year 2000 --end-year 2025
+python scripts/collect_community_data.py
+python scripts/collect_npb_community.py --prepare
 # 확보한 전체 기간 / 리그별 최근 5시즌 선택
 python scripts/prepare_league_data.py
 python scripts/prepare_league_data.py --last-seasons 5
 ```
 
-EraMatch의 **수집한 리그·시대의 공통 기록으로 비교하기**에서 MLB·제공 KBO 자료를 같은 사건 정의로 비교합니다. Match 학습 화면에는 확보한 **전체 기간·최근 5시즌·개별 시즌** 선택이 나타납니다. 원본을 한 번 정제한 뒤 검증된 캐시를 재사용하며, 실행하면 기존 신경망 학습과 결과 화면으로 이어집니다. 시즌 합계로 구종 선택이나 투구 궤적을 만들지 않습니다. 결측값·최소 요건·보정 가정·원천별 사용 결정은 [공통 자료 규칙](docs/league-data-contract.md)을 따릅니다. NPB는 공식 2차 이용 금지 고지를 확인해 새 시뮬레이션·학습에서 차단합니다.
+EraMatch의 **수집한 리그·시대의 공통 기록으로 비교하기**에서 MLB·KBO·비공식 NPB 자료를 같은 사건 정의로 비교합니다. Match 학습 화면에는 확보한 **전체 기간·최근 5시즌·개별 시즌** 선택이 나타납니다. 원본과 기존 집계의 검증값을 확인해 재사용하며, 기존 신경망 학습과 결과 화면으로 이어집니다. 시즌 합계로 구종 선택이나 투구 궤적을 만들지 않습니다. 결측값·최소 요건·보정 가정·출처별 결정은 [공통 자료 규칙](docs/league-data-contract.md)을 따릅니다. 공식 NPB 수집본의 제한과 비공식 배포본의 라이선스 선언은 별도로 취급합니다. 게시자의 라이선스는 upstream 권리·정확성의 독립 검증을 뜻하지 않습니다.
 
 EraMatch 기본 자료는 앱 패키지에 포함된 대결용 시즌 집계입니다. 생년월일·학교·드래프트 항목과 원본 CSV/ZIP/코드/HWP는 포함하지 않습니다. [원본 대조·기본 자료 검증](docs/eramatch-default-data.md).
 
