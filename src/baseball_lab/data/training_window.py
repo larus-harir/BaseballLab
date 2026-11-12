@@ -60,7 +60,7 @@ def acquire(root,start,end):
         else:
             print(f'{year}년 원본의 주자·아웃 연속성과 실제 경기 종료 날짜를 검사합니다.',flush=True)
             data=normalize(path,folder,{'source_version':entry['sha256'],'source_url':m['source_url'],'season':year},
-                official=True,skip_empty_no_play=True,persist=False)
+                official=True,skip_empty_no_play=True,persist=False,regulation_rule_check=True)
             dates={}
             with path.open(encoding='utf-8-sig',newline='') as f:
                 for row in csv.DictReader(f):

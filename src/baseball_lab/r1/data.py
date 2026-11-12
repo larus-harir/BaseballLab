@@ -66,7 +66,7 @@ def walk(bases):
     return int(True)+2*int(first or second)+4*int(third or(first and second)),int(first and second and third)
 
 
-def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty_no_play=False,persist=True):
+def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty_no_play=False,persist=True,regulation_rule_check=False):
     csv_path=Path(csv_path);output=Path(output)
     records=[];pending=[];last_half=None;seen=set();errors=Counter();total=0;sequence_bad=0
     previous=None;score_mismatches=0;official_stats=Counter();source_exclusions=[]
@@ -114,6 +114,10 @@ def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty
     iw=[r for r in records if r['intentional_walk']]
     iw_matches=sum(walk(r['bases'])==(r['end_bases'],r['runs']) and r['outs_added']==0 for r in iw)
     isolated=[r for r in iw if len(r['event_codes'])==1]
+    if regulation_rule_check:
+        ends={}
+        for r in records:ends[(r['game_id'],r['inning'],r['bottom'])]=r['outs']+r['outs_added']
+        isolated=[r for r in isolated if 1<=r['inning']<=8 and ends[(r['game_id'],r['inning'],r['bottom'])]==3]
     isolated_matches=sum(walk(r['bases'])==(r['end_bases'],r['runs']) and r['outs_added']==0 for r in isolated)
     if not test_only and (not isolated or len(isolated)!=isolated_matches):
         raise ValueError('Isolated observed intentional walks do not verify the force-walk rule')
@@ -129,6 +133,7 @@ def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty
               'missing_features':['pitch type','pitch location','velocity','swing intention','player ability','fatigue'],
               'records_checksum':content_hash(records)}
     manifest['source_status']='MOCK_TEST_ONLY' if test_only else 'REAL_OBSERVED'
+    if regulation_rule_check:manifest['intentional_walk_validation_population']='completed regulation innings 1-8; same population as collected-window donors; raw all-inning mismatch counts retained'
     manifest['dataset_id']=content_hash({k:manifest[k] for k in ('schema','records_checksum','parsed_csv_sha256')})
     if persist:write_json(output/'dataset.json',{'manifest':manifest,'records':records})
     return {'manifest':manifest,'records':records}

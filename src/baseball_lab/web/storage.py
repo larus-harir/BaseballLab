@@ -50,6 +50,13 @@ class Storage:
         for source,label,category in catalog_targets:
             p=self.root/'data/local/catalog'/source
             if p.exists():targets['catalog:'+source]=(p,label,category)
+        for name,label,category in (
+            ('collections','수집 원본·출처별 등록 기록','other'),
+            ('community','비공식 CSV 원본·버전·라이선스','private'),
+            ('standardized','공통 선수 기록·제공자별 집계','derived'),
+            ('training-windows','수집 시즌의 학습용 전이 기록','derived')):
+            p=self.root/'data/local'/name
+            if p.exists():targets['collected:'+name]=(p,label,category)
         output=self.root/'outputs/workbench'
         try:self._safe(output);safe_output=True
         except ValueError:safe_output=False
@@ -82,6 +89,7 @@ class Storage:
                     if metadata.get('catalog_source'):catalog_runs[identifier]=metadata['catalog_source']
                 if r.is_file() and not r.is_symlink():
                     data=json.loads(r.read_text(encoding='utf-8'));run_sources[identifier]={d[:4] for d in data.get('model',{}).get('selected_dates',[])}
+                    run_sources[identifier].update(str(y) for y in data.get('dataset',{}).get('selected_seasons',[]))
                     run_sources[identifier].update(f.stem.split('-')[-1] for f in (p/'result').glob('external-*.json'))
             except (OSError,ValueError,TypeError):continue
         for identifier,(p,label,category) in targets.items():
@@ -92,11 +100,13 @@ class Storage:
                 # KBO assignment ZIP/CSV are private user materials, never "official".
                 if identifier=='catalog:kbo-assignment':
                     stats['categories']['private']+=stats['categories']['official'];stats['categories']['official']=0
+                if identifier=='collected:community':
+                    stats['categories']['private']+=stats['categories']['official'];stats['categories']['official']=0
                 items.append({'id':identifier,'label':label,'category':category,'location':str(p.relative_to(self.root)),
                               **{k:stats[k] for k in ('bytes','file_count','changed_at','categories')},
                               'dependent_runs':len(dependencies),'verified':self.verifications.get(identifier,{}).get('message','해시 검사 전입니다') if self.verifications.get(identifier,{}).get('fingerprint')==stats['fingerprint'] else '해시 재검사 전입니다',
-                              'deletable':not stats['links'],'link_warning':bool(stats['links']),
-                              'use':'선수별 사건 비율·확률 대결' if identifier.startswith('catalog:') else '아웃·주자·득점 상황' if category=='official' else '별도 투구 연구' if category=='private' else '학습·관찰의 실행 기록'})
+                              'deletable':not stats['links'] and not identifier.startswith('collected:'),'link_warning':bool(stats['links']),
+                              'use':'선수 선택·실제 기록·학습에 연결된 수집 자료' if identifier.startswith('collected:') else '선수별 사건 비율·확률 대결' if identifier.startswith('catalog:') else '아웃·주자·득점 상황' if category=='official' else '별도 투구 연구' if category=='private' else '학습·관찰의 실행 기록'})
             except (OSError,ValueError):
                 items.append({'id':identifier,'label':label,'category':category,'bytes':None,'deletable':False,'link_warning':True})
         for location,label in (('data/local/retrosheet','이전 조사 자료·도구'),('outputs/E01','명령줄에서 만든 연구 결과')):
@@ -118,6 +128,7 @@ class Storage:
                 'transmission':'자료 준비 때 공식 제공자와 통신합니다. 사용자 CSV·학습 가중치를 외부로 업로드하는 기능은 없습니다.'}
 
     def preview(self,identifier):
+        if isinstance(identifier,str) and identifier.startswith('collected:'):raise ValueError('연결된 수집 자료는 현재 읽기·검증 전용입니다. 통째로 삭제하지 않습니다.')
         target=self._targets().get(identifier)
         if not target:raise ValueError('지정된 보관 항목이 없습니다.')
         path=self._safe(target[0]);stats=scan(path)
@@ -127,6 +138,8 @@ class Storage:
         return {'confirmation':token,'item':item,'warning':'삭제하면 관련 연구를 재현하거나 이어서 확인하지 못할 수 있습니다. 원본은 동일 배포가 유지될 때만 다시 받을 수 있습니다. 휴지통 복구 기능은 없습니다.'}
 
     def verify(self,identifier):
+        if isinstance(identifier,str) and identifier.startswith('collected:'):
+            return self._verify_collected(identifier)
         target=self._targets().get(identifier)
         if not target or not identifier.startswith(('source:','catalog:')):raise ValueError('등록된 원본 기록을 선택하세요.')
         path=self._safe(target[0])
@@ -145,6 +158,30 @@ class Storage:
         data=load(path/'dataset.json')
         message=f"원본·정제 기록 해시 일치 · {data['manifest']['games']:,}경기. 인과 타당성이나 암호화의 인증은 아닙니다."
         self.verifications[identifier]={'fingerprint':scan(path)['fingerprint'],'message':message}
+        return {'id':identifier,'verified':True,'message':message}
+
+    def _verify_collected(self,identifier):
+        target=self._targets().get(identifier)
+        if not target:raise ValueError('등록된 수집 자료를 선택하세요.')
+        folder=self._safe(target[0])
+        if scan(folder)['links']:raise ValueError('자료 경로에 링크가 있습니다.')
+        from baseball_lab.data.warehouse import local_path
+        from baseball_lab.data.lineage import checksum
+        checks=0
+        for file in folder.glob('**/manifest.json'):
+            m=json.loads(file.read_text());entries=[]
+            if m.get('archive_sha256'):entries.append((file.parent/'source.zip',m['archive_sha256']))
+            if m.get('metadata_sha256'):entries.append((file.parent/'metadata.json',m['metadata_sha256']))
+            if m.get('rows_sha256'):entries.append((file.parent/m.get('rows_file','rows.jsonl'),m['rows_sha256']))
+            if m.get('sha256') and (file.parent/'dataset.json').is_file():entries.append((file.parent/'dataset.json',m['sha256']))
+            if m.get('raw_file'):entries.append((file.parent/m['raw_file'],m['source_sha256']))
+            for item in m.get('files',[])+m.get('evidence',[]):
+                if item.get('path') and item.get('sha256'):entries.append((self.root/item['path'],item['sha256']))
+            for path,sha in entries:
+                if checksum(local_path(self.root,path))!=sha:raise ValueError('수집 원본·집계 검증값이 다릅니다.')
+                checks+=1
+        message=f'등록된 원본·집계 검증값 {checks}건 일치. 통계 타당성·권리의 인증은 아닙니다.'
+        self.verifications[identifier]={'fingerprint':scan(folder)['fingerprint'],'message':message}
         return {'id':identifier,'verified':True,'message':message}
 
     def delete(self,confirmation,confirmed):

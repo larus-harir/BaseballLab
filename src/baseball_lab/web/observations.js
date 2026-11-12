@@ -1,12 +1,13 @@
 /* Measured human records stay separate from the simulator's sampled outcomes. */
 let observationVersion=0,observationRequest=null,observationKey=null;
-function resetObservations(){observationVersion++;observationRequest?.abort();observationRequest=null;observationKey=null;$('observations').open=false;$('observations').classList.toggle('hidden',current?.project!=='baseball');$('observationBody').replaceChildren();$('observationStatus').textContent=''}
+function resetObservations(){observationVersion++;observationRequest?.abort();observationRequest=null;observationKey=null;$('observations').open=false;$('observations').classList.toggle('hidden',!current?.batter);$('observationBody').replaceChildren();$('observationStatus').textContent=''}
 function positionDiagram(rows){
  const pos={'1':[210,220],'2':[210,336],'3':[306,228],'4':[258,168],'5':[114,228],'6':[162,168],'7':[90,98],'8':[210,55],'9':[330,98]},counts=Object.fromEntries(rows.map(x=>[x.code,x])),max=Math.max(1,...rows.map(x=>x.n));
  return '<svg viewBox="0 0 420 390" role="img" aria-label="실제 기록에서 처음 공을 처리한 수비 포지션별 횟수"><path d="M210 350 22 155 Q210 -45 398 155Z" fill="#e5eee1"/><path d="m210 335-116-116L210 103l116 116Z" fill="#cfb899" stroke="white" stroke-width="3"/><path d="m210 311-92-92 92-92 92 92Z" fill="#92b591"/>'+Object.entries(pos).map(([code,[x,y]])=>{const row=counts[code],n=row?.n||0;return '<g><circle cx="'+x+'" cy="'+y+'" r="'+(10+9*n/max)+'" fill="#147168"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="white" font-size="12">'+code+'</text><text x="'+x+'" y="'+(y+34)+'" text-anchor="middle" fill="#152c38" font-size="12">'+esc(row?.label||({'1':'투수','2':'포수','3':'1루수','4':'2루수','5':'3루수','6':'유격수','7':'좌익수','8':'중견수','9':'우익수'})[code])+' '+n+'</text></g>'}).join('')+'</svg>';
 }
 async function loadObservations(){
- if(!current||current.project!=='baseball')return;
+ if(!current)return;
+ if(current.batter.league!=='MLB'){await loadTeamContext();return;}
  const role=$('observationRole').value,player=role==='batter'?current.batter:current.pitcher,key=player.season+':'+role+':'+player.player_id;
  if(observationKey===key)return;observationKey=key;const version=++observationVersion;observationRequest?.abort();const request=new AbortController();observationRequest=request;
  $('observationStatus').textContent='실제 시즌 기록을 확인하는 중… 다른 탭도 사용할 수 있습니다.';$('observationBody').replaceChildren();
@@ -18,3 +19,13 @@ async function loadObservations(){
 }
 
 function pitchExamples(rows){return '<div class="pitch-sequences">'+rows.map(x=>'<div><small>'+esc(x.game_id)+' · 기록 '+esc(x.play_number)+'</small><div class="pitch-chips">'+(x.tokens||[]).map(t=>'<span class="'+(t.kind==='pitch_result'?'pitch-token':'record-token')+'">'+esc(t.label)+'</span>').join('')+'</div><details><summary>원본 코드</summary><code>'+esc(x.pitch_result_codes)+' / '+esc(x.event_code)+'</code></details></div>').join('')+'</div>'}
+
+async function loadTeamContext(){
+ const player=$('observationRole').value==='pitcher'?current.pitcher:current.batter,version=++observationVersion;
+ $('observationStatus').textContent='실제 시즌·팀 보조 기록을 확인하고 있어요.';
+ try{const response=await fetch('/api/observations?'+new URLSearchParams({league:player.league,season:player.season,role:player.role,player:player.player_id})),d=await response.json();if(!response.ok)throw Error(d.error);if(version!==observationVersion)return;
+ $('observationStatus').textContent=player.league+' '+player.season+' 실제 시즌 기록';
+ const c=player.counts,stats=['G','PA','TBF','AB','H','2B','3B','HR','SO','BB','HBP','SB','CS','R','RBI','IP_OUTS','ER'].filter(k=>c[k]!=null);
+ $('observationBody').innerHTML='<h3>'+esc(player.name)+' · 실제 선수 기록</h3>'+table(['항목','관측 계수'],stats.map(k=>[({G:'경기',PA:'타석',TBF:'상대 타자',AB:'타수',H:'안타',SO:'삼진',BB:'볼넷',HBP:'사구',SB:'도루',CS:'도루 실패',R:'득점',RBI:'타점',IP_OUTS:'투구 아웃 수',ER:'자책점'})[k]||labels[k]||k,c[k]]))+'<p>'+esc(d.note)+'</p>'+d.tables.map(t=>'<h3>'+({running:'실제 팀별 주루 기록',defense:'실제 팀별 수비 기록'})[t.kind]+'</h3><div class="tablewrap">'+table(t.kind==='running'?['팀','경기','도루 시도','도루','실패','확인 사항']:['팀','경기','실책','병살','자살','보살'],t.rows.map(r=>t.kind==='running'?[r.team,r.games,r.steal_attempts,r.steals,r.caught_stealing,r.quality_note||'계수 합계 일치']:[r.team,r.games,r.errors,r.double_plays,r.putouts,r.assists]))+'</div><p><a href="'+esc(t.source_url)+'">배포 출처</a> · '+esc(t.license)+'</p>').join('')+(d.pitch_samples?'<h3>실제 투구 원문 예시</h3><div class="tablewrap">'+table(['경기·원문 행','보고된 구속 (km/h)','원문 좌표 x/y','기록'],d.pitch_samples.map(r=>[r.game_id+' / '+r.play_id,r.release_speed_kmh,[r.plate_x,r.plate_y].join(' / '),r.description_jap]))+'</div><p>'+esc(d.attribution)+'</p>':'')+'<p>'+esc(d.scope)+'</p>';
+ }catch(e){if(version===observationVersion)$('observationStatus').textContent='기록을 열지 못했습니다: '+e.message}
+}

@@ -6,7 +6,7 @@ from baseball_lab.data.protection import public_view
 
 def render(project,token='',analysis=None):
     if project not in ('baseball','eramatch'):raise ValueError('알 수 없는 프로젝트')
-    if analysis and analysis.get('model',{}).get('model')=='common':
+    if analysis and analysis.get('model',{}).get('model')=='common' and analysis.get('data_mode')!='collected':
         return render_common(token,analysis)
     body=Path(__file__).parents[1].joinpath('web/matchup.html').read_text(encoding='utf-8')
     body=body.replace('__PRINCIPLES_SCRIPT__',Path(__file__).parents[1].joinpath('web/principles.js').read_text(encoding='utf-8'))

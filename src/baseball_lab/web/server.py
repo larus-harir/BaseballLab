@@ -238,7 +238,6 @@ class Workbench:
                     collected=options.get('collected_window',False)
                     if type(collected) is not bool:raise ValueError('수집 기간 선택을 확인하세요.')
                     if collected:
-                        if kind=='simulate':raise ValueError('수집 기간은 AI 전략 학습에서 선택하세요.')
                         from baseball_lab.data.training_window import validate_window
                         start,end=validate_window(self.root,options.get('start'),options.get('end'))
                     else:start,end=validate_period(options.get('start'),options.get('end'),min_days=minimum)
@@ -267,6 +266,7 @@ class Workbench:
                         raise ValueError('지원하는 관찰 방식을 선택하세요.')
                     extra=['--mode','simulate','--start',start,'--end',end,'--seed',str(seed),
                            '--outs',str(outs),'--bases',str(bases),'--observation-source',observation,'--policy-style',style]
+                    if collected:extra.append('--collected-window')
             elif kind=='fit':
                 before=date.fromisoformat(str(options.get('train_before','')))
                 after=date.fromisoformat(str(options.get('test_from','')))
@@ -421,6 +421,10 @@ def make_handler(workbench):
                 except (ValueError,KeyError,TypeError) as exc:self._json({'error':public_text(exc)},400)
             elif path=='/api/observations':
                 try:
+                    query=parse_qs(urlparse(self.path).query)
+                    if query.get('league',['MLB'])[0] in ('KBO','NPB'):
+                        from baseball_lab.data.auxiliary import summarize as team_context
+                        self._json(public_view(team_context(workbench.root,query['league'][0],int(query.get('season',[''])[0]),query.get('role',[None])[0],query.get('player',[None])[0])));return
                     from baseball_lab.data.contact_observations import summarize
                     query=parse_qs(urlparse(self.path).query)
                     year=int(query.get('season',[''])[0])
@@ -440,7 +444,8 @@ def make_handler(workbench):
                     from baseball_lab.matchup.service import overview
                     query=parse_qs(urlparse(self.path).query)
                     result=overview(workbench.root,query.get('project',['baseball'])[0],
-                        role=query.get('role',[None])[0],query=query.get('query',[''])[0],season=query.get('season',[None])[0])
+                        role=query.get('role',[None])[0],query=query.get('query',[''])[0],season=query.get('season',[None])[0],
+                        data_mode=query.get('data_mode',[None])[0],league=query.get('league',[None])[0])
                     self._json(public_view(result))
                 except (ValueError,KeyError,TypeError,OSError) as exc:self._json({'error':public_text(exc)},400)
             elif path.startswith('/reports/'):

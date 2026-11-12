@@ -58,7 +58,6 @@ def main():
             from baseball_lab.data.retrosheet_releases import validate_period
             minimum=1 if args.mode=='simulate' and args.observation_source=='observed' else 3
             if args.collected_window:
-                if args.mode=='simulate':raise ValueError('수집 기간 연결은 득점 전략 학습에 사용합니다.')
                 from baseball_lab.data.training_window import validate_window
                 args.start,args.end=validate_window(REPOSITORY_ROOT,args.start,args.end)
             else:args.start,args.end=validate_period(args.start,args.end,min_days=minimum)
@@ -68,7 +67,10 @@ def main():
         if args.mode=='simulate':
             from baseball_lab.data.catalog import DatasetCatalog
             from baseball_lab.simulation.scoring import observe
-            dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
+            if args.collected_window:
+                from baseball_lab.data.training_window import acquire as acquire_window
+                dataset=acquire_window(REPOSITORY_ROOT,args.start,args.end)
+            else:dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
             observe(dataset,args.start,args.end,output,seed=args.seed,outs=args.outs,bases=args.bases,source=args.observation_source,style=args.policy_style)
             print('관찰 완료 · 정책 학습 없이 실제 기록 또는 모델 전이를 재생합니다.',flush=True)
         elif args.mode in ('scoring','inning'):

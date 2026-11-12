@@ -26,8 +26,16 @@ def source_for(project,season=2024):
     return DatasetCatalog('.').source_id(project,season)
 
 
-def overview(root,project,*,role=None,query='',season=None):
+def overview(root,project,*,role=None,query='',season=None,data_mode=None,league=None):
     _project(project);year=_year(season)
+    if league not in (None,'MLB','KBO','NPB'):raise ValueError('리그를 확인하세요.')
+    if league is not None and ((project=='baseball')!=(league=='MLB')):raise ValueError('리그와 프로젝트를 확인하세요.')
+    if data_mode=='legacy' and league=='NPB':raise ValueError('NPB는 수집 기록에서 선택하세요. 다른 리그로 대체하지 않습니다.')
+    if data_mode not in (None,'legacy','collected'):raise ValueError('자료 선택을 확인하세요.')
+    if data_mode in (None,'collected'):
+        from pathlib import Path
+        from . import collected
+        if collected.available(Path(root)) or league=='NPB':return collected.overview(root,project,role=role,query=query,season=season,league=league)
     if role not in ('batter','pitcher',None):raise ValueError('선수 역할을 확인하세요.')
     if not isinstance(query,str) or len(query)>80:raise ValueError('검색어는 80자 이내입니다.')
     registry=DatasetCatalog(root);descriptor=registry.describe(project,year)
@@ -75,6 +83,10 @@ def _select_model(catalog,b,p,requested):
 def analyze(root,project,options):
     _project(project)
     if not isinstance(options,dict):raise ValueError('대결 설정이 필요합니다.')
+    candidate=options.get('batter')
+    if options.get('data_mode')=='collected' or (options.get('data_mode') is None and isinstance(candidate,str) and len(candidate)==64 and all(c in '0123456789abcdef' for c in candidate)):
+        from .collected import analyze as collected_analyze
+        return collected_analyze(root,project,options)
     if options.get('data_mode')=='common':
         if project!='eramatch':raise ValueError('리그 공통 비교는 EraMatch에서 실행하세요.')
         from .shared import analyze as common_analyze

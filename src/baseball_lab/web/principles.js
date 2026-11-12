@@ -7,6 +7,16 @@ function principles(result){
  $('calculationFlow').innerHTML=definitions.map(([i,t,d])=>'<a href="#calc-'+i+'"><span>'+i+'</span><strong>'+t+'</strong><small>'+d+'</small></a>').join('');
  for(const i of ['02','03','04','05','06','07'])$('calcBody'+i).innerHTML='<p class="empty">대결을 실행하면 이 선택의 실제 수치를 표시합니다.</p>';
  if(!result){$('modelDifferences').innerHTML=comparisonTable(null);return}
+ if(result.model.model==='common'){
+  const r=result,s=r.model.steps,keys=Object.keys(r.model.probabilities);
+  $('calcBody02').innerHTML='<p>원래 리그 평균 대비 빈도를 '+esc(s.target)+' 환경으로 옮겼습니다.</p>'+table(['결과','타자 기록','투수 기록','기준 환경'],keys.map(k=>[labels[k],pct(s.batter_raw[k]),pct(s.pitcher_raw[k]),pct(s.reference[k])]));
+  $('calcBody03').innerHTML='<p>타자 '+s.batter_n+'타석 · 투수 '+s.pitcher_n+'명 상대. 원래 리그 평균을 '+s.strength+'타석만큼 섞었습니다. 탐색용 보정이며 검증된 리그 간 실력 환산이 아닙니다.</p>';
+  $('calcBody04').innerHTML='<p>안타 종류·타수·희생플라이가 부족하면 BABIP를 계산하지 않습니다. 현재 대결은 안타 종류를 합친 네 사건만 사용합니다. 사구·실책 출루 등은 나머지에 포함되며 전부 아웃을 뜻하지 않습니다.</p>';
+  $('calcBody05').innerHTML='<p>사건별 보정 타자 × 보정 투수 ÷ 기준 환경의 빈도를 구한 뒤 합계를 100%로 맞춥니다.</p>'+table(['결과','계산 확률'],keys.map(k=>[labels[k],pct(r.model.probabilities[k])]));
+  $('calcBody06').innerHTML=table(['결과','예상 개수','이번 개수'],keys.map(k=>[labels[k],r.simulation.expected[k].toFixed(1),r.simulation.counts[k]]));
+  $('calcBody07').innerHTML='<p>'+esc(r.simulation.uncertainty)+'</p><p>출처·원래 시즌·관측 타석 수를 보존합니다. 예측·인과 검증을 통과한 모형이라는 뜻은 아닙니다.</p>';
+  $('modelDifferences').innerHTML=r.model.assumptions.map(x=>'<p>'+esc(x)+'</p>').join('');return;
+ }
  const r=result,s=r.model.steps,legacy=r.model.model==='legacy',event=$('explainEvent').value,key=legacy?({strikeout:'K_rate',walk:'BB_rate',home_run:'HR_rate'})[event]:event;
  const safe=x=>x==null?'미집계':pct(x),br=s.batter_raw?.[key],be=s.batter_era?.[key],ba=s.batter_adjusted?.[key],pr=s.pitcher_raw?.[key],pe=s.pitcher_era?.[key],pa=s.pitcher_adjusted?.[key],lr=s.reference?.[key];
  const label=labels[event],nn=r.simulation.n,q=r.model.probabilities[event];

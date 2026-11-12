@@ -19,6 +19,9 @@ class DatasetCatalog:
     def __init__(self,root):self.root=Path(root).resolve()
 
     def supported_seasons(self,project):
+        if project=='match':
+            from .training_window import sources
+            return sorted(set(RELEASES)|set(sources(self.root)))
         if project in ('baseball','match'):return sorted(RELEASES)
         if project=='eramatch':
             data=self.get('eramatch')
@@ -29,13 +32,15 @@ class DatasetCatalog:
         if project not in ('baseball','eramatch','match'):raise ValueError('지원하는 프로젝트를 선택하세요.')
         if type(season) is not int:raise ValueError('시즌은 정수 연도여야 합니다.')
         if project in ('baseball','match'):
-            if season not in RELEASES:raise ValueError('현재 확인된 MLB 시즌은 2023·2024년입니다.')
+            if season not in self.supported_seasons(project):raise ValueError('이 시즌의 확인된 MLB 기록이 없습니다.')
             return f'mlb-{season}' if project=='baseball' else f'retrosheet-{season}'
         if not 1982<=season<=2025:raise ValueError('과제에 포함된 시즌 범위는 1982~2025년입니다.')
         return 'kbo-assignment'
 
     def get(self,project,season=2024):
         source=self.source_id(project,season)
+        if project=='match' and season not in RELEASES:
+            return None  # Preparation belongs to ensure(), not a read lookup.
         if project!='match':
             data=read_catalog(self.root,source)
             if data is not None or project!='eramatch':return data
@@ -61,6 +66,10 @@ class DatasetCatalog:
             from baseball_lab.matchup.mlb import prepare
             return prepare(self.root,season,progress=progress)
         if project=='match':
+            if season not in RELEASES:
+                from .training_window import acquire,periods
+                bounds=periods(self.root)[str(season)]
+                return acquire(self.root,bounds['start'],bounds['end'])
             from baseball_lab.r1.provider import acquire
             if progress:progress(f'{season}년 공식 경기 기록을 준비하고 있어요.')
             return acquire(self.root/'data/local/retrosheet',year=season)
@@ -123,6 +132,13 @@ class DatasetCatalog:
                     'league':'KBO' if project=='eramatch' else 'MLB','ready':False,'needs_connection':False,
                     'automatic_preparation':False,'supported_seasons':[] if project=='eramatch' else self.supported_seasons(project),
                     'seasons':[],'metadata':None,'error':str(exc),'message':f'보관 자료를 확인해야 합니다: {exc}'})
+        from baseball_lab.matchup.collected import available,overview
+        if available(self.root):
+            for league in ('MLB','KBO','NPB'):
+                try:
+                    d=overview(self.root,'baseball' if league=='MLB' else 'eramatch',league=league)
+                    if d['supported_seasons']:result.append({**{k:v for k,v in d.items() if k!='profiles'},'source_id':'collected-'+league.lower()})
+                except (OSError,ValueError,KeyError) as exc:result.append({'source_id':'collected-'+league.lower(),'ready':False,'error':str(exc)})
         return result
 
     def iter_plays(self,season):
@@ -130,7 +146,13 @@ class DatasetCatalog:
         self.source_id('match',season)
         descriptor=self.describe('match',season)
         if not descriptor['ready']:raise ValueError('이 시즌의 플레이별 원본이 없어 세부 사건을 확인할 수 없습니다.')
-        with (self._raw_directory(season)/f'{season}plays.csv').open(encoding='utf-8-sig',newline='') as file:
+        if descriptor.get('collected'):
+            from .training_window import sources
+            from .warehouse import local_path
+            entry=next(f for f in sources(self.root)[season]['files'] if f['path'].endswith('.csv'))
+            path=local_path(self.root,self.root/entry['path'])
+        else:path=self._raw_directory(season)/f'{season}plays.csv'
+        with path.open(encoding='utf-8-sig',newline='') as file:
             for row in csv.DictReader(file):
                 if row['gametype']=='regular' and row['pbp']=='full':yield row
 
@@ -146,7 +168,24 @@ class DatasetCatalog:
         base={'project':'match','source_id':source_id,'league':'MLB','supported_seasons':self.supported_seasons('match'),
               'seasons':[season],'ready':False,'needs_connection':False,'automatic_preparation':True,'metadata':None,
               'message':f'{season}년 공식 경기 기록은 학습을 시작할 때 자동으로 준비합니다.'}
-        if not path.is_file():return base
+        if not path.is_file():
+            from .training_window import sources
+            m=sources(self.root).get(season)
+            if not m:return base
+            from .warehouse import local_path
+            files=[(local_path(self.root,self.root/f['path']),f['sha256']) for f in m['files']]
+            fingerprint=tuple((str(p),p.stat().st_size,p.stat().st_mtime_ns,sha) for p,sha in files)
+            key='collected:'+str(self.root)+':'+str(season);cached=_RAW_CACHE.get(key)
+            if not cached or cached[0]!=fingerprint:
+                if any(checksum(p)!=sha for p,sha in files):raise ValueError('수집 원본의 지문이 다릅니다.')
+                _RAW_CACHE[key]=(fingerprint,m,utc_now())
+            base.update(ready=True,collected=True,message='수집한 실제 플레이 원본을 사용합니다.',metadata={
+                'schema':'dataset-descriptor-v1','provider':'Retrosheet','league':'MLB','seasons':[season],
+                'source_schema':m['schema'],'status':m['source_status'],'source_url':m['source_url'],
+                'dataset_id':m['files'][-1]['sha256'],'version':m['files'][-1]['sha256'],'row_count':m['row_count'],
+                'sha256':[{'name':p.name,'sha256':sha} for p,sha in files],'license':m.get('credit'),
+                'verified_at':_RAW_CACHE[key][2],'capabilities':{'observed_turns':True,'pitch_actions':False,'full_game':False}})
+            return base
         files=[path,directory/f'{season}plays.zip',directory/f'{season}plays.csv']
         if any(p.is_symlink() or not p.is_file() for p in files):raise ValueError('공식 원본 경로를 확인하세요.')
         fingerprint=tuple((p.name,p.stat().st_size,p.stat().st_mtime_ns) for p in files)

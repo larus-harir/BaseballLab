@@ -84,6 +84,8 @@ def attach(root,result):
                  'simulation_n':events.count('other'),'version':VERSION}
     if result['project']=='baseball':
         try:
+            if result['batter']['season']!=result['pitcher'].get('season',result['batter']['season']):
+                raise ValueError('서로 다른 시즌의 세부 잔여 사건은 임의로 혼합하지 않았습니다. 각 선수의 실제 기록은 해당 시즌으로 확인하세요.')
             data=index(root,result['batter']['season']);b=result['batter']['player_id'];p=result['pitcher']['player_id']
             a=data['batters'].get(b,Counter());z=data['pitchers'].get(p,Counter());overlap=data['pairs'].get((b,p),Counter())
             pool={key:a[key]+z[key]-overlap[key] for key in DETAIL_LABELS}
