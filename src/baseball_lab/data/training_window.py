@@ -16,7 +16,7 @@ from baseball_lab.data.protection import private
 def sources(root):
     root=Path(root).resolve();result={}
     for path in sorted((root/'data/local/collections').glob('*/manifest.json')):
-        local_path(root,path);m=json.loads(path.read_text())
+        local_path(root,path);m=json.loads(path.read_text(encoding='utf-8'))
         if m.get('league')!='MLB' or m.get('granularity')!='play':continue
         if m.get('source_status')!='REAL_OBSERVED' or m.get('rights_status')!='RETROSHEET_CREDIT_REQUIRED':continue
         if m.get('status')!='ACQUIRED_SCHEMA_CHECKED':continue
@@ -28,7 +28,15 @@ def sources(root):
 
 def periods(root):
     def iso(s):return date(int(s[:4]),int(s[4:6]),int(s[6:])).isoformat()
-    return {str(y):{'start':iso(m['date_range'][0]),'end':iso(m['date_range'][1])} for y,m in sources(root).items()}
+    local=sources(root)
+    if not local:
+        from .compact import periods as included_periods
+        return included_periods()
+    observed={str(y):{'start':iso(m['date_range'][0]),'end':iso(m['date_range'][1])} for y,m in local.items()}
+    if all(m.get('source_url','').startswith('https://www.retrosheet.org/') for m in local.values()):
+        from .compact import periods as included_periods
+        return {**included_periods(),**observed}
+    return observed
 
 
 def validate_window(root,start,end):
@@ -44,6 +52,11 @@ def validate_window(root,start,end):
 
 def acquire(root,start,end):
     root=Path(root).resolve();validate_window(root,start,end);selected=sources(root);records=[];datasets=[];checks=[]
+    from .compact import index
+    published=index()['mlb']
+    if not selected or all(str(y) in published and (y not in selected or selected[y].get('source_url')==published[str(y)]['source_url']) for y in range(int(start[:4]),int(end[:4])+1)):
+        from .memory_source import acquire as memory_acquire
+        return memory_acquire(root,start,end,selected)
     from baseball_lab.r1.data import normalize
     from baseball_lab.experiments.match.team_win.half_inning import completion_aligned
     for year in range(int(start[:4]),int(end[:4])+1):
@@ -53,9 +66,9 @@ def acquire(root,start,end):
         key=content_hash({'source':entry['sha256'],'adapter':'completed-innings-1-8-v1'})
         folder=local_path(root,root/'data/local/training-windows'/key);cache=folder/'dataset.json';meta=folder/'manifest.json'
         if cache.exists():
-            local_path(root,cache);local_path(root,meta);metadata=json.loads(meta.read_text())
+            local_path(root,cache);local_path(root,meta);metadata=json.loads(meta.read_text(encoding='utf-8'))
             if checksum(cache)!=metadata['sha256']:raise ValueError('학습용 정제 기록이 변경됐습니다.')
-            data=json.loads(cache.read_text())
+            data=json.loads(cache.read_text(encoding='utf-8'))
             if data['manifest']['source_version']!=entry['sha256']:raise ValueError('학습 원천 버전이 다릅니다.')
         else:
             print(f'{year}년 원본의 주자·아웃 연속성과 실제 경기 종료 날짜를 검사합니다.',flush=True)

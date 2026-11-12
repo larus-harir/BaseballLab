@@ -94,7 +94,7 @@ def load_snapshots(root,*,leagues=None,start=None,end=None,last_seasons=None,reu
     sources=[]
     for file in sorted(base.glob('**/manifest.json')):
         local_path(root,file)
-        m=json.loads(file.read_text())
+        m=json.loads(file.read_text(encoding='utf-8'))
         if m.get('league') not in ('MLB','KBO','NPB'):continue
         if leagues and m['league'] not in leagues:continue
         if start is not None and m['season']<start or end is not None and m['season']>end:continue
@@ -105,7 +105,7 @@ def load_snapshots(root,*,leagues=None,start=None,end=None,last_seasons=None,reu
         prior=m['supersedes'];target=local_path(root,Path(root).resolve()/prior['manifest'])
         if target==file.resolve() or not target.is_relative_to(base):raise ValueError('정제 수정본의 이전 버전 경로가 잘못됐습니다.')
         if checksum(target)!=prior['sha256']:raise ValueError('정제 수정본의 이전 버전 지문이 다릅니다.')
-        before=json.loads(target.read_text())
+        before=json.loads(target.read_text(encoding='utf-8'))
         if any(before.get(k)!=m.get(k) for k in ('league','season','role','granularity','source_url','source_sha256')):
             raise ValueError('정제 수정본이 서로 다른 원천을 대체할 수 없습니다.')
         superseded.add(target)
@@ -141,12 +141,12 @@ def build(root,*,leagues=None,start=None,end=None,last_seasons=None,include_buil
     if leagues is None or 'MLB' in leagues:
         candidates=sorted((root/'data/local/standardized').glob('*/manifest.json'),key=lambda p:p.stat().st_mtime,reverse=True)
         for file in candidates:
-            local_path(root,file);old=json.loads(file.read_text())
+            local_path(root,file);old=json.loads(file.read_text(encoding='utf-8'))
             if old.get('schema')!=SCHEMA:continue
             if not old.get('coverage',{}).get('MLB'):continue
             path=local_path(root,file.parent/'rows.jsonl')
             if checksum(path)!=old['rows_sha256']:raise ValueError('기존 표준 자료의 지문이 다릅니다.')
-            with path.open() as f:
+            with path.open(encoding='utf-8') as f:
                 for line in f:
                     row=json.loads(line)
                     if row.get('league')=='MLB' and row.get('source_namespace')=='retrosheet':
@@ -182,7 +182,7 @@ def build(root,*,leagues=None,start=None,end=None,last_seasons=None,include_buil
           'cross_league':'Requires league/rules/era/park calibration; common columns are not equivalent player ability.'}}
     if folder.exists():
         local_path(root,folder/'manifest.json');local_path(root,folder/'rows.jsonl')
-        old=json.loads((folder/'manifest.json').read_text());path=folder/'rows.jsonl'
+        old=json.loads((folder/'manifest.json').read_text(encoding='utf-8'));path=folder/'rows.jsonl'
         if checksum(path)!=old['rows_sha256']:raise ValueError('기존 표준 자료가 변경됐습니다.')
         return old,folder
     private(folder,directory=True)

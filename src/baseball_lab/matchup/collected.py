@@ -47,8 +47,9 @@ def overview(root,project,*,league=None,role=None,query='',season=None):
     rows.sort(key=lambda p:-(p['counts'].get('PA' if p['role']=='batter' else 'TBF') or 0))
     if league=='MLB':
         for p in rows:p['name']=roster.get(p['player_id'],p['name'])
+    from baseball_lab.data.compact import index as included_index
     source={'id':'collected-'+league.lower(),'label':f'{league} · 수집한 선수 기록','status':'REAL_OBSERVED' if league=='MLB' else 'COMMUNITY_UNVERIFIED',
-        'license':'원천별 선언 조건을 유지한 로컬 탐색용 기록','files':[]}
+        'license':'원천별 선언 조건을 유지한 시즌 집계'+(' · '+included_index()['npb']['attribution'] if league=='NPB' else ''),'files':[]}
     full=league=='MLB'
     return {'data_mode':'collected','project':project,'league':league,'ready':any(p['season']==year and (role is None or p['role']==role) for p in all_profiles),'supported_seasons':years,'seasons':years,
         'cached_seasons':cached_years,'selected_season':year,'dataset_id':data['dataset_id'],'source':source,'profiles':rows[:80],'matched':len(rows),

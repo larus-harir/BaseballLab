@@ -169,7 +169,7 @@ class Storage:
         from baseball_lab.data.lineage import checksum
         checks=0
         for file in folder.glob('**/manifest.json'):
-            m=json.loads(file.read_text());entries=[]
+            m=json.loads(file.read_text(encoding='utf-8'));entries=[]
             if m.get('archive_sha256'):entries.append((file.parent/'source.zip',m['archive_sha256']))
             if m.get('metadata_sha256'):entries.append((file.parent/'metadata.json',m['metadata_sha256']))
             if m.get('rows_sha256'):entries.append((file.parent/m.get('rows_file','rows.jsonl'),m['rows_sha256']))

@@ -112,10 +112,10 @@ def acquire_kbo(root,ref):
     root=Path(root).resolve();base=local_path(root,root/'data/local/community'/('kaggle-'+ref.replace('/','-')+'-'+secrets.token_hex(6)))
     private(base,directory=True);metadata=base/'metadata.json'
     source='https://www.kaggle.com/api/v1/datasets/view/'+ref;download(source,metadata,4*1024*1024)
-    m=json.loads(metadata.read_text());version=m['currentVersionNumber'];license=m.get('licenseName')
+    m=json.loads(metadata.read_text(encoding='utf-8'));version=m['currentVersionNumber'];license=m.get('licenseName')
     if not license or license=='Unknown':raise ValueError('게시자의 데이터 라이선스 선언이 없습니다.')
     for previous in (root/'data/local/community').glob('kaggle-'+ref.replace('/','-')+'-*/manifest.json'):
-        local_path(root,previous);cached=json.loads(previous.read_text())
+        local_path(root,previous);cached=json.loads(previous.read_text(encoding='utf-8'))
         if cached.get('version')!=version:continue
         if checksum(local_path(root,previous.parent/'source.zip'))!=cached['archive_sha256']:raise ValueError('보관한 공개 배포 ZIP이 변경됐습니다.')
         for item in cached['files']:

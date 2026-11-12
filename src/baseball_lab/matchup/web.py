@@ -24,6 +24,6 @@ def render(project,token='',analysis=None):
 
 def render_common(token='',analysis=None):
     directory=Path(__file__).parents[1]/'web'
-    css=(directory/'matchup.html').read_text().split('<style>',1)[1].split('</style>',1)[0]
+    css=(directory/'matchup.html').read_text(encoding='utf-8').split('<style>',1)[1].split('</style>',1)[0]
     initial=json.dumps(public_view(analysis),ensure_ascii=False,allow_nan=False).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
-    return (directory/'common.html').read_text().replace('__STYLE__',css).replace('__SESSION_TOKEN__',token).replace('__ANALYSIS__',initial)
+    return (directory/'common.html').read_text(encoding='utf-8').replace('__STYLE__',css).replace('__SESSION_TOKEN__',token).replace('__ANALYSIS__',initial)

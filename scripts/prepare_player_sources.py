@@ -17,7 +17,7 @@ def prepare_sources(root, league, start=2025, end=2025):
             folder=new_dir(root,'MLB',end,'notice')
             notice=folder/'source-notice.html'
             fetch(TERMS_URL,notice)
-            text=notice.read_text()
+            text=notice.read_text(encoding='utf-8')
             if 'free to make any desired use' not in text or 'copyrighted by Retrosheet' not in text:
                 raise ValueError('Retrosheet 이용 고지 확인 실패')
             for y in missing:

@@ -15,7 +15,7 @@ def summarize(root,league,season,role=None,player_id=None):
         return result
     root=Path(root).resolve();chosen={}
     for file in (root/'data/local/community').glob('kaggle-*/manifest.json'):
-        local_path(root,file);m=json.loads(file.read_text());key=m.get('source_namespace','')
+        local_path(root,file);m=json.loads(file.read_text(encoding='utf-8'));key=m.get('source_namespace','')
         if key not in ('kaggle-lazyjun01/kbo-defensive-data2001-2024','kaggle-lazyjun01/kbo-runners-data2001-2024'):continue
         previous=chosen.get(key)
         if previous is None or m['version']>previous['version']:chosen[key]=m
@@ -45,7 +45,7 @@ def npb_samples(root,season,role,player_id):
     requested=integer(player_id) if role and player_id else None
     manifests=sorted((root/'data/local/community/npb-armstjc').glob('*/manifest.json'),reverse=True)
     for manifest in manifests[:1]:
-        local_path(root,manifest);m=json.loads(manifest.read_text())
+        local_path(root,manifest);m=json.loads(manifest.read_text(encoding='utf-8'))
         for item in m['files']:
             if item.get('kind')!='pbp' or str(season) not in item.get('seasons',[]):continue
             path=local_path(root,root/item['path'])

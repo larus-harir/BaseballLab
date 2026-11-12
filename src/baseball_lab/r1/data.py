@@ -8,12 +8,12 @@ CREDIT='The information used here was obtained free of charge from and is copyri
 SCHEMA='retrosheet-turn-segments-v1'
 
 
-def official_rows(path, stats, excluded=None, *, skip_empty_no_play=False):
+def official_rows(path, stats, excluded=None, *, skip_empty_no_play=False,open_csv=None):
     """Map documented official fields; retain raw play text, never infer a pitch type."""
     required={'gid','event','inning','vis_home','score_v','score_h','pitches','pa','bunt','iw',
               'outs_pre','outs_post','runs','pn','gametype','pbp',
               *(f'br{i}_{suffix}' for i in (1,2,3) for suffix in ('pre','post'))}
-    with Path(path).open(newline='',encoding='utf-8-sig') as file:
+    with (open_csv() if open_csv else Path(path).open(newline='',encoding='utf-8-sig')) as file:
         reader=csv.DictReader(file)
         if not required.issubset(reader.fieldnames or []):raise ValueError('공식 플레이 CSV 필수 열이 없습니다.')
         ids=set();previous=None
@@ -66,12 +66,13 @@ def walk(bases):
     return int(True)+2*int(first or second)+4*int(third or(first and second)),int(first and second and third)
 
 
-def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty_no_play=False,persist=True,regulation_rule_check=False):
+def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty_no_play=False,persist=True,regulation_rule_check=False,open_csv=None,parsed_sha256=None):
     csv_path=Path(csv_path);output=Path(output)
+    if open_csv and (persist or not parsed_sha256):raise ValueError('메모리 정제는 원본 지문을 지정하고 파일 저장을 꺼야 합니다.')
     records=[];pending=[];last_half=None;seen=set();errors=Counter();total=0;sequence_bad=0
     previous=None;score_mismatches=0;official_stats=Counter();source_exclusions=[]
-    with csv_path.open(newline='',encoding='utf-8') as file:
-        reader=official_rows(csv_path,official_stats,source_exclusions,skip_empty_no_play=skip_empty_no_play) if official else csv.DictReader(file)
+    with (open_csv() if open_csv else csv_path.open(newline='',encoding='utf-8')) as file:
+        reader=official_rows(csv_path,official_stats,source_exclusions,skip_empty_no_play=skip_empty_no_play,open_csv=open_csv) if official else csv.DictReader(file)
         for ordinal,row in enumerate(reader,1):
             total+=1
             half=(row['GAME_ID'],int(row['INN_CT']),int(row['BAT_HOME_ID']))
@@ -122,7 +123,7 @@ def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty
     if not test_only and (not isolated or len(isolated)!=isolated_matches):
         raise ValueError('Isolated observed intentional walks do not verify the force-walk rule')
     manifest={'schema':SCHEMA,'source_status':'REAL_OBSERVED','acquired_at':utc_now(),**source,'credit':CREDIT,
-              'parsed_csv_path':str(csv_path.resolve()),'parsed_csv_sha256':checksum(csv_path),
+              'parsed_csv_path':None if open_csv else str(csv_path.resolve()),'parsed_csv_sha256':parsed_sha256 if open_csv else checksum(csv_path),
               'raw_event_rows':total,'used_segments':len(records),'games':len({r['game_id'] for r in records}),
               'dates':[min(r['date'] for r in records),max(r['date'] for r in records)],'exclusions':dict(errors),
               'sequence_mismatches':sequence_bad,'intentional_walks':len(iw),'intentional_walk_rule_matches':iw_matches,

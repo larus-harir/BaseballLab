@@ -33,9 +33,11 @@ def weights(value):
 def validate(root,value):
     chosen=weights(value);names=set()
     for p in (Path(root)/'data/local/collections').glob('*/manifest.json'):
-        local_path(root,p);m=json.loads(p.read_text());names.add(m.get('source_namespace'))
+        local_path(root,p);m=json.loads(p.read_text(encoding='utf-8'));names.add(m.get('source_namespace'))
     for league,provider in (('KBO','kaggle-netsong-kbo'),('NPB','armstjc-npb-spaia')):
-        if league in chosen and provider not in names:raise ValueError(f'{league}의 등록된 수집 기록이 없습니다.')
+        if league in chosen and provider not in names:
+            from baseball_lab.data.compact import players
+            if not any(r['source_namespace']==provider for r in players()):raise ValueError(f'{league}의 등록된 수집 기록이 없습니다.')
     return chosen
 
 
@@ -48,6 +50,10 @@ def rates(counts):
 def outcome_labels(root,dataset):
     from baseball_lab.data.training_window import sources
     from baseball_lab.matchup.outcome_details import classify
+    if dataset['manifest'].get('storage_mode')=='memory-only':
+        result={r['record_id']:r['common_event'] for r in dataset['records']}
+        if any(e not in (*EVENTS,'non_pa') for e in result.values()):raise ValueError('공통 사건이 등록 범위를 벗어났습니다.')
+        return result
     lookup={};source=sources(root)
     for year in dataset['manifest']['selected_seasons']:
         entry=next(x for x in source[year]['files'] if x['path'].endswith('.csv'));path=local_path(root,Path(root).resolve()/entry['path'])
@@ -66,11 +72,13 @@ def outcome_labels(root,dataset):
     return result
 
 
-def npb_before(root,cutoff):
+def npb_before(root,cutoff,*,by_day=False):
     """Only known regular-season games dated before validation begins."""
     root=Path(root).resolve();files=sorted((root/'data/local/community/npb-armstjc').glob('*/manifest.json'),reverse=True)
-    if not files:raise ValueError('NPB 경기별 수집 원본이 없습니다.')
-    local_path(root,files[0]);meta=json.loads(files[0].read_text());games={};hashes=[]
+    if not files:
+        from baseball_lab.data.compact import npb_before as compact_npb
+        return compact_npb(cutoff)
+    local_path(root,files[0]);meta=json.loads(files[0].read_text(encoding='utf-8'));games={};hashes=[]
     for item in meta['files']:
         if item.get('kind')!='pbp':continue
         path=local_path(root,root/item['path'])
@@ -80,7 +88,7 @@ def npb_before(root,cutoff):
             for r in csv.DictReader(f):
                 if {'1':'セ・リーグ公式戦','2':'パ・リーグ公式戦','26':'セ・パ交流戦'}.get(r['game_type_id'])!=r['game_type_name']:continue
                 games[r['game_id']]=max(games.get(r['game_id'],''),r['game_date'][:10])
-    c=Counter(dict.fromkeys(EVENTS,0));seen=set();dates=set()
+    c=Counter(dict.fromkeys(EVENTS,0));seen=set();dates=set();daily=defaultdict(Counter)
     for item in meta['files']:
         if item.get('kind')!='game_stats':continue
         path=local_path(root,root/item['path'])
@@ -97,8 +105,9 @@ def npb_before(root,cutoff):
                 if any(v is None for v in values.values()):continue
                 part=shared.partition({'role':'batter','counts':values})
                 if part:
-                    c.update(part);dates.add(day)
+                    c.update(part);dates.add(day);daily[day].update(part)
     if not sum(c.values()):raise ValueError('검사 시작 전 NPB 정규시즌 관측이 없습니다. NPB를 포함하려면 2025년 수집 기간을 권장합니다.')
+    if by_day:return {'daily_counts':dict(daily),'source_hashes':hashes,'rights_status':meta['rights_status'],'attribution':meta['license']['attribution']}
     q=rates(dict(c))
     return {'rates':q,'counts':dict(c),'dates':[min(dates),max(dates)],'cutoff_exclusive':cutoff,
         'provider':'armstjc-npb-spaia','source_hashes':hashes,'rights_status':meta['rights_status'],

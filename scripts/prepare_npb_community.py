@@ -9,7 +9,7 @@ from baseball_lab.data.lineage import checksum,content_hash
 
 
 def prepare(root,manifest):
-    root=Path(root).resolve();manifest=local_path(root,Path(manifest).resolve());meta=json.loads(manifest.read_text());games={};counts=Counter()
+    root=Path(root).resolve();manifest=local_path(root,Path(manifest).resolve());meta=json.loads(manifest.read_text(encoding='utf-8'));games={};counts=Counter()
     files=meta['files']
     for item in files:
         if item.get('kind') not in ('pbp','game_stats'):continue

@@ -1,0 +1,17 @@
+MLB: Retrosheet
+The information used here was obtained free of charge from and is copyrighted by Retrosheet.
+Interested parties may contact Retrosheet at 20 Sunset Rd., Newark, DE 19711.
+https://www.retrosheet.org/downloads/plays.html
+
+KBO: netsong, KBO player statistics (dataset slug: kbo-player-stats-19822025), Kaggle version 7.
+https://www.kaggle.com/datasets/netsong/kbo-player-stats-19822025
+Publisher license: CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/
+Changes: only matchup season counts and identity retained; missing values kept missing;
+no biographies, raw CSVs, source programs or trained weights included.
+The supplied-assignment KBO bundle retains its separate original provenance.
+
+NPB: Copyright (c) 2023 Joseph Armstrong. See NPB_LICENSE.txt.
+This uses data sourced from the Nippon Baseball Data Repository, which can be accessed here:
+https://github.com/armstjc/Nippon-Baseball-Data-Repository
+Changes: only known regular-season player aggregates and dated league PA marginals retained.
+Publisher declarations are distinct from independently verified upstream rights/accuracy.

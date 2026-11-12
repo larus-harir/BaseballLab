@@ -114,7 +114,7 @@ async function loadCatalog(allowPrepare=true){
       }else{$('prepareControls').classList.remove('hidden')}
       return;
     }
-    $('catalogStatus').textContent=data.data_mode==='collected'?selectedLeague+' · 보관한 수집 기록으로 대결합니다.':'';$('catalogStatus').classList.add('quiet');
+    $('catalogStatus').textContent=data.data_mode==='collected'?selectedLeague+' · 시즌 집계로 대결합니다. 원본 다운로드는 필요하지 않습니다.':'';$('catalogStatus').classList.add('quiet');
     fillModels(data);await Promise.all(['b','p'].map(search));if(version===loadGeneration)explain();
   }catch(e){if(version===loadGeneration){$('catalogStatus').textContent='선택한 기록을 준비하지 못했습니다. 시즌을 바꾸거나 다시 시도할 수 있어요.';$('prepareControls').classList.remove('hidden');error(e,false)}}
   finally{if(version===loadGeneration)busy(false)}

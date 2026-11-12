@@ -34,7 +34,7 @@ def save_rows(directory,rows,meta):
 
 def reusable_manifest(root,url):
     """Reuse a verified local snapshot; never modify its files."""
-    snapshots={path:json.loads(path.read_text()) for path in sorted((root/'data/local/collections').glob('*/manifest.json'))}
+    snapshots={path:json.loads(path.read_text(encoding='utf-8')) for path in sorted((root/'data/local/collections').glob('*/manifest.json'))}
     superseded=set()
     for meta in snapshots.values():
         prior=meta.get('supersedes')
@@ -80,7 +80,7 @@ def npb_players(root,year,role,team):
     if cached:return cached
     directory=new_dir(root,'NPB',year,'players-'+role+'-'+team)
     page=directory/'source.html';fetch(url,page);fingerprint=checksum(page)
-    text=page.read_text()
+    text=page.read_text(encoding='utf-8')
     if f'{year}年度' not in text:raise ValueError('NPB 선수 원천 시즌 확인 실패')
     rows=parse_npb_players(text,year,role,team,fingerprint)
     return save_rows(directory,rows,{'league':'NPB','season':year,'role':role,'granularity':'player_season_team',
@@ -137,7 +137,7 @@ def main():
     if 'NPB' in a.leagues and a.start_year<1950:p.error('NPB 양대 리그 수집은 1950년 이후만 지원')
     root=a.root.resolve();results=[];failures=[];jobs=[]
     if 'MLB' in a.leagues:
-        directory=new_dir(root,'MLB',a.end_year,'notice');page=directory/'source-notice.html';fetch(TERMS_URL,page);notice=page.read_text()
+        directory=new_dir(root,'MLB',a.end_year,'notice');page=directory/'source-notice.html';fetch(TERMS_URL,page);notice=page.read_text(encoding='utf-8')
         if 'free to make any desired use' not in notice or 'copyrighted by Retrosheet' not in notice:raise ValueError('Retrosheet 이용 고지 확인 실패')
         for year in range(a.start_year,a.end_year+1):jobs.append((mlb,(root,year,notice)))
     if 'NPB' in a.leagues:

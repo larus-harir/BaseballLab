@@ -35,7 +35,7 @@ def overview(root,project,*,role=None,query='',season=None,data_mode=None,league
     if data_mode in (None,'collected'):
         from pathlib import Path
         from . import collected
-        if collected.available(Path(root)) or league=='NPB' or (data_mode=='collected' and league=='MLB'):
+        if collected.available(Path(root)) or league=='NPB' or (data_mode=='collected' and league in ('MLB','KBO')):
             ready=collected.overview(root,project,role=role,query=query,season=season,league=league)
             if ready['supported_seasons'] or league=='NPB':return ready
     if role not in ('batter','pitcher',None):raise ValueError('선수 역할을 확인하세요.')

@@ -70,7 +70,7 @@ class Workbench:
         result['scoring']={'periods':{str(k):v for k,v in PERIODS.items()},
                            'cached_seasons':{str(k):(self.root/f'data/local/retrosheet/official-{k}/dataset.json').is_file() for k in PERIODS},'available':True,'cached':(self.root/'data/local/retrosheet/official-2024/dataset.json').exists(),
                            'title':'실제 Retrosheet 기록으로 득점 상황 학습',
-                           'reason':'선택한 시즌의 공식 배포 자료를 자동 준비하고 재사용합니다. 처음 받을 때만 인터넷이 필요합니다.'}
+                           'reason':'선수 대결은 앱 포함 집계를 사용합니다. 학습은 공식 기록을 메모리에서 읽으며 원본을 PC에 저장하지 않습니다. 인터넷·RAM과 결과 저장 공간은 필요합니다.'}
         from baseball_lab.data.training_window import periods
         result['scoring']['collected_periods']=periods(self.root)
         return result

@@ -18,9 +18,12 @@ def preview(root,start,end,mixture):
     if not mixture:return {'lines':lines}
     chosen=weights(mixture);registry=DatasetCatalog(root);all_dates=set()
     for year in range(first.year,last.year+1):
-        d=registry.describe('match',year)
-        if not d['ready']:raise ValueError('이 PC에 선택한 MLB 시즌 원본이 없습니다. 보관 자료를 먼저 연결하세요.')
-        all_dates.update(dates(str(registry.root),year,content_hash(d['metadata']['sha256'])))
+        d=registry.describe('match',year) if year in registry.supported_seasons('match') else {'ready':False}
+        if not d['ready']:
+            from .compact import index
+            if str(year) not in index()['mlb']:raise ValueError('선택한 MLB 시즌의 출처가 등록되지 않았습니다.')
+            all_dates.update(index()['mlb'][str(year)]['dates'])
+        else:all_dates.update(dates(str(registry.root),year,content_hash(d['metadata']['sha256'])))
     days=sorted(d for d in all_dates if start<=d<=end)
     if len(days)<3:raise ValueError('날짜를 나눌 실제 경기 기록이 부족합니다.')
     cutoff=days[max(1,int(len(days)*.6))]

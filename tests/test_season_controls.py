@@ -23,13 +23,13 @@ def test_npb_connection_uses_fixed_preparation_script_not_legacy_kbo(tmp_path):
     assert not list((tmp_path/'data/local/catalog').glob('*'))
 
 
-def test_fresh_collected_catalog_exposes_downloadable_seasons(tmp_path):
+def test_fresh_collected_catalog_works_without_downloads(tmp_path):
     from baseball_lab.matchup.service import overview
     mlb=overview(tmp_path,'baseball',league='MLB',data_mode='collected',season=2022)
     assert mlb['supported_seasons']==list(range(2025,1999,-1))
-    assert not mlb['ready'] and not mlb['cached_seasons'] and mlb['selected_season']==2022
+    assert mlb['ready'] and mlb['cached_seasons']==list(range(2025,1999,-1)) and mlb['selected_season']==2022
     npb=overview(tmp_path,'eramatch',league='NPB',data_mode='collected')
-    assert npb['supported_seasons']==[2025] and npb['selected_season']==2025 and not npb['ready']
+    assert npb['supported_seasons']==[2025] and npb['selected_season']==2025 and npb['ready']
 
 
 def test_mlb_download_job_is_bounded_and_uses_separate_source_route(tmp_path):

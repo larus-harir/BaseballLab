@@ -63,7 +63,7 @@ def collect(root, *, pbp_year=2025, workers=4):
         private(ancestor, directory=True)
     for previous in sorted(base.glob('*/manifest.json'),reverse=True):
         local_path(root,previous)
-        cached=json.loads(previous.read_text())
+        cached=json.loads(previous.read_text(encoding='utf-8'))
         years={year for f in cached.get('files',[]) if f.get('kind')=='pbp' for year in f.get('seasons',[])}
         if cached.get('revision')!=REVISION or cached.get('summary',{}).get('failures')!=0 or years!={str(pbp_year)}:continue
         for item in cached['files']+cached['evidence']:

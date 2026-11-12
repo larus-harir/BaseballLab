@@ -34,7 +34,7 @@ def partition(row):
 def catalog(root):
     root=Path(root).resolve();candidates=[]
     for path in (root/'data/local/standardized').glob('*/manifest.json'):
-        local_path(root,path);m=json.loads(path.read_text())
+        local_path(root,path);m=json.loads(path.read_text(encoding='utf-8'))
         # A recent-years export must never silently hide older collected data.
         if all(m.get('selection',{}).get(k) is None for k in ('leagues','start','end','last_seasons_per_league')):
             candidates.append((m.get('created_at',''),path,m))
@@ -42,15 +42,17 @@ def catalog(root):
         _,path,manifest=max(candidates,key=lambda v:v[0]);rowsfile=local_path(root,path.parent/'rows.jsonl')
         fingerprint=(str(path),checksum(path),rowsfile.stat().st_size,rowsfile.stat().st_mtime_ns)
     else:
-        from baseball_lab.experiments.eramatch.builtin import BUNDLE_SHA256
-        manifest={'dataset_id':content_hash({'bundle':BUNDLE_SHA256,'adapter':'common-v1'}),'rows_sha256':None};fingerprint=('builtin',BUNDLE_SHA256)
+        from baseball_lab.data.compact import index,INDEX_SHA256
+        manifest={'dataset_id':content_hash({'compact':INDEX_SHA256,'source':index()['source_dataset_id']}),'rows_sha256':None};fingerprint=('compact',INDEX_SHA256)
     with _LOCK:
         cached=_CACHE.get(str(root))
         if cached and cached[0]==fingerprint:return cached[1]
     if candidates:
         if checksum(rowsfile)!=manifest['rows_sha256']:raise ValueError('공통 자료의 검증값이 달라졌습니다.')
-        rows=[json.loads(line) for line in rowsfile.read_text().splitlines() if line]
-    else:rows=list(builtin_rows())
+        rows=[json.loads(line) for line in rowsfile.read_text(encoding='utf-8').splitlines() if line]
+    else:
+        from baseball_lab.data.compact import players
+        rows=players()
     names={};ambiguous=set()
     from baseball_lab.experiments.eramatch.builtin import load_builtin
     for p in load_builtin()['profiles'].values():
@@ -141,11 +143,12 @@ def analyze(root,options):
     simulation=simulate(model,options.get('n',25),options.get('seed',secrets.randbelow(2**31)),options.get('repetitions',200))
     identity={'dataset_id':data['dataset_id'],'batter':b['id'],'pitcher':p['id'],'model':model,
         'n':simulation['n'],'seed':simulation['seed'],'repetitions':simulation['repetitions']}
+    from baseball_lab.data.compact import index as included_index
     result={'schema':'statistical-matchup-v1','project':'eramatch','project_name':'EraMatch','created_at':utc_now(),
         **{k:v for k,v in identity.items() if k in ('dataset_id',)},'batter':b,'pitcher':p,'model':model,'simulation':simulation,
         'labels':LABELS,'training_executed':False,'model_status':'LEAGUE_RELATIVE_ASSUMPTION','run_id':content_hash(identity),
         'source':{'id':'shared-standard-data','label':'수집 기록의 공통 타석 비교','status':'MIXED_PROVENANCE','files':[],
-            'license':'원천별 이용 조건 유지 · 원본 및 NPB 기록 재배포 없음'},
+            'license':'원천별 선언 조건 유지 · 앱에는 선별한 시즌 집계만 포함'+(' · '+included_index()['npb']['attribution'] if any(r['source_namespace']=='armstjc-npb-spaia' for r in (b,p)) else '')},
         'scope':'독립 타석 반복입니다. 리그 간 상대 빈도 비교이며 실제 리그 간 승률·절대 실력의 검증이 아닙니다.'}
     if options.get('expected_run_id',result['run_id'])!=result['run_id']:raise ValueError('자료·기준 환경이 달라 같은 결과를 재현할 수 없습니다.')
     result['data_policy']={'events':list(LABELS),'missing_fill':False,'baseline':data['baselines'][target],
