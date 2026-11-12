@@ -232,6 +232,12 @@ class Workbench:
                 study=options.get('study','one_run')
                 if study not in ('one_run','half_inning'):raise ValueError('학습 목표를 확인하세요.')
                 if study=='half_inning' and source!='retrosheet':raise ValueError('이닝 득점 학습은 공식 경기 기록으로 실행합니다.')
+                mixture=options.get('league_mixture')
+                if mixture is not None:
+                    from baseball_lab.experiments.match.team_win.mixed import validate
+                    if source!='retrosheet' or study!='half_inning' or kind!='run':raise ValueError('리그 혼합은 이닝 득점 학습에서 선택하세요.')
+                    mixture=validate(self.root,mixture)
+                    options={**options,'collected_window':True}
                 if source=='retrosheet':
                     from baseball_lab.data.retrosheet_releases import validate_period
                     minimum=1 if kind=='simulate' and options.get('observation_source')=='observed' else 3
@@ -250,10 +256,11 @@ class Workbench:
                 if type(seed) is not int or not 0<=seed<=2**31-1:raise ValueError('재현 번호 범위를 확인하세요.')
                 extra=['--mode','scoring' if source=='retrosheet' else 'run','--start',start,'--end',end,'--episodes',str(episodes),'--seed',str(seed)]
                 if source=='retrosheet' and collected:extra.append('--collected-window')
+                if mixture is not None:extra.extend(['--league-mixture',json.dumps(mixture)])
                 if source=='retrosheet' and study=='half_inning':extra[1]='inning'
                 if source=='retrosheet' and kind=='run':
                     if seed>2**31-3:raise ValueError('여러 재현 번호를 만들기 위해 seed는 2,147,483,645 이하여야 합니다.')
-                    extra.extend(['--evaluation-n','500'])
+                    extra.extend(['--evaluation-n','100' if mixture is not None else '500'])
                 reference=options.get('authorization_reference','')
                 if not isinstance(reference,str) or len(reference)>2000:raise ValueError('자료 연결 설정을 확인하세요.')
                 if reference.strip():extra.extend(['--authorization-reference',reference.strip()])

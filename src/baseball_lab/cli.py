@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--model',type=Path,help='실제 데이터로 보정·독립 검증한 model.json')
     parser.add_argument('--start');parser.add_argument('--end')
     parser.add_argument('--collected-window',action='store_true',help='확보한 여러 시즌의 실제 플레이로 학습')
+    parser.add_argument('--league-mixture',help='이닝 학습의 리그 환경 비중 JSON. 예: {"MLB":1,"KBO":1,"NPB":1}')
     parser.add_argument('--train-before',default='2024-05-04');parser.add_argument('--test-from',default='2024-05-05')
     parser.add_argument('--usage-note',default='Local exploratory research; terms not independently verified by software; no redistribution grant')
     parser.add_argument('--csv',type=Path,action='append',help='사용자가 공식 사이트에서 내보낸 원본 CSV')
@@ -54,6 +55,14 @@ def main():
     output=args.output or REPOSITORY_ROOT/'outputs/E01'/('research_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
     model_path=args.model or args.data_dir/'model.json'
     try:
+        mixture=None
+        if args.league_mixture:
+            import json
+            from baseball_lab.experiments.match.team_win.mixed import validate
+            if args.mode!='inning':raise ValueError('리그 혼합은 이닝 총득점 학습에서 선택하세요.')
+            try:mixture=validate(REPOSITORY_ROOT,json.loads(args.league_mixture))
+            except json.JSONDecodeError:raise ValueError('리그 비중 JSON을 확인하세요.') from None
+            args.collected_window=True
         if args.mode in ('scoring','inning','simulate'):
             from baseball_lab.data.retrosheet_releases import validate_period
             minimum=1 if args.mode=='simulate' and args.observation_source=='observed' else 3
@@ -99,7 +108,10 @@ def main():
                         'swing_on_pitchout':sum(codes.get(k,0) for k in 'QRY')}
                     evidence['reason']=f"실제 {details['pa_n']:,}타석에서 피치아웃 P {evidence['pitchout']}개, 이에 대한 스윙·접촉 Q/R/Y {evidence['swing_on_pitchout']}개입니다. 현재 원천에는 구종·구속·위치가 없고, 피치아웃에 스윙했을 때의 결과 표본도 부족합니다. 던지지 않은 공의 결과를 만들어내지 않고, 실제로 확인 가능한 아웃·주자 전이와 번트·고의볼넷 선택으로 총득점을 학습합니다."
                 print('단계 3 · 세 아웃까지 총득점 최대화·실점 최소화를 학습합니다.',flush=True)
-                train(dataset,args.start,args.end,output,config,evidence=evidence)
+                if mixture:
+                    from baseball_lab.experiments.match.team_win.mixed import train as train_mixed
+                    train_mixed(REPOSITORY_ROOT,dataset,args.start,args.end,output,config,mixture)
+                else:train(dataset,args.start,args.end,output,config,evidence=evidence)
             else:
                 print('단계 3 · 출루가 아닌 한 점 득점·실점 방어를 학습합니다.',flush=True)
                 train(dataset,args.start,args.end,output,config)

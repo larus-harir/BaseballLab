@@ -65,6 +65,7 @@ def completion_aligned(dataset, dates):
 
 def play(env, batter, pitcher, seed, *, record=False):
     rng = Random(seed); obs = Observation(0, 0); total = 0; events = []
+    if hasattr(env,'begin'):env.begin(rng)
     for turn in range(128):
         legal = env.batter_actions(obs)
         b = batter.act(obs, legal, rng); p = pitcher.act(obs, PITCH_ACTIONS, rng)
@@ -104,7 +105,7 @@ def assessments(env, pair, initial, past, human, n, seed):
     return rows
 
 
-def train(dataset, start, end, output, config=Config(), *, test_only=False, evidence=None):
+def train(dataset, start, end, output, config=Config(), *, test_only=False, evidence=None,prepared=None):
     from ..reporting.inning import report
     config.validate(); output = Path(output)
     if dataset['manifest']['source_status'] != 'REAL_OBSERVED' and not test_only:
@@ -113,7 +114,7 @@ def train(dataset, start, end, output, config=Config(), *, test_only=False, evid
         raise ValueError('기존 결과가 있는 폴더를 덮어쓰지 않습니다.')
     if not test_only and 'original_dataset_id' not in dataset['manifest']:
         raise ValueError('경기 종료일 정렬을 먼저 확인해야 합니다.')
-    envs, model = fit(dataset, start, end)
+    envs, model = prepared if prepared is not None else fit(dataset, start, end)
     model['date_semantics'] = dataset['manifest'].get('date_semantics', 'MOCK_TEST_ONLY')
     human = human_frequencies(dataset, model['split']['fit']['dates'])
     output.mkdir(parents=True, exist_ok=True)
@@ -145,6 +146,7 @@ def train(dataset, start, end, output, config=Config(), *, test_only=False, evid
     result['run_id'] = content_hash({'schema': SCHEMA, 'dataset': model['dataset_id'], 'config': asdict(config), 'source_hash': source_hash})
     write_json(output/'models.json', {k: e.serialize() for k,e in envs.items()})
     for seed in config.seeds:
+        exposure_before=Counter(getattr(envs['fit'],'episode_counts',{}))
         rng = Random(seed); b,p = policy('batter',seed),policy('pitcher',seed+1)
         initial = (b.frozen(),p.frozen()); archived = [initial]; histories = []
         batches = [[],[]]; baselines = [0.,0.]; observed = [Counter(),Counter()]; modes = Counter()
@@ -154,6 +156,7 @@ def train(dataset, start, end, output, config=Config(), *, test_only=False, evid
         def checkpoint(done):
             pair = (b.frozen(),p.frozen())
             histories.append({'episodes':done, 'policy_probes':probes(envs['fit'],*pair),
+                'league_exposure':dict(Counter(getattr(envs['fit'],'episode_counts',{}))-exposure_before),
                 'validation_evaluation':assessments(envs['validation'],pair,initial,archived[-1],human,config.evaluation_n,seed+100000),
                 'observed_learner_choices':{'batter':dict(observed[0]),'pitcher':dict(observed[1])},
                 'training_opponents':dict(modes),'optimizer_steps':{'batter':b.steps,'pitcher':p.steps}})
@@ -193,9 +196,20 @@ def train(dataset, start, end, output, config=Config(), *, test_only=False, evid
                 checkpoint(episode)
         run['both_parameters_changed'] = all(any(not np.array_equal(x,y) for x,y in zip(old,agent.params)) for old,agent in zip(before,(b,p)))
         if not run['both_parameters_changed']: raise RuntimeError('두 정책의 가중치 갱신을 확인하지 못했습니다.')
+        run['league_exposure']=dict(Counter(getattr(envs['fit'],'episode_counts',{}))-exposure_before)
         final = (b.frozen(),p.frozen()); past = archived[max(1,len(archived)//2)]
         run['test_evaluation'] = assessments(envs['test'],final,initial,past,human,config.evaluation_n,seed+900000)
         run['initial_test_evaluation'] = assessments(envs['test'],initial,initial,initial,human,config.evaluation_n,seed+900000)
+        if hasattr(envs['test'],'for_league'):
+            run['per_league_evaluation']=[]
+            for league in envs['test'].mixture:
+                domain=envs['test'].for_league(league)
+                for role in ('batter','pitcher'):
+                    before_pair=(initial[0],Fixed('pitcher')) if role=='batter' else (Fixed('batter'),initial[1])
+                    after_pair=(final[0],Fixed('pitcher')) if role=='batter' else (Fixed('batter'),final[1])
+                    run['per_league_evaluation'].append({'league':league,'role':role,
+                        'initial':evaluate(domain,*before_pair,config.evaluation_n,seed+900000),
+                        'learned':evaluate(domain,*after_pair,config.evaluation_n,seed+900000)})
         control = envs['test'].bunt_effect_ablation()
         run['bunt_effect_ablation'] = {'source_status':'UNVERIFIED_ASSUMPTION',
             'initial':evaluate(control,initial[0],Fixed('pitcher'),config.evaluation_n,seed+900000),
