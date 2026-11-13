@@ -97,6 +97,9 @@ class Workbench:
                         from baseball_lab.experiments.match.reporting.summary import build_summary
                         reading=build_summary(data)
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
+                    elif data.get('schema')=='Match-whole-game-v1':
+                        data_runs=data.get('seeds',[]);completed=[s['test_after']['win_rate'] for s in data_runs if 'test_after' in s]
+                        run['reading']={'headline':'전체 경기 전략 학습'+(' · 평가 승률 '+str(round(100*sum(completed)/len(completed),1))+'%' if completed else ' · 진행 중')}
                     elif data.get('schema')=='Match-half-inning-research-v1':
                         from baseball_lab.experiments.match.reporting.inning import summary
                         reading=summary(data)
@@ -242,8 +245,8 @@ class Workbench:
                 source='retrosheet' if kind=='simulate' else options.get('source','statcast')
                 if source not in ('statcast','retrosheet'):raise ValueError('지원하지 않는 자료 연결입니다.')
                 study=options.get('study','one_run')
-                if study not in ('one_run','half_inning'):raise ValueError('학습 목표를 확인하세요.')
-                if study=='half_inning' and source!='retrosheet':raise ValueError('이닝 득점 학습은 공식 경기 기록으로 실행합니다.')
+                if study not in ('one_run','half_inning','whole_game'):raise ValueError('학습 목표를 확인하세요.')
+                if study in ('half_inning','whole_game') and source!='retrosheet':raise ValueError('이닝 득점 학습은 공식 경기 기록으로 실행합니다.')
                 mixture=options.get('league_mixture')
                 if mixture is not None:
                     from baseball_lab.experiments.match.team_win.mixed import validate
@@ -274,9 +277,12 @@ class Workbench:
                 if source=='retrosheet' and collected:extra.append('--collected-window')
                 if mixture is not None:extra.extend(['--league-mixture',json.dumps(mixture)])
                 if source=='retrosheet' and study=='half_inning':extra[1]='inning'
+                if study=='whole_game':
+                    extra[1]='whole_game'
+                    if '--collected-window' not in extra:extra.append('--collected-window')
                 if source=='retrosheet' and kind=='run':
                     if seed>2**31-3:raise ValueError('여러 재현 번호를 만들기 위해 seed는 2,147,483,645 이하여야 합니다.')
-                    extra.extend(['--evaluation-n','100' if mixture is not None else '500'])
+                    extra.extend(['--evaluation-n','20' if study=='whole_game' else '100' if mixture is not None else '500'])
                 reference=options.get('authorization_reference','')
                 if not isinstance(reference,str) or len(reference)>2000:raise ValueError('자료 연결 설정을 확인하세요.')
                 if reference.strip():extra.extend(['--authorization-reference',reference.strip()])
@@ -338,11 +344,11 @@ class Workbench:
                     log.write(line);log.flush()
                     with self.lock:
                         self.job['logs'].append(line.rstrip())
-                        progress=re.search(r'학습 (\d+)/(\d+)(타석|상황)',line)
+                        progress=re.search(r'학습 (\d+)/(\d+)(타석|상황|경기)',line)
                         if line.startswith('단계 ') or self.job['kind']=='prepare_catalog':self.job['message']=line.strip()
                         if progress and self.job['kind'] in ('train','run'):
                             done,total=map(int,progress.groups()[:2]);unit=progress.group(3)
-                            display_unit='이닝' if 'inning' in command else '득점 기회' if 'scoring' in command else unit
+                            display_unit='경기' if 'whole_game' in command else '이닝' if 'inning' in command else '득점 기회' if 'scoring' in command else unit
                             self.job.update(completed_episodes=done,target_episodes=total,message=f'AI 연습 {done:,}/{total:,}{display_unit} · 지금까지의 결과를 볼 수 있습니다.')
                         if (output/'result/report.html').exists():
                             self.job['report']=f'/reports/{job_id}/result/report.html'
@@ -498,6 +504,9 @@ def make_handler(workbench):
                             external=[json.loads(p.read_text(encoding='utf-8')) for p in sorted(resolved.parent.glob('external-*.json'))]
                             evidence['external_evaluation']=[r for r in external if r.get('run_id')==evidence['run_id']]
                             from baseball_lab.experiments.match.reporting.report import render
+                            return self._html(render(evidence))
+                        if evidence.get('schema')=='Match-whole-game-v1':
+                            from baseball_lab.experiments.match.full_game.research import render
                             return self._html(render(evidence))
                         if evidence.get('schema')=='Match-half-inning-research-v1':
                             from baseball_lab.experiments.match.reporting.inning import render

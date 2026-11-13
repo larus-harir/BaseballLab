@@ -12,7 +12,7 @@ from baseball_lab.experiments.registry import REPOSITORY_ROOT
 def main():
     if os.name=='posix':os.umask(0o077)
     parser=argparse.ArgumentParser(description='야구 AI 연구실 · 실제 데이터와 실행 근거로 관찰하는 E01')
-    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run','scoring','inning','simulate'),default='web')
+    parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run','scoring','inning','whole_game','simulate'),default='web')
     parser.add_argument('--port',type=int,default=8765,help='웹 연구실 포트')
     parser.add_argument('--authorization-reference',help='자동 수집에 별도로 허용받은 근거 (기본은 수동 내보내기)')
     parser.add_argument('--data-dir',type=Path,default=REPOSITORY_ROOT/'data/local/statcast')
@@ -40,11 +40,11 @@ def main():
     parser.add_argument('--bases',type=int,default=1)
     parser.add_argument('--policy-style',choices=('basic','random'),default='basic')
     args=parser.parse_args()
-    args.start=args.start or ('2024-03-20' if args.mode in ('scoring','inning','simulate') else '2024-05-01')
-    args.end=args.end or ('2024-09-30' if args.mode in ('scoring','inning','simulate') else '2024-05-06')
-    args.evaluate_every=args.evaluate_every or (max(200,args.episodes//3) if args.mode in ('scoring','inning') else 200)
+    args.start=args.start or ('2024-03-20' if args.mode in ('scoring','inning','whole_game','simulate') else '2024-05-01')
+    args.end=args.end or ('2024-09-30' if args.mode in ('scoring','inning','whole_game','simulate') else '2024-05-06')
+    args.evaluate_every=args.evaluate_every or (max(200,args.episodes//3) if args.mode in ('scoring','inning','whole_game') else 200)
     if args.list:
-        print('E01 · 실제 경기 기록으로 득점·실점 방어를 배우는 상황 실험. 웹에서 AI 학습 시작을 누르세요. 전체 경기 승리는 아직 미지원입니다.')
+        print('E01 · 실제 경기 기록으로 득점·실점 방어를 배우는 상황 실험. 웹에서 AI 학습 시작을 누르세요. 전체 경기 승리 학습과 별도 한 이닝 연구를 선택할 수 있습니다.')
         return
     if args.mode=='web':
         if not 0<=args.port<=65535:parser.error('포트는 0~65535 사이의 정수로 입력하세요.')
@@ -63,7 +63,7 @@ def main():
             try:mixture=validate(REPOSITORY_ROOT,json.loads(args.league_mixture))
             except json.JSONDecodeError:raise ValueError('리그 비중 JSON을 확인하세요.') from None
             args.collected_window=True
-        if args.mode in ('scoring','inning','simulate'):
+        if args.mode in ('scoring','inning','whole_game','simulate'):
             from baseball_lab.data.retrosheet_releases import validate_period
             minimum=1 if args.mode=='simulate' and args.observation_source=='observed' else 3
             if args.collected_window:
@@ -82,6 +82,16 @@ def main():
             else:dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
             observe(dataset,args.start,args.end,output,seed=args.seed,outs=args.outs,bases=args.bases,source=args.observation_source,style=args.policy_style)
             print('관찰 완료 · 정책 학습 없이 실제 기록 또는 모델 전이를 재생합니다.',flush=True)
+        elif args.mode=='whole_game':
+            from baseball_lab.data.training_window import sources,validate_window
+            from baseball_lab.data.memory_source import acquire as acquire_game
+            from baseball_lab.experiments.match.full_game.research import train
+            from baseball_lab.experiments.match.team_win.training import Config
+            validate_window(REPOSITORY_ROOT,args.start,args.end)
+            dataset=acquire_game(REPOSITORY_ROOT,args.start,args.end,sources(REPOSITORY_ROOT),game_actions=True)
+            print('단계 2 · 경기 전체의 승패를 목표로 학습합니다.',flush=True)
+            seeds=tuple(int(s) for s in args.seeds.split(',')) if args.seeds else (args.seed,args.seed+1,args.seed+2)
+            train(dataset,args.start,args.end,output,Config(args.episodes,seeds,args.evaluate_every,args.evaluation_n))
         elif args.mode in ('scoring','inning'):
             from baseball_lab.data.catalog import DatasetCatalog
             from baseball_lab.r1.training import train,Config

@@ -43,7 +43,7 @@ def archive_bytes(root,year,local=None):
     return fetch(m['source_url'])
 
 
-def season(root,year,local=None,*,prepared_archive=None,announce=True):
+def season(root,year,local=None,*,prepared_archive=None,announce=True,game_actions=False):
     from baseball_lab.r1.data import normalize
     from baseball_lab.experiments.match.team_win.half_inning import completion_aligned
     from baseball_lab.matchup.outcome_details import classify
@@ -56,7 +56,7 @@ def season(root,year,local=None,*,prepared_archive=None,announce=True):
         if len(members)!=1 or members[0].filename!=f'{year}plays.csv':raise ValueError('공식 CSV 이외의 압축 경로·중복 파일을 거부했습니다.')
         info=members[0]
         if info.file_size>256*1024*1024 or info.file_size>max(1,info.compress_size)*200:raise ValueError('압축 해제 크기·압축률 한도를 넘었습니다.')
-        digest=hashlib.sha256();opened=False;dates={};labels={}
+        digest=hashlib.sha256();opened=False;dates={};labels={};approaches={};steals=[]
         def open_csv():
             nonlocal opened
             if opened:raise ValueError('같은 시즌의 중복 읽기를 거부했습니다.')
@@ -64,6 +64,11 @@ def season(root,year,local=None,*,prepared_archive=None,announce=True):
             return io.TextIOWrapper(io.BufferedReader(DigestReader(archive.open(info),digest)),encoding='utf-8-sig',newline='')
         def observe(line,r):
             dates[r['gid']]=max(dates.get(r['gid'],''),r['date'])
+            if game_actions:
+                first=next((c for c in r['pitches'] if c in 'BCFSXHILMOPQRTVYU'),'')
+                approaches[f"{r['gid']}:play{r['pn']}:csvline{line}"]='early_swing' if first in 'FSXLMOQRTY' else 'take_first' if first in 'BC' else None
+                if r['pa']=='0' and any(t.startswith(('SB','CS','POCS')) for t in r['event'].split('.',1)[0].split('+')):
+                    steals.append({'game_id':r['gid'],'inning':int(r['inning']),'bottom':int(r['vis_home']),'outs':int(r['outs_pre']),'bases':sum(1<<(i-1) for i in (1,2,3) if r[f'br{i}_pre']), 'outs_added':int(r['outs_post'])-int(r['outs_pre']),'end_bases':sum(1<<(i-1) for i in (1,2,3) if r[f'br{i}_post']),'runs':int(r['runs']),'record_id':f"{r['gid']}:steal:csvline{line}",'event_codes':[r['event']]})
             if r['pa']!='1':return
             classify(r)
             event='strikeout' if r['k']=='1' else 'walk' if r['walk']=='1' else 'hit' if any(r[k]=='1' for k in ('single','double','triple','hr')) else 'other'
@@ -77,12 +82,16 @@ def season(root,year,local=None,*,prepared_archive=None,announce=True):
             event=labels.get(row['source_row_ids'][-1])
             if event is None and not row['truncated']:raise ValueError('완료 타석 전이와 공식 사건을 연결하지 못했습니다.')
             row['common_event']=event or 'non_pa'
+        if game_actions:
+            halves={(r['game_id'],r['inning'],r['bottom']) for r in data['records']}
+            for r in data['records']:r['approach']=approaches.get(r['source_row_ids'][0])
+            data['steal_records']=[{**s,'date':f"{dates[s['game_id']][:4]}-{dates[s['game_id']][4:6]}-{dates[s['game_id']][6:]}"} for s in steals if (s['game_id'],s['inning'],s['bottom']) in halves and 0<=s['outs']<=2 and s['outs']+s['outs_added']<=3]
         # Extra labels don't alter the retained source transition identity.
         return data
 
 
-def acquire(root,start,end,local):
-    records=[];datasets=[];checks=[]
+def acquire(root,start,end,local,*,game_actions=False):
+    records=[];datasets=[];checks=[];steals=[]
     years=list(range(int(start[:4]),int(end[:4])+1))
     # One future prepares only the next bounded ZIP while the current season
     # is checked. Parsing stays sequential and no inputs are written to disk.
@@ -93,11 +102,12 @@ def acquire(root,start,end,local):
             body=pending.result()
             if position+1<len(years):
                 nxt=years[position+1];pending=pool.submit(archive_bytes,root,nxt,local.get(nxt))
-            data=season(root,year,local.get(year),prepared_archive=body,announce=False)
+            data=season(root,year,local.get(year),prepared_archive=body,announce=False,game_actions=game_actions)
             del body
             datasets.append(data['manifest']['dataset_id']);checks.append(index()['mlb'][str(year)]['csv_sha256'])
             records.extend(r for r in data['records'] if start<=r['date']<=end)
             print(f'단계 1 · {position+1}/{len(years)}시즌 확인 완료 · MLB {year}년',flush=True)
+            if game_actions:steals.extend(s for s in data['steal_records'] if start<=s['date']<=end)
             del data
     if not records:raise ValueError('기간 안에 검증된 전이 기록이 없습니다.')
     manifest={'schema':'collected-training-window-v1','source_status':'REAL_OBSERVED','storage_mode':'memory-only',
@@ -109,4 +119,8 @@ def acquire(root,start,end,local):
         'source_url':'https://www.retrosheet.org/downloads/plays.html',
         'donor_population':{'version':'completed-regulation-innings-1-to-8-v1'},
         'mixture_policy':'Observed MLB transitions pooled within fit only; no KBO/NPB aggregate transitions and no league-strength conversion.'}
-    return {'manifest':manifest,'records':records}
+    result={'manifest':manifest,'records':records}
+    if game_actions:
+        result['steal_records']=steals
+        manifest['dataset_id']=content_hash({'base':manifest['dataset_id'],'game_actions':'observed-first-pitch-and-running-v1','approaches':[(r['record_id'],r['approach']) for r in records],'steals':steals})
+    return result
