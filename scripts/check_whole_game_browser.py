@@ -5,14 +5,11 @@ from playwright.sync_api import sync_playwright,expect
 
 with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     browser=pw.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox']);page=browser.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
-    page.goto(base+'/match');page.locator('a[href="/match/team?study=whole_game"]').first.click()
-    expect(page.locator('#study')).to_have_value('whole_game')
-    expect(page.locator('#recordSeason')).to_have_value('collected:2025',timeout=30000)
-    expect(page.locator('#leagueLearning')).not_to_be_visible()
-    assert page.locator('#study option[value="one_run"]').count()==0
-    page.locator('#episodes').fill('20');expect(page.locator('#trainBtn')).to_be_enabled(timeout=30000)
-    with page.expect_response(lambda r:r.url.endswith('/api/start')) as response:page.locator('#trainBtn').click()
-    task=response.value.json();assert response.value.ok,task
+    page.goto(base+'/match/team?study=half_inning')
+    expect(page.locator('#study')).to_have_value('half_inning')
+    token=wb.token
+    response=page.request.post(base+'/api/start',headers={'X-Lab-Token':token},data={'kind':'run','options':{'source':'retrosheet','study':'whole_game','collected_window':True,'start':'2025-03-18','end':'2025-09-28','episodes':20,'seed':41}})
+    task=response.json();assert response.ok,task
     deadline=time.monotonic()+180
     while time.monotonic()<deadline:
         state=page.request.get(base+'/api/state?project=match').json();job=state['job']

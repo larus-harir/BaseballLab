@@ -8,7 +8,7 @@ User instructions take precedence over this file and archived plans.
 
 - BaseballLab is the executable statistical player matchup program and owner of
   shared data, probability contracts and simulation services.
-- Match owns competitive AI learning. The primary study is a full-game final-win experiment; the three-out run study remains a separate option. Preserve historical one-run results without advertising them as the main learner. Expand only source-supported actions, keep chronological holdouts, and never present the current action subset as unrestricted baseball intelligence.
+- Match owns competitive AI learning. The primary study is pitch-decision self-play in a fitted, independently checked pitch-result world; both A and B learn terminal game wins. Preserve the archived turn-selection whole-game study; the three-out run study remains a separate option. Preserve historical one-run results without advertising them as the main learner. Expand only source-supported actions, keep chronological holdouts, and never present the current action subset as unrestricted baseball intelligence.
 - EraMatch is the unified MLB/KBO player matchup experience; retain legacy
   project=baseball identifiers and /baseball compatibility. The supplied KBO assignment remains a distinct calculation mode.
   Reproduction and improved candidates share the same engine, with different
