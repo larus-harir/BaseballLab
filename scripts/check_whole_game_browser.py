@@ -25,7 +25,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     assert {'early_swing','take_first','steal_attempt'}<=set(data['supported_actions'])
     assert all(s['test_before']['games']==20 and s['test_after']['games']==20 for s in data['seeds'])
     page.goto(base+job['report']);expect(page.locator('#scores')).to_contain_text('%')
-    expect(page.locator('#policyChanges')).to_contain_text('학습 후')
+    page.locator('#tab-learning').click();expect(page.locator('#policyChanges')).to_contain_text('A팀')
     expect(page.locator('#actions')).to_contain_text('도루 시도')
     assert page.locator('#scene').inner_text();page.locator('#pos').fill('1')
     page.set_viewport_size({'width':390,'height':844});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
