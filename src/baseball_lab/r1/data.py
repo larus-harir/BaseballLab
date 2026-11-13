@@ -1,5 +1,7 @@
 """Normalize Chadwick output, keeping observed transition segments and provenance."""
 import csv
+import re
+from contextlib import nullcontext
 from collections import Counter
 from pathlib import Path
 from baseball_lab.data.lineage import checksum,content_hash,write_json,utc_now
@@ -8,7 +10,7 @@ CREDIT='The information used here was obtained free of charge from and is copyri
 SCHEMA='retrosheet-turn-segments-v1'
 
 
-def official_rows(path, stats, excluded=None, *, skip_empty_no_play=False,open_csv=None):
+def official_rows(path, stats, excluded=None, *, skip_empty_no_play=False,open_csv=None,observe_row=None):
     """Map documented official fields; retain raw play text, never infer a pitch type."""
     required={'gid','event','inning','vis_home','score_v','score_h','pitches','pa','bunt','iw',
               'outs_pre','outs_post','runs','pn','gametype','pbp',
@@ -21,6 +23,7 @@ def official_rows(path, stats, excluded=None, *, skip_empty_no_play=False,open_c
             stats['all_download_rows']+=1
             if row['gametype']!='regular' or row['pbp']!='full':
                 stats['excluded_non_regular_or_non_full']+=1;continue
+            if observe_row is not None:observe_row(line,row)
             identity=(row['gid'],row['pn'])
             if identity in ids:raise ValueError(f'Duplicate official play ID: {identity}')
             ids.add(identity)
@@ -61,18 +64,32 @@ def official_rows(path, stats, excluded=None, *, skip_empty_no_play=False,open_c
             yield previous
 
 
+def pure_intentional_walk(record):
+    """An IW with documented WP/PB/error/steal is not a force-walk-only example.
+
+    Identify extra events from source annotations, never by discarding numerical
+    mismatches. Unexplained state mismatches must still fail validation.
+    """
+    codes=record['event_codes']
+    if len(codes)!=1:return False
+    code=codes[0]
+    if isinstance(code,int):return code==15
+    if code.split('.',1)[0].split('/',1)[0]!='IW':return False
+    return not re.search(r'(?<![A-Z])(?:WP|PB|BK|SB[123H]|CS[123H]|PO[123H]|E[1-9])(?:[^A-Z]|$)',code)
+
+
 def walk(bases):
     first,second,third=(bool(bases&(1<<i)) for i in range(3))
     return int(True)+2*int(first or second)+4*int(third or(first and second)),int(first and second and third)
 
 
-def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty_no_play=False,persist=True,regulation_rule_check=False,open_csv=None,parsed_sha256=None):
+def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty_no_play=False,persist=True,regulation_rule_check=False,open_csv=None,parsed_sha256=None,observe_row=None):
     csv_path=Path(csv_path);output=Path(output)
     if open_csv and (persist or not parsed_sha256):raise ValueError('메모리 정제는 원본 지문을 지정하고 파일 저장을 꺼야 합니다.')
     records=[];pending=[];last_half=None;seen=set();errors=Counter();total=0;sequence_bad=0
     previous=None;score_mismatches=0;official_stats=Counter();source_exclusions=[]
-    with (open_csv() if open_csv else csv_path.open(newline='',encoding='utf-8')) as file:
-        reader=official_rows(csv_path,official_stats,source_exclusions,skip_empty_no_play=skip_empty_no_play,open_csv=open_csv) if official else csv.DictReader(file)
+    with (nullcontext() if official else open_csv() if open_csv else csv_path.open(newline='',encoding='utf-8')) as file:
+        reader=official_rows(csv_path,official_stats,source_exclusions,skip_empty_no_play=skip_empty_no_play,open_csv=open_csv,observe_row=observe_row) if official else csv.DictReader(file)
         for ordinal,row in enumerate(reader,1):
             total+=1
             half=(row['GAME_ID'],int(row['INN_CT']),int(row['BAT_HOME_ID']))
@@ -118,7 +135,7 @@ def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty
     if regulation_rule_check:
         ends={}
         for r in records:ends[(r['game_id'],r['inning'],r['bottom'])]=r['outs']+r['outs_added']
-        isolated=[r for r in isolated if 1<=r['inning']<=8 and ends[(r['game_id'],r['inning'],r['bottom'])]==3]
+        isolated=[r for r in isolated if 1<=r['inning']<=8 and ends[(r['game_id'],r['inning'],r['bottom'])]==3 and pure_intentional_walk(r)]
     isolated_matches=sum(walk(r['bases'])==(r['end_bases'],r['runs']) and r['outs_added']==0 for r in isolated)
     if not test_only and (not isolated or len(isolated)!=isolated_matches):
         raise ValueError('Isolated observed intentional walks do not verify the force-walk rule')
@@ -134,7 +151,7 @@ def normalize(csv_path,output,source,*,test_only=False,official=False,skip_empty
               'missing_features':['pitch type','pitch location','velocity','swing intention','player ability','fatigue'],
               'records_checksum':content_hash(records)}
     manifest['source_status']='MOCK_TEST_ONLY' if test_only else 'REAL_OBSERVED'
-    if regulation_rule_check:manifest['intentional_walk_validation_population']='completed regulation innings 1-8; same population as collected-window donors; raw all-inning mismatch counts retained'
+    if regulation_rule_check:manifest['intentional_walk_validation_population']='pure IW events in completed regulation innings 1-8; explicitly annotated additional events excluded from force-walk-only checks; all observed records retained'
     manifest['dataset_id']=content_hash({k:manifest[k] for k in ('schema','records_checksum','parsed_csv_sha256')})
     if persist:write_json(output/'dataset.json',{'manifest':manifest,'records':records})
     return {'manifest':manifest,'records':records}

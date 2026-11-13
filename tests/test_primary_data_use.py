@@ -83,7 +83,7 @@ def test_rule_check_matches_completed_inning_donors_without_changing_original(tm
     m=data['manifest']
     assert m['intentional_walks']==2 and m['intentional_walk_rule_matches']==1
     assert m['isolated_intentional_walks']==m['isolated_intentional_walk_rule_matches']==1
-    assert 'same population' in m['intentional_walk_validation_population']
+    assert 'pure IW events' in m['intentional_walk_validation_population']
     assert any(r['event_codes']==['IW.2-3(WP)'] for r in data['records'])
     assert before==path.read_bytes() and not (tmp_path/'dataset.json').exists()
 

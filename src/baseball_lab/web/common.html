@@ -4,7 +4,7 @@
 <div class="hero"><span class="eyebrow">ERAMATCH</span><h1>리그·시대 공통 비교</h1><p>각 리그 평균보다 얼마나 달랐는지, 같은 기준 환경에 옮겨 비교합니다.</p></div>
 <section id="setup"><h2>누구를 비교할까요?</h2><p>두 선수와 리그 기준에 실제로 있는 홈런·장타·사구 기록을 활용합니다. 빠진 항목만 구분하지 않고, 없는 수치를 채우지 않습니다.</p><p id="usageNotice" class="notice"></p>
 <div class="row"><div><h3>타자</h3><label>리그·시즌<select id="bSource"></select></label><label>이름 또는 원천 ID 검색<input id="bQuery" type="search" maxlength="80"></label><label>타자<select id="bPlayer"></select></label></div><div><h3>투수</h3><label>리그·시즌<select id="pSource"></select></label><label>이름 또는 원천 ID 검색<input id="pQuery" type="search" maxlength="80"></label><label>투수<select id="pPlayer"></select></label></div></div>
-<label>경기를 가정할 기준 환경<select id="reference"></select><small>선수 기록의 리그·시즌 평균 대비 비율을 이 환경으로 옮깁니다.</small></label>
+<label>어느 리그·시즌의 평균에 맞춰 비교할까요?<select id="reference"></select><small>예를 들어 MLB 2024를 고르면 두 선수가 각자 리그 평균보다 얼마나 달랐는지를 MLB 2024 평균에 맞춰 비교합니다. 리그 간 실제 실력을 환산해 검증한 값은 아닙니다.</small></label>
 <label>타석 수<input id="n" type="number" value="100" min="1" max="10000"></label><button id="run" disabled>공통 기록으로 대결</button>
 <details><summary>보정·재현 설정</summary><label>리그 평균을 섞을 타석 수<input id="strength" type="number" min="0" max="2000" value="100"></label><p>100은 탐색용 고정값입니다. 리그 간 예측 성능으로 선택한 값이 아닙니다.</p><label>재현 번호 (비우면 매번 새 추첨)<input id="seed" type="number" min="0" max="2147483647"></label></details>
 <p id="message" role="status" aria-live="polite">자료를 확인하고 있어요.</p></section>

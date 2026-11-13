@@ -64,7 +64,7 @@ def main():
                 expect(page.locator('#recordSeason')).to_have_value('recent:5',timeout=30000)
                 page.locator('#recordSeason').select_option('collected:2025')
                 page.locator('#learnKBO').check();page.locator('#learnNPB').check()
-                expect(page.locator('#sourcePreview')).to_contain_text('KBO: 2024',timeout=30000)
+                expect(page.locator('#sourcePreview')).to_contain_text('2024 시즌 한 시즌만',timeout=30000)
                 submitted=[]
                 def submit(route):
                     submitted.append(route.request.post_data_json)

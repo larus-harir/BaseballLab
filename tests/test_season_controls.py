@@ -5,8 +5,8 @@ from baseball_lab.web.server import Workbench
 
 
 def test_preview_names_each_league_year_instead_of_implying_same_season(tmp_path):
-    descriptor={'ready':True,'metadata':{'sha256':[{'sha256':'MOCK_TEST_ONLY'}]}}
-    with patch('baseball_lab.data.learning_preview.DatasetCatalog.describe',return_value=descriptor),patch('baseball_lab.data.learning_preview.dates',return_value=['2024-04-01','2024-05-01','2024-06-01','2024-07-01','2024-08-01']),patch('baseball_lab.matchup.shared.catalog',return_value={'baselines':{'KBO:2023':{},'KBO:2024':{}}}):
+    fake={'mlb':{'2024':{'dates':['2024-04-01','2024-05-01','2024-06-01','2024-07-01','2024-08-01']}},'npb':{'daily_counts':{}}}
+    with patch('baseball_lab.data.learning_preview.index',return_value=fake),patch('baseball_lab.matchup.shared.catalog',return_value={'baselines':{'KBO:2023':{},'KBO:2024':{}}}):
         r=preview(tmp_path,'2024-03-20','2024-09-30',{'MLB':1,'KBO':1,'NPB':1})
     assert 'KBO: 2023 시즌' in r['lines']
     assert any('자료 없음' in x for x in r['lines'] if x.startswith('NPB:'))

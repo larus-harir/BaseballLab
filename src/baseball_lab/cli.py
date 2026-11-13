@@ -92,7 +92,7 @@ def main():
                 from baseball_lab.data.training_window import acquire as acquire_window
                 dataset=acquire_window(REPOSITORY_ROOT,args.start,args.end)
             else:dataset=DatasetCatalog(REPOSITORY_ROOT).ensure('match',datetime.fromisoformat(args.start).year)
-            print('단계 2 · 경기와 날짜를 나눠 실제 전이 분포를 검사합니다.',flush=True)
+            print('단계 2 · 학습용 기록과 평가용 기록을 나누고, 사용할 야구 상황을 확인합니다.',flush=True)
             if args.mode=='inning':
                 from baseball_lab.experiments.match.team_win.half_inning import train,completion_aligned
                 from baseball_lab.matchup.outcome_details import index
@@ -107,13 +107,13 @@ def main():
                         'completed_pa_n':details['pa_n'],'pitchout':codes.get('P',0),
                         'swing_on_pitchout':sum(codes.get(k,0) for k in 'QRY')}
                     evidence['reason']=f"실제 {details['pa_n']:,}타석에서 피치아웃 P {evidence['pitchout']}개, 이에 대한 스윙·접촉 Q/R/Y {evidence['swing_on_pitchout']}개입니다. 현재 원천에는 구종·구속·위치가 없고, 피치아웃에 스윙했을 때의 결과 표본도 부족합니다. 던지지 않은 공의 결과를 만들어내지 않고, 실제로 확인 가능한 아웃·주자 전이와 번트·고의볼넷 선택으로 총득점을 학습합니다."
-                print('단계 3 · 세 아웃까지 총득점 최대화·실점 최소화를 학습합니다.',flush=True)
+                print('단계 3 · 공격 AI는 더 많이 득점하고, 수비 AI는 실점을 줄이도록 연습합니다.',flush=True)
                 if mixture:
                     from baseball_lab.experiments.match.team_win.mixed import train as train_mixed
                     train_mixed(REPOSITORY_ROOT,dataset,args.start,args.end,output,config,mixture)
                 else:train(dataset,args.start,args.end,output,config,evidence=evidence)
             else:
-                print('단계 3 · 출루가 아닌 한 점 득점·실점 방어를 학습합니다.',flush=True)
+                print('단계 3 · 공격 AI는 한 점을 내고, 수비 AI는 득점을 막도록 연습합니다.',flush=True)
                 train(dataset,args.start,args.end,output,config)
         elif args.mode=='run':
             from baseball_lab.research.pipeline import Plan,run
@@ -160,7 +160,10 @@ def main():
             import webbrowser
             webbrowser.open((output/'report.html').resolve().as_uri())
     except (OSError,ValueError,KeyError,TypeError,RuntimeError,ImportError,csv.Error) as exc:
-        failure={'status':'DATA_OR_VALIDATION_REQUIRED','observed_at':utc_now(),'error':str(exc),
+        message=str(exc)
+        if 'Isolated observed intentional walks' in message:
+            message='일부 고의볼넷 장면의 주자 이동이 규칙 검사와 맞지 않아 중단했습니다. 실행 로그에서 해당 시즌을 확인하세요.'
+        failure={'status':'DATA_OR_VALIDATION_REQUIRED','observed_at':utc_now(),'error':message,
                  'research_executed':False,'synthetic_fallback':False}
         # Keep previous successful runs intact if the chosen directory already has evidence.
         if not output.exists() or not any(output.iterdir()):
@@ -170,4 +173,4 @@ def main():
             if args.open:
                 import webbrowser
                 webbrowser.open((output/'report.html').resolve().as_uri())
-        parser.exit(2,f'연구 실행 보류: {exc}\n임의 합성 자료로 대체하지 않았습니다.\n')
+        parser.exit(2,f'실행을 마치지 못했습니다: {message}\n')

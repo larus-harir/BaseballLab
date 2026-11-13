@@ -70,7 +70,7 @@ class Workbench:
         result['scoring']={'periods':{str(k):v for k,v in PERIODS.items()},
                            'cached_seasons':{str(k):(self.root/f'data/local/retrosheet/official-{k}/dataset.json').is_file() for k in PERIODS},'available':True,'cached':(self.root/'data/local/retrosheet/official-2024/dataset.json').exists(),
                            'title':'실제 Retrosheet 기록으로 득점 상황 학습',
-                           'reason':'선수 대결은 앱 포함 집계를 사용합니다. 학습은 공식 기록을 메모리에서 읽으며 원본을 PC에 저장하지 않습니다. 인터넷·RAM과 결과 저장 공간은 필요합니다.'}
+                           'reason':'선택한 시즌의 경기 기록을 확인한 뒤 공격·수비 AI가 연습합니다. 학습에 쓴 경기와 이후 평가용 경기를 나눠 성적을 비교합니다.'}
         from baseball_lab.data.training_window import periods
         result['scoring']['collected_periods']=periods(self.root)
         return result
@@ -259,6 +259,10 @@ class Workbench:
                         from baseball_lab.data.training_window import validate_window
                         start,end=validate_window(self.root,options.get('start'),options.get('end'))
                     else:start,end=validate_period(options.get('start'),options.get('end'),min_days=minimum)
+                    if mixture is not None:
+                        from baseball_lab.data.learning_preview import preview
+                        explanation=preview(self.root,start,end,mixture)
+                        if not explanation['can_start']:raise ValueError(' '.join(explanation['issues']))
                 else:
                     from baseball_lab.research.pipeline import Plan
                     plan=Plan(str(options.get('start','')),str(options.get('end','')))
@@ -325,7 +329,7 @@ class Workbench:
                 process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
                                          cwd=self.root,env=env,text=True,encoding='utf-8',errors='replace')
                 self.process=process
-                self.job.update(status='running',message='공개 기록을 내려받고 검사하고 있어요.' if self.job['kind']=='prepare_catalog' else '학습 없이 상황을 준비하고 있어요.' if self.job['kind']=='simulate' else '자료 준비부터 순서대로 진행하고 있어요.' if self.job['kind']=='run' else '기록을 검사하고 있어요.' if self.job['kind']=='fit' else '두 AI가 타석 대결을 학습하고 있어요.')
+                self.job.update(status='running',message='공개 기록을 내려받고 검사하고 있어요.' if self.job['kind']=='prepare_catalog' else '학습 없이 상황을 준비하고 있어요.' if self.job['kind']=='simulate' else '경기 기록을 확인한 뒤 AI 연습을 시작합니다.' if self.job['kind']=='run' else '기록을 검사하고 있어요.' if self.job['kind']=='fit' else '두 AI가 타석 대결을 학습하고 있어요.')
                 self._persist()
             with (output/'output.log').open('w',encoding='utf-8') as log:
                 private(output/'output.log')
@@ -338,7 +342,8 @@ class Workbench:
                         if line.startswith('단계 ') or self.job['kind']=='prepare_catalog':self.job['message']=line.strip()
                         if progress and self.job['kind'] in ('train','run'):
                             done,total=map(int,progress.groups()[:2]);unit=progress.group(3)
-                            self.job.update(completed_episodes=done,target_episodes=total,message=line.strip()+' · 현재까지의 결과를 볼 수 있어요.')
+                            display_unit='이닝' if 'inning' in command else '득점 기회' if 'scoring' in command else unit
+                            self.job.update(completed_episodes=done,target_episodes=total,message=f'AI 연습 {done:,}/{total:,}{display_unit} · 지금까지의 결과를 볼 수 있습니다.')
                         if (output/'result/report.html').exists():
                             self.job['report']=f'/reports/{job_id}/result/report.html'
                         self.job['logs']=self.job['logs'][-120:]
