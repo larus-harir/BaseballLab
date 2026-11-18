@@ -19,12 +19,29 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     assert all(all(all(v) for v in s['parameters_changed']) for s in data['seeds'])
     assert all(all(all(v>0 for v in row) for row in s['optimizer_steps']) for s in data['seeds'])
     assert (folder/'world.json').exists() and data['world']['holdout_prediction']['test']['pitches']>=100
+    metrics=data['world']['holdout_prediction']['validation']
+    assert metrics['brier']<=metrics['baseline_brier']+1e-12
+    assert data['world']['coverage'] and data['dataset']['pitch_acquisition']
     for s in data['seeds']:
-        assert all(e['offense'] in ('take','swing') for e in s['replay']['events'])
+        assert all(e['offense'] in ('take','swing',None) for e in s['replay']['events'])
+        assert all(e['offense'] is None for e in s['replay']['events'] if e['defense']!='pitch')
         assert any(e['strikes']>0 or e['balls']>0 for e in s['replay']['events'])
+        assert all(len(h['against_initial'])==2 and len(h['choice_probes'])==3 for h in s['history'])
+        assert s['history'][0]['seed_bank']!=s['history'][-1]['seed_bank']
     page.goto(base+job['report']);expect(page.locator('#score')).to_contain_text('A팀 평가')
+    expect(page.locator('#verdict')).to_contain_text('총 60경기')
+    expect(page.locator('#growthTable')).to_contain_text('학습 전')
+    expect(page.locator('#strategy')).to_contain_text('0볼 2스트라이크')
     expect(page.locator('#choice')).to_contain_text('팀 타자');page.locator('#pos').fill('5');assert page.locator('#outcome').inner_text()
+    page.locator('#pos').focus();page.keyboard.press('ArrowRight');expect(page.locator('#pos')).to_have_value('6')
+    page.reload();expect(page.locator('#growthTable')).to_contain_text('학습 전')
     page.set_viewport_size({'width':390,'height':844});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    # Historical reports are rendered read-only without inventing new comparisons.
+    old=next((p for p in (ROOT/'outputs/workbench').glob('*/result/research.json') if p!=folder/'research.json' and (lambda d:d.get('schema')=='Match-pitch-decision-game-v1' and 'against_initial' not in d['seeds'][0]['history'][0])(json.loads(p.read_text(encoding='utf-8')))),None)
+    if old:
+        before=old.read_bytes();report='/reports/'+old.parents[1].name+'/result/report.html'
+        page.goto(base+report);expect(page.locator('#growthTable')).to_contain_text('이전 실행')
+        assert old.read_bytes()==before
     page.goto(base+'/match/team?study=half_inning');expect(page.locator('#study')).to_have_value('half_inning')
     assert not errors,errors
     print('PASS: actual pitch-decision main web job; 3 x 20 full games, A/B offense and defense all updated; fitted world held-out metrics; real pitch counts, official pitcher substitutions, saved report, mobile, preserved inning study. Report:',job['report'])

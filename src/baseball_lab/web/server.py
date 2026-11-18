@@ -471,7 +471,7 @@ def make_handler(workbench):
                 try:
                     from baseball_lab.data.learning_preview import preview
                     q=parse_qs(urlparse(self.path).query)
-                    self._json(preview(workbench.root,q.get('start',[''])[0],q.get('end',[''])[0],json.loads(q.get('mixture',['{}'])[0])))
+                    self._json(preview(workbench.root,q.get('start',[''])[0],q.get('end',[''])[0],json.loads(q.get('mixture',['{}'])[0]),q.get('study',['half_inning'])[0]))
                 except (ValueError,OSError,KeyError,TypeError) as exc:self._json({'error':public_text(exc)},400)
             elif path=='/api/shared/catalog':
                 try:

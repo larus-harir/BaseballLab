@@ -128,5 +128,10 @@ def acquire(root,start,end,local,*,game_actions=False,pitch_actions=False):
         manifest['dataset_id']=content_hash({'base':manifest['dataset_id'],'game_actions':'observed-first-pitch-and-running-v1','approaches':[(r['record_id'],r['approach']) for r in records],'steals':steals})
     if pitch_actions:
         result['pitch_turns']=pitch_turns
+        manifest['pitch_acquisition']={
+            'normalized_turns':len(records),'linked_single_row_turns':len(pitch_turns),
+            'unlinked_or_interrupted_turns':len(records)-len(pitch_turns),
+            'policy':'Only single-source-row PAs enter pitch parsing; interrupted sequences are not stitched. Valid runner transitions are checked separately.',
+            'source_csv_sha256':checks}
         manifest['dataset_id']=content_hash({'base':manifest['dataset_id'],'pitch_actions':'observed-pitch-sequence-v1','turns':pitch_turns})
     return result

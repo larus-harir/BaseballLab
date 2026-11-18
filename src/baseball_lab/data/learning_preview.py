@@ -2,7 +2,7 @@
 from .compact import index
 
 
-def preview(root,start,end,mixture):
+def preview(root,start,end,mixture,study='half_inning'):
     from datetime import date
     from baseball_lab.experiments.match.team_win.mixed import weights
     first,last=date.fromisoformat(start),date.fromisoformat(end)
@@ -19,10 +19,19 @@ def preview(root,start,end,mixture):
         ('학습',days[:fit_end],'실제 야구 상황의 발생 확률을 만들고 AI를 연습시킵니다.'),
         ('중간 점검',days[fit_end:test_start],'학습 중 성적을 확인합니다. 이 구간으로 발생 확률을 다시 맞추지 않습니다.'),
         ('최종 평가',days[test_start:],'학습을 끝낸 뒤 확인합니다. 학습과 중간 점검에 사용하지 않습니다.'))]
+    if study=='pitch_game':
+        if mixture:raise ValueError('매 공의 행동 학습은 현재 MLB 투구 순서 기록을 사용합니다.')
+        for split,purpose in zip(splits,(
+            '실제 투구 결과와 진루 확률을 추정합니다. A·B팀은 이 모델 안에서 새 가상 경기를 치르며 승패로 학습합니다.',
+            '실제 투구 예측 오차를 비교해 사용할 모델을 고릅니다. AI 팀의 경기 성적을 계산하는 자료는 아닙니다.',
+            '모델 선택에 사용하지 않은 이후 날짜의 실제 투구로 예측력을 마지막 검사합니다.')):
+            split['purpose']=purpose
     chosen=weights(mixture) if mixture else {'MLB':1.}
     years=list(range(first.year,last.year+1));issues=[]
     league_rows=[{'league':'MLB','period':f'{start} ~ {end}',
         'use':'주자·아웃·득점이 어떻게 바뀌는지 배우는 기본 경기 기록입니다. 위의 세 구간으로 나눠 사용합니다.'}]
+    if study=='pitch_game':
+        league_rows[0]['use']='실제 투구 순서·타격 결과·진루 기록입니다. 해석 가능한 투구와 진루 표본을 따로 확인하며, 시즌 합계만 있는 자료로 투구를 만들지 않습니다.'
     lines=[f'MLB 경기 기록: {start} ~ {end}']
     if 'KBO' in chosen:
         from baseball_lab.matchup.shared import catalog

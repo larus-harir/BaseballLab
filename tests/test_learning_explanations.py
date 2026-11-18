@@ -26,6 +26,14 @@ def test_explanation_does_not_scan_source_files_or_make_up_future_npb(tmp_path):
     assert r['can_start'] and r['weights']['MLB']==2/3
 
 
+def test_pitch_preview_separates_world_selection_from_team_evaluation(tmp_path):
+    p=periods()['2025']
+    r=preview(tmp_path,p['start'],p['end'],None,study='pitch_game')
+    assert '가상 경기' in r['splits'][0]['purpose']
+    assert '모델을 고릅니다' in r['splits'][1]['purpose']
+    assert '사용하지 않은' in r['splits'][2]['purpose']
+
+
 def test_unavailable_npb_is_rejected_before_long_input_processing(web):
     wb,server=web;p=periods()
     with patch('subprocess.Popen',side_effect=AssertionError('MOCK_TEST_ONLY must not launch')):
