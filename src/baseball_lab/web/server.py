@@ -81,6 +81,7 @@ class Workbench:
             current=dict(self.job) if self.job else None
             if current:current['logs']=list(current['logs'])
             operation=self._operation
+        if current:self._execution_view(current)
         runs=[]
         for p in sorted(self.outputs.glob('*/task.json'),reverse=True):
             try:
@@ -89,15 +90,16 @@ class Workbench:
                 if project in ('baseball','eramatch') and (run.get('kind')!='matchup' or run.get('project')!=project):continue
                 if run['status'] in ('queued','running','cancelling') and (not current or run['id']!=current['id']):
                     run['status']='interrupted'
+                self._execution_view(run)
                 run.pop('logs',None);runs.append(run)
                 evidence=p.parent/'result/research.json'
-                if evidence.exists():
+                if evidence.exists() and run['status'] not in ('failed','interrupted','cancelled'):
                     data=json.loads(evidence.read_text(encoding='utf-8'))
                     if data.get('schema')=='E01-R1-research-v1':
                         from baseball_lab.experiments.match.reporting.summary import build_summary
                         reading=build_summary(data)
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
-                    elif data.get('schema')=='Match-pitch-decision-game-v1':
+                    elif data.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2'):
                         run['reading']={'headline':'매 공의 행동 학습 · '+('완료' if data.get('status')=='COMPLETED' else '진행 중')}
                     elif data.get('schema')=='Match-whole-game-v1':
                         data_runs=data.get('seeds',[]);completed=[s['test_after']['win_rate'] for s in data_runs if 'test_after' in s]
@@ -109,6 +111,29 @@ class Workbench:
                 if len(runs)>=30:break
             except (OSError,ValueError,KeyError):continue
         return public_view({'readiness':self.readiness(),'job':current,'operation':operation,'runs':runs})
+
+    @staticmethod
+    def _execution_view(job):
+        job['can_retry']=job.get('status') in ('failed','interrupted','cancelled') and isinstance(job.get('retry_request'),dict)
+        job.pop('retry_request',None)
+        if job.get('status') in ('failed','interrupted','cancelled'):job['report']=None
+
+    def retry(self,job_id):
+        if not isinstance(job_id,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}',job_id):
+            raise ValueError('재시도할 학습 기록을 확인하세요.')
+        path=self.outputs/job_id/'task.json'
+        self.storage._safe(path)
+        saved=json.loads(path.read_text(encoding='utf-8'))
+        if saved.get('status') not in ('failed','interrupted','cancelled'):
+            # A crashed server leaves the persisted job as running.
+            with self.lock:active=self.job and self.job['id']==job_id and self.job['status'] in ('queued','running','cancelling')
+            if saved.get('status') not in ('queued','running','cancelling') or active:
+                raise ValueError('끝난 학습은 설정 화면에서 새로 시작하세요.')
+        request=saved.get('retry_request')
+        if not isinstance(request,dict):raise ValueError('이전 버전 기록에는 설정이 없습니다. 학습 설정을 선택하고 다시 시작하세요.')
+        if request.get('kind') not in ('run','train'):raise ValueError('학습 작업만 재시도할 수 있습니다.')
+        result=self.start(request['kind'],request['options'])
+        return result
 
     @contextmanager
     def operation(self,label):
@@ -315,6 +340,9 @@ class Workbench:
             output=self.outputs/job_id;private(output,directory=True)
             job={'id':job_id,'kind':kind,'status':'queued','started_at':utc_now(),'logs':[],
                       'report':None,'message':'작업을 준비하고 있어요.'}
+            if kind in ('run','train'):
+                allowed={'source','study','start','end','episodes','seed','collected_window','league_mixture'}
+                job['retry_request']={'kind':kind,'options':{key:value for key,value in options.items() if key in allowed}}
             if kind in ('run','simulate') and source=='retrosheet':job['source_year']=start[:4]
             if kind=='run':job['study']=study
             command=[sys.executable,'-u',str(self.root/'scripts/quickstart.py'),'--data-dir',str(self.data),
@@ -352,7 +380,7 @@ class Workbench:
                             done,total=map(int,progress.groups()[:2]);unit=progress.group(3)
                             display_unit='경기' if 'whole_game' in command or 'pitch_game' in command else '이닝' if 'inning' in command else '득점 기회' if 'scoring' in command else unit
                             self.job.update(completed_episodes=done,target_episodes=total,message=f'AI 연습 {done:,}/{total:,}{display_unit} · 지금까지의 결과를 볼 수 있습니다.')
-                        if (output/'result/report.html').exists():
+                        if (output/'result/report.html').exists() and not (output/'result/failure.json').exists():
                             self.job['report']=f'/reports/{job_id}/result/report.html'
                         self.job['logs']=self.job['logs'][-120:]
                         self._persist()
@@ -373,12 +401,12 @@ class Workbench:
                     try:message=json.loads(failure.read_text(encoding='utf-8'))['error']
                     except (OSError,ValueError,KeyError):pass
                 self.job.update(status=status,message=public_text(message),exit_code=code,completed_at=utc_now(),
-                    report=f'/reports/{job_id}/result/report.html' if report.exists() else None)
+                    report=f'/reports/{job_id}/result/report.html' if report.exists() and status=='completed' else None)
                 self._persist()
         except Exception as exc:
             if process and process.poll() is None:process.terminate();process.wait(timeout=10)
             with self.lock:
-                self.job.update(status='failed',message=public_text(exc),completed_at=utc_now());self._persist()
+                self.job.update(status='failed',report=None,message=public_text(exc),completed_at=utc_now());self._persist()
         finally:
             with self.lock:
                 if self.process is process:self.process=None
@@ -507,7 +535,7 @@ def make_handler(workbench):
                             evidence['external_evaluation']=[r for r in external if r.get('run_id')==evidence['run_id']]
                             from baseball_lab.experiments.match.reporting.report import render
                             return self._html(render(evidence))
-                        if evidence.get('schema')=='Match-pitch-decision-game-v1':
+                        if evidence.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2'):
                             from baseball_lab.experiments.match.pitch_game.research import render
                             return self._html(render(evidence))
                         if evidence.get('schema')=='Match-whole-game-v1':
@@ -559,6 +587,10 @@ def make_handler(workbench):
                     if not isinstance(payload,dict):raise ValueError('올바른 작업 요청이 아닙니다.')
                     result=workbench.start(payload['kind'],payload.get('options',{}))
                 elif path=='/api/cancel':result=workbench.cancel()
+                elif path=='/api/retry':
+                    payload=json.loads(body)
+                    if not isinstance(payload,dict):raise ValueError('재시도할 학습 기록이 필요합니다.')
+                    result=workbench.retry(payload.get('id'))
                 elif path in ('/api/storage/preview','/api/storage/delete','/api/storage/verify'):
                     payload=json.loads(body)
                     if not isinstance(payload,dict):raise ValueError('올바른 자료 관리 요청이 아닙니다.')

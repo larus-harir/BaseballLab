@@ -2,7 +2,7 @@
 from random import Random
 import numpy as np
 import pytest
-from baseball_lab.experiments.match.pitch_game.research import sequence,policy,Observation,OFF,DEF,play,finish,World
+from baseball_lab.experiments.match.pitch_game.research import sequence,policy,Observation,OFF,PITCH_OFF,DEF,play,finish,World
 
 
 def turn(pitches,event):return {'pitches':pitches,'event':event,'intentional_walk':False}
@@ -38,6 +38,7 @@ class Management:
         return next((x for x in legal if x.startswith('change_')),'pitch')
 class StrikeWorld:
     pitchers=['MOCK_TEST_ONLY_0','MOCK_TEST_ONLY_1','MOCK_TEST_ONLY_2']
+    def legal(self,o):return ('take','swing')
     def pitch(self,*args):return 'strike'
     def advance(self,outs,bases,event,rng):assert event=='strikeout';return outs+1,bases,0
 
@@ -55,13 +56,13 @@ def test_learned_world_masks_impossible_actions_without_sampling_history_rows():
     from collections import Counter,defaultdict
     from baseball_lab.experiments.match.pitch_game.research import World,EVENTS
     w=World.__new__(World);w.pitchers=['MOCK_TEST_ONLY_0','MOCK_TEST_ONLY_1','MOCK_TEST_ONLY_2']
-    w.supported={'take':{'ball','strike','hbp'},'swing':{'strike','foul','out','home_run'}}
+    w.supported={'take':{'ball','strike','hbp'},'swing':{'strike','foul','out','home_run'},'bunt':{'strike','bunt_foul','out','single'}}
     w.baseline=defaultdict(Counter)
     w.pooled={a:Counter({e:1 for e in events}) for a,events in w.supported.items()}
     w.selected_iterations=100
     w.w=np.zeros((17,len(EVENTS)))
     assert not hasattr(w,'records') and not hasattr(w,'donors')
-    for action in OFF:
+    for action in PITCH_OFF:
         events={w.pitch(1,1,action,w.pitchers[0],Random(i)) for i in range(100)}
         assert events<=w.supported[action]
     assert 'home_run' not in {w.pitch(1,1,'take',w.pitchers[0],Random(i)) for i in range(100)}
@@ -124,7 +125,7 @@ def test_world_selection_never_uses_final_test_and_keeps_valid_runner_evidence()
     assert world.metrics['test']!=other.metrics['test']
     assert world.metrics['validation']['brier']<=world.metrics['validation']['baseline_brier']+1e-12
     assert world.evidence['runner_fit_turns']==6*161
-    assert world.runner[0,0,'single'][0,1,0]==6*41
+    assert world.runner[0,0,'single',False][0,1,0]==6*41
     for counts in world.evidence['coverage'].values():
         assert counts['source_turns']==counts['used_turns']+sum(counts['excluded_by_reason'].values())
         assert counts['excluded_by_reason']['unsupported_pitch_code']>0

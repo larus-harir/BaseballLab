@@ -118,7 +118,7 @@ def test_real_process_cancel_and_progress_are_recorded(tmp_path):
 
 def test_platform_match_and_observer_are_separate_pages(web):
     wb,s=web
-    for path,label in [('/','선수 가상 대결'),('/match','AI 전략 연구'),('/match/team','AI 득점 전략'),('/match/at-bat','researchSource'),('/simulation','장면 살펴보기'),('/lab/data','자료와 신뢰성')]:
+    for path,label in [('/','선수 가상 대결'),('/match','AI 전략 연구'),('/match/team','AI 야구 전략 학습'),('/match/at-bat','researchSource'),('/simulation','장면 살펴보기'),('/lab/data','자료와 신뢰성')]:
         code,body=call(s,path)
         assert code==200 and label in body.decode()
     with pytest.raises(ValueError):wb.start('simulate',{'start':'2024-03-20','end':'2024-09-30','outs':3})

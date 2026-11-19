@@ -189,7 +189,7 @@ def main():
         if not output.exists() or not any(output.iterdir()):
             from baseball_lab.tracking.evidence_report import write_report
             write_report(output,failure=failure)
-            print(f'대기 상태 관찰실: {(output/"report.html").resolve()}')
+            print('학습을 마치지 못했습니다. 연결·검사 기록을 남겼습니다. 웹 화면에서 같은 설정으로 재시도할 수 있습니다.')
             if args.open:
                 import webbrowser
                 webbrowser.open((output/'report.html').resolve().as_uri())

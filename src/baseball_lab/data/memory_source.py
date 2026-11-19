@@ -2,6 +2,10 @@
 import hashlib
 import io
 import urllib.request
+import urllib.error
+import http.client
+import ssl
+import time
 import zipfile
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -12,12 +16,29 @@ from baseball_lab.r1.provider import OfficialRedirect
 
 def fetch(url):
     if url not in {m['source_url'] for m in index()['mlb'].values()}:raise ValueError('확인한 공식 시즌 주소만 읽을 수 있습니다.')
-    with urllib.request.build_opener(OfficialRedirect()).open(url,timeout=60) as response:
-        body=response.read(32*1024*1024+1)
-        if len(body)>32*1024*1024:raise ValueError('공식 배포 압축 파일 크기 한도를 넘었습니다.')
-        expected=response.headers.get('Content-Length')
-        if expected is not None and len(body)!=int(expected):raise ValueError('자료 수신이 중간에 끊겼습니다. 다시 시작하세요.')
-        return body
+    request=urllib.request.Request(url,headers={'User-Agent':'BaseballLab/0.9 (Retrosheet research client)'})
+    for attempt in range(3):
+        try:
+            with urllib.request.build_opener(OfficialRedirect()).open(request,timeout=30) as response:
+                body=response.read(32*1024*1024+1)
+                if len(body)>32*1024*1024:raise ValueError('공식 배포 압축 파일 크기 한도를 넘었습니다.')
+                expected=response.headers.get('Content-Length')
+                if expected is not None and len(body)!=int(expected):
+                    raise http.client.IncompleteRead(b'',max(0,int(expected)-len(body)))
+                return body
+        except (OSError,http.client.HTTPException) as exc:
+            reason=exc.reason if isinstance(exc,urllib.error.URLError) else exc
+            transient=(isinstance(reason,(TimeoutError,ConnectionError,http.client.IncompleteRead,http.client.RemoteDisconnected,ssl.SSLEOFError))
+                       or isinstance(exc,urllib.error.HTTPError) and exc.code in (408,429,500,502,503,504))
+            if not transient or isinstance(reason,ssl.SSLCertVerificationError):raise
+            if attempt==2:
+                raise ConnectionError('경기 자료 연결이 반복해서 끊겼습니다. 잠시 뒤 같은 설정으로 학습을 재시도하세요. 확인된 자료를 다른 시즌이나 가상 자료로 대체하지 않았습니다.') from exc
+            delay=2**attempt
+            if isinstance(exc,urllib.error.HTTPError):
+                retry_after=exc.headers.get('Retry-After','') if exc.headers else ''
+                if retry_after.isdigit():delay=min(5,max(delay,int(retry_after)))
+            print(f'단계 1 · MLB {url.rsplit("/",1)[-1][:4]}년 자료 연결이 잠시 끊겨 다시 연결합니다 ({attempt+2}/3).',flush=True)
+            time.sleep(delay)
 
 
 class DigestReader(io.RawIOBase):
@@ -56,7 +77,7 @@ def season(root,year,local=None,*,prepared_archive=None,announce=True,game_actio
         if len(members)!=1 or members[0].filename!=f'{year}plays.csv':raise ValueError('공식 CSV 이외의 압축 경로·중복 파일을 거부했습니다.')
         info=members[0]
         if info.file_size>256*1024*1024 or info.file_size>max(1,info.compress_size)*200:raise ValueError('압축 해제 크기·압축률 한도를 넘었습니다.')
-        digest=hashlib.sha256();opened=False;dates={};labels={};approaches={};steals=[];pitch_meta={}
+        digest=hashlib.sha256();opened=False;dates={};labels={};approaches={};steals=[];pitch_meta={};running=[]
         def open_csv():
             nonlocal opened
             if opened:raise ValueError('같은 시즌의 중복 읽기를 거부했습니다.')
@@ -64,13 +85,17 @@ def season(root,year,local=None,*,prepared_archive=None,announce=True,game_actio
             return io.TextIOWrapper(io.BufferedReader(DigestReader(archive.open(info),digest)),encoding='utf-8-sig',newline='')
         def observe(line,r):
             dates[r['gid']]=max(dates.get(r['gid'],''),r['date'])
+            if pitch_actions:
+                from .pitch_actions import running_play
+                play=running_play(r,line)
+                if play:running.append(play)
             if game_actions:
                 first=next((c for c in r['pitches'] if c in 'BCFSXHILMOPQRTVYU'),'')
                 approaches[f"{r['gid']}:play{r['pn']}:csvline{line}"]='early_swing' if first in 'FSXLMOQRTY' else 'take_first' if first in 'BC' else None
                 if r['pa']=='0' and any(t.startswith(('SB','CS','POCS')) for t in r['event'].split('.',1)[0].split('+')):
                     steals.append({'game_id':r['gid'],'inning':int(r['inning']),'bottom':int(r['vis_home']),'outs':int(r['outs_pre']),'bases':sum(1<<(i-1) for i in (1,2,3) if r[f'br{i}_pre']), 'outs_added':int(r['outs_post'])-int(r['outs_pre']),'end_bases':sum(1<<(i-1) for i in (1,2,3) if r[f'br{i}_post']),'runs':int(r['runs']),'record_id':f"{r['gid']}:steal:csvline{line}",'event_codes':[r['event']]})
             if r['pa']!='1':return
-            if pitch_actions:pitch_meta[f"{r['gid']}:play{r['pn']}:csvline{line}"]={'pitches':r['pitches'],'pitcher':r['pitcher'],'event':'single' if r['single']=='1' else 'double' if r['double']=='1' else 'triple' if r['triple']=='1' else 'home_run' if r['hr']=='1' else 'strikeout' if r['k']=='1' else 'walk' if r['walk']=='1' else 'hbp' if r['hbp']=='1' else 'out'}
+            if pitch_actions:pitch_meta[f"{r['gid']}:play{r['pn']}:csvline{line}"]={'pitches':r['pitches'],'pitcher':r['pitcher'],'bunt_contact':r['bunt']=='1','event':'single' if r['single']=='1' else 'double' if r['double']=='1' else 'triple' if r['triple']=='1' else 'home_run' if r['hr']=='1' else 'strikeout' if r['k']=='1' else 'walk' if r['walk']=='1' else 'hbp' if r['hbp']=='1' else 'out'}
             classify(r)
             event='strikeout' if r['k']=='1' else 'walk' if r['walk']=='1' else 'hit' if any(r[k]=='1' for k in ('single','double','triple','hr')) else 'other'
             labels[f"{r['gid']}:play{r['pn']}:csvline{line}"]=event
@@ -87,13 +112,16 @@ def season(root,year,local=None,*,prepared_archive=None,announce=True,game_actio
             halves={(r['game_id'],r['inning'],r['bottom']) for r in data['records']}
             for r in data['records']:r['approach']=approaches.get(r['source_row_ids'][0])
             data['steal_records']=[{**s,'date':f"{dates[s['game_id']][:4]}-{dates[s['game_id']][4:6]}-{dates[s['game_id']][6:]}"} for s in steals if (s['game_id'],s['inning'],s['bottom']) in halves and 0<=s['outs']<=2 and s['outs']+s['outs_added']<=3]
-        if pitch_actions:data['pitch_turns']=[{**r,**pitch_meta[r['source_row_ids'][0]]} for r in data['records'] if len(r['source_row_ids'])==1 and r['source_row_ids'][0] in pitch_meta]
+        if pitch_actions:
+            data['pitch_turns']=[{**r,**pitch_meta[r['source_row_ids'][0]]} for r in data['records'] if len(r['source_row_ids'])==1 and r['source_row_ids'][0] in pitch_meta]
+            halves={(r['game_id'],r['inning'],r['bottom']) for r in data['records']}
+            data['pitch_running']=[{**r,'date':f"{dates[r['game_id']][:4]}-{dates[r['game_id']][4:6]}-{dates[r['game_id']][6:]}"} for r in running if (r['game_id'],r['inning'],r['bottom']) in halves]
         # Extra labels don't alter the retained source transition identity.
         return data
 
 
 def acquire(root,start,end,local,*,game_actions=False,pitch_actions=False):
-    records=[];datasets=[];checks=[];steals=[];pitch_turns=[]
+    records=[];datasets=[];checks=[];steals=[];pitch_turns=[];running=[]
     years=list(range(int(start[:4]),int(end[:4])+1))
     # One future prepares only the next bounded ZIP while the current season
     # is checked. Parsing stays sequential and no inputs are written to disk.
@@ -111,6 +139,7 @@ def acquire(root,start,end,local,*,game_actions=False,pitch_actions=False):
             print(f'단계 1 · {position+1}/{len(years)}시즌 확인 완료 · MLB {year}년',flush=True)
             if game_actions:steals.extend(s for s in data['steal_records'] if start<=s['date']<=end)
             if pitch_actions:pitch_turns.extend(r for r in data['pitch_turns'] if start<=r['date']<=end)
+            if pitch_actions:running.extend(r for r in data['pitch_running'] if start<=r['date']<=end)
             del data
     if not records:raise ValueError('기간 안에 검증된 전이 기록이 없습니다.')
     manifest={'schema':'collected-training-window-v1','source_status':'REAL_OBSERVED','storage_mode':'memory-only',
@@ -128,10 +157,12 @@ def acquire(root,start,end,local,*,game_actions=False,pitch_actions=False):
         manifest['dataset_id']=content_hash({'base':manifest['dataset_id'],'game_actions':'observed-first-pitch-and-running-v1','approaches':[(r['record_id'],r['approach']) for r in records],'steals':steals})
     if pitch_actions:
         result['pitch_turns']=pitch_turns
+        result['pitch_running']=running
         manifest['pitch_acquisition']={
             'normalized_turns':len(records),'linked_single_row_turns':len(pitch_turns),
             'unlinked_or_interrupted_turns':len(records)-len(pitch_turns),
             'policy':'Only single-source-row PAs enter pitch parsing; interrupted sequences are not stitched. Valid runner transitions are checked separately.',
-            'source_csv_sha256':checks}
-        manifest['dataset_id']=content_hash({'base':manifest['dataset_id'],'pitch_actions':'observed-pitch-sequence-v1','turns':pitch_turns})
+            'joint_running_pitches':len(running),'source_csv_sha256':checks,
+            'code_definitions':'https://www.retrosheet.org/eventfile.htm'}
+        manifest['dataset_id']=content_hash({'base':manifest['dataset_id'],'pitch_actions':'observed-bunt-running-v2','turns':pitch_turns,'running':running})
     return result

@@ -15,10 +15,12 @@ from baseball_lab.core.contracts import RuleSet
 from baseball_lab.r1.data import walk
 from baseball_lab.data.lineage import content_hash,write_json,utc_now
 
-SCHEMA='Match-pitch-decision-game-v1'
-EVENTS=('ball','strike','foul','out','single','double','triple','home_run','hbp')
-OFF=('take','swing');DEF=('pitch','intentional_walk','change_1','change_2')
-NAMES={'take':'지켜보기','swing':'스윙','pitch':'현재 투수로 투구','intentional_walk':'고의볼넷','change_1':'두 번째 투수로 교체','change_2':'세 번째 투수로 교체'}
+SCHEMA='Match-pitch-decision-game-v2'
+EVENTS=('ball','strike','foul','out','single','double','triple','home_run','hbp','bunt_foul')
+OFF=('take','swing','bunt','steal_2','steal_3')
+PITCH_OFF=('take','swing','bunt')
+MIN_ACTION_SAMPLES=10;DEF=('pitch','intentional_walk','change_1','change_2')
+NAMES={'take':'지켜보기','swing':'스윙','bunt':'번트 시도','steal_2':'지켜보며 2루 도루','steal_3':'지켜보며 3루 도루','pitch':'현재 투수로 투구','intentional_walk':'고의볼넷','change_1':'두 번째 투수로 교체','change_2':'세 번째 투수로 교체'}
 
 
 def checked_sequence(turn):
@@ -28,7 +30,7 @@ def checked_sequence(turn):
     codes = [c for c in turn['pitches'] if c.isalpha()]
     if not codes:
         return [], 'missing_sequence'
-    if any(c not in 'BCSFTXH' for c in codes):
+    if any(c not in 'BCSFTXHLMO' for c in codes):
         return [], 'unsupported_pitch_code'
     balls = strikes = 0
     rows = []
@@ -36,19 +38,19 @@ def checked_sequence(turn):
     for c in codes:
         if terminal:
             return [], 'event_count_mismatch'
-        action = 'take' if c in 'BCH' else 'swing'
+        action = ('take' if c in 'BCH' else 'bunt' if c in 'LMO' or c=='X' and turn.get('bunt_contact') else 'swing')
         event = ('ball' if c == 'B' else 'strike' if c in 'CST' else
-                 'foul' if c == 'F' else 'hbp' if c == 'H' else turn['event'])
+                 'bunt_foul' if c=='L' else 'strike' if c in 'MO' else 'foul' if c == 'F' else 'hbp' if c == 'H' else turn['event'])
         if event in ('walk', 'strikeout'):
             return [], 'event_count_mismatch'
         rows.append((balls, strikes, action, event))
         if event == 'ball':
             balls += 1
             terminal = balls == 4
-        elif event == 'strike':
+        elif event == 'strike' or event=='bunt_foul' and strikes==2:
             strikes += 1
             terminal = strikes == 3
-        elif event == 'foul':
+        elif event in ('foul','bunt_foul'):
             strikes = min(2, strikes + 1)
         else:
             terminal = True
@@ -62,7 +64,10 @@ def sequence(turn):
     return checked_sequence(turn)[0]
 
 
-def allowed(action):return ('ball','strike','hbp') if action=='take' else ('strike','foul','out','single','double','triple','home_run')
+def allowed(action):
+    if action=='take':return ('ball','strike','hbp')
+    if action=='bunt':return ('strike','bunt_foul','out','single','double','triple','home_run')
+    return ('strike','foul','out','single','double','triple','home_run')
 
 
 class World:
@@ -89,8 +94,11 @@ class World:
         def samples(key):return [(r,b,s,act,event) for r,seq in parsed[key] for b,s,act,event in seq]
         fit=samples('fit');val=samples('validation');test=samples('test')
         if len(fit)<1000 or min(len(val),len(test))<100:raise ValueError('학습·점검·평가 구간의 투구 표본이 부족합니다.')
-        self.supported={a:{e for r,b,s,action,e in fit if action==a} for a in OFF}
-        if not all(self.supported.values()):raise ValueError('스윙·지켜보기의 실제 투구 표본이 모두 필요합니다.')
+        self.supported={a:{e for r,b,s,action,e in fit if action==a} for a in PITCH_OFF}
+        if not all(self.supported[a] for a in ('take','swing')):raise ValueError('스윙·지켜보기의 실제 투구 표본이 모두 필요합니다.')
+        source_pitches={'validation':len(val),'test':len(test)}
+        val=[r for r in val if self.supported[r[3]]];test=[r for r in test if self.supported[r[3]]]
+        if min(len(val),len(test))<100:raise ValueError('학습 구간과 같은 행동으로 검사할 실제 투구가 부족합니다.')
         self.baseline=defaultdict(Counter);self.pooled=defaultdict(Counter)
         for r,b,s,a,e in fit:
             self.baseline[b,s,a][e]+=1;self.pooled[a][e]+=1
@@ -125,18 +133,32 @@ class World:
         # Runner movements do not require a readable pitch sequence. Reuse all
         # normalized fit-period completed PAs rather than discarding valid movement.
         for r in parts['fit']:
-            self.runner[r['outs'],r['bases'],r['event']][r['outs_added'],r['end_bases'],r['runs']]+=1
+            self.runner[r['outs'],r['bases'],r['event'],bool(r.get('bunt_contact'))][r['outs_added'],r['end_bases'],r['runs']]+=1
+        self.running=defaultdict(Counter)
+        for row in data.get('pitch_running',[]):
+            if self.split['fit']['dates'][0]<=row['date']<=self.split['fit']['dates'][1]:
+                self.running[row['outs'],row['bases'],row['balls'],row['strikes'],row['action']][row['pitch_event'],row['outs_added'],row['end_bases']]+=1
+        running_check={}
+        for part in ('validation','test'):
+            rows=[r for r in data.get('pitch_running',[]) if self.split[part]['dates'][0]<=r['date']<=self.split[part]['dates'][1]]
+            losses=[]
+            for r in rows:
+                counts=self.running.get((r['outs'],r['bases'],r['balls'],r['strikes'],r['action']),{})
+                if sum(counts.values())<MIN_ACTION_SAMPLES:continue
+                probability=counts.get((r['pitch_event'],r['outs_added'],r['end_bases']),0)/sum(counts.values())
+                losses.append(-math.log(max(probability,1e-12)))
+            running_check[part]={'source_plays':len(rows),'covered_plays':len(losses),'log_loss':sum(losses)/len(losses) if losses else None}
         self.metrics={}
         for key,rows in [('validation',val),('test',test)]:
             xx,yy,mm,pp=arrays(rows)
             q=pp if not selected else self.batch(xx,mm,pp)
-            self.metrics[key]={'baseline_brier':brier(pp,yy),'pitches':len(rows),
+            self.metrics[key]={'baseline_brier':brier(pp,yy),'pitches':len(rows),'source_pitches':source_pitches[key],'unsupported_action_pitches':source_pitches[key]-len(rows),
                 'log_loss':float(-np.log(np.maximum(q[np.arange(len(q)),yy],1e-12)).mean()),
                 'brier':brier(q,yy)}
         if not all(math.isfinite(m['brier']) for m in self.metrics.values()):
             raise ValueError('투구 예측 검사에서 유효하지 않은 확률이 나왔습니다.')
         from baseball_lab.data.compact import mlb_names
-        self.evidence={'pitcher_names':{p:mlb_names().get(p,p) for p in self.pitchers},'model':'frequency-residual-pitch-world-v2','selected_iterations':selected,'selection':{'criterion':'lowest validation Brier; frequency wins ties; test never used','candidates':candidates},'coverage':coverage,'runner_fit_turns':len(parts['fit']),'fit_pitcher_scope':'All usable fit-period pitchers train the shared world; three fit-only identities form the experimental roster. Other identities use the learned pooled feature.','fit_pitches':len(fit),'pitchers':self.pitchers,'split':self.split,'holdout_prediction':self.metrics,'excluded_turns':len(turns)-sum(len(v) for v in parsed.values()),'source_dataset_id':data['manifest']['dataset_id'],'causal_validity':'unverified observed-action association; not a physical or identified intervention model'}
+        self.evidence={'pitcher_names':{p:mlb_names().get(p,p) for p in self.pitchers},'model':'frequency-residual-bunt-running-world-v3','action_support':{'minimum_observed_per_count_state':MIN_ACTION_SAMPLES,'bunt_count_pitches':{f'{b}-{st}':sum(self.baseline[b,st,'bunt'].values()) for b in range(4) for st in range(3)},'running_fit_plays':sum(sum(c.values()) for c in self.running.values()),'running_supported_cells':sum(sum(c.values())>=MIN_ACTION_SAMPLES for c in self.running.values()),'running_holdout':running_check,'meaning':'Conditional observational actions, not causal estimates. Steals keep the observed joint pitch/count and runner transition; only called-ball/strike isolated SB/CS evidence.'},'selected_iterations':selected,'selection':{'criterion':'lowest validation Brier; frequency wins ties; test never used','candidates':candidates},'coverage':coverage,'runner_fit_turns':len(parts['fit']),'fit_pitcher_scope':'All usable fit-period pitchers train the shared world; three fit-only identities form the experimental roster. Other identities use the learned pooled feature.','fit_pitches':len(fit),'pitchers':self.pitchers,'split':self.split,'holdout_prediction':self.metrics,'excluded_turns':len(turns)-sum(len(v) for v in parsed.values()),'source_dataset_id':data['manifest']['dataset_id'],'causal_validity':'unverified observed-action association; not a physical or identified intervention model'}
 
     def vector(self,b,s,action,pitcher):
         return [1.,*(float(i==b*3+s) for i in range(12)),float(action=='swing'),*(float(pitcher==p) for p in self.pitchers)]
@@ -153,12 +175,24 @@ class World:
         prior=self.frequency(b,s,action)
         q=prior if not self.selected_iterations else self.batch(np.array([self.vector(b,s,action,pitcher)]),self.mask(action)[None,:],prior[None,:])[0]
         return rng.choices(EVENTS,weights=q,k=1)[0]
-    def advance(self,outs,bases,event,rng):
+    def legal(self,o):
+        legal=['take','swing']
+        if sum(self.baseline[o.balls,o.strikes,'bunt'].values())>=MIN_ACTION_SAMPLES:
+            terminal=self.supported['bunt']&{'out','single','double','triple'}
+            if all(self.runner.get((o.outs,o.bases,event,True)) for event in terminal):legal.append('bunt')
+        for action in ('steal_2','steal_3'):
+            if sum(self.running.get((o.outs,o.bases,o.balls,o.strikes,action),{}).values())>=MIN_ACTION_SAMPLES:legal.append(action)
+        return tuple(legal)
+    def run(self,o,action,rng):
+        counts=self.running[o.outs,o.bases,o.balls,o.strikes,action]
+        if sum(counts.values())<MIN_ACTION_SAMPLES:raise ValueError('이 도루 상황의 실제 투구·주자 이동 표본이 부족합니다.')
+        return rng.choices(tuple(counts),weights=tuple(counts.values()),k=1)[0]
+    def advance(self,outs,bases,event,rng,*,bunt=False):
         if event in ('walk','hbp'):
             end,runs=walk(bases);return outs,end,runs
         if event=='strikeout':return outs+1,bases if outs<2 else 0,0
         if event=='home_run':return outs,0,1+bases.bit_count()
-        counts=self.runner[outs,bases,event]
+        counts=self.runner[outs,bases,event,bunt]
         if not counts:raise ValueError(f'{outs}아웃·주자{bases}·{event}의 실제 진루 전이 표본이 없습니다. 결과를 만들지 않고 중단합니다.')
         # Draw a modeled transition code from fitted frequencies, never a historical row.
         delta,end,runs=rng.choices(tuple(counts),weights=tuple(counts.values()),k=1)[0]
@@ -170,7 +204,7 @@ class Observation:
 FEATURES=('bias','inning','bottom','outs','first','second','third','difference','balls','strikes','pitcher','faced')
 def features(o,role):
     return np.array([1,o.inning/9,o.bottom,o.outs/2,*(int(bool(o.bases&(1<<i))) for i in range(3)),math.tanh((o.difference if role=='batter' else -o.difference)/5),o.balls/3,o.strikes/2,o.pitcher/2,min(o.faced/12,1)])
-def policy(role,seed):return NeuralPolicy(role,seed,actions=OFF if role=='batter' else DEF,feature_encoder=features,feature_names=FEATURES,observation_schema=SCHEMA,action_schema='pitch-swing-and-pitcher-management-v1')
+def policy(role,seed):return NeuralPolicy(role,seed,actions=OFF if role=='batter' else DEF,feature_encoder=features,feature_names=FEATURES,observation_schema=SCHEMA,action_schema='pitch-bunt-running-and-management-v2')
 
 
 def play(world,teams,seed,record=False,home_team=1):
@@ -191,14 +225,26 @@ def play(world,teams,seed,record=False,home_team=1):
                         if record:events.append({'inning':inning,'bottom':batting,'balls':balls,'strikes':strikes,'outs':outs,'bases':bases,'offense':None,'defense':p,'pitcher_id':world.pitchers[active[fielding]],'event':'pitcher_change','batting_team':order[batting],'scores_before':[score[order.index(i)] for i in (0,1)]})
                         continue
                     half_ended[fielding]=False
-                    b=None if p=='intentional_walk' else teams[order[batting]][0].act(o,OFF,rng)
+                    offense_legal=world.legal(o)
+                    b=None if p=='intentional_walk' else teams[order[batting]][0].act(o,offense_legal,rng)
                     if b is not None:counts[order[batting]][b]+=1
-                    event='walk' if p=='intentional_walk' else world.pitch(balls,strikes,b,world.pitchers[active[fielding]],rng)
-                    state=State(4,strikes,'walk') if event in ('walk','hbp') else transition(State(balls,strikes),event,RuleSet());terminal=state.result
+                    running=b in ('steal_2','steal_3')
+                    if running:event,run_outs,run_bases=world.run(o,b,rng)
+                    else:event='walk' if p=='intentional_walk' else world.pitch(balls,strikes,b,world.pitchers[active[fielding]],rng)
+                    rule_event='strike' if event=='bunt_foul' and strikes==2 else 'foul' if event=='bunt_foul' else event
+                    state=State(4,strikes,'walk') if event in ('walk','hbp') else transition(State(balls,strikes),rule_event,RuleSet());terminal=state.result
                     if record:events.append({'inning':inning,'bottom':batting,'balls':balls,'strikes':strikes,'outs':outs,'bases':bases,'offense':b,'defense':p,'pitcher_id':world.pitchers[active[fielding]],'event':event,'batting_team':order[batting],'scores_before':[score[order.index(i)] for i in (0,1)]})
+                    if record and b is not None:
+                        events[-1]['legal_offense']=list(offense_legal)
+                        actor=teams[order[batting]][0]
+                        if hasattr(actor,'probabilities'):events[-1]['offense_probabilities']=dict(zip(OFF,map(float,actor.probabilities(o,offense_legal))))
                     balls,strikes=state.balls,state.strikes
+                    if running:
+                        outs+=run_outs;bases=run_bases
+                        if record:events[-1].update(after_outs=outs,after_bases=bases,running_outs=run_outs)
+                        if outs>=3:break
                     if terminal:
-                        outs,bases,runs=world.advance(outs,bases,'hbp' if event=='hbp' else terminal,rng)
+                        outs,bases,runs=world.advance(outs,bases,'hbp' if event=='hbp' else terminal,rng,**({'bunt':True} if b=='bunt' else {}))
                         if batting and inning>=9 and score[1]+runs>score[0] and terminal!='home_run':runs=min(runs,score[0]-score[1]+1)
                         score[batting]+=runs;faced[fielding]+=1
                         if record:events[-1].update(scores=[score[order.index(i)] for i in (0,1)],runs=runs,after_outs=outs,after_bases=bases)
@@ -220,13 +266,13 @@ def evaluate(world, teams, n, seed):
     return {'games': n, 'wins': [sum(g['winner'] == team for g in games) for team in (0, 1)]}
 
 
-def choice_probes(teams):
+def choice_probes(teams,world):
     """Compare the same situations over time, independent of visited states."""
     situations = [('first_pitch', Observation(1,0,0,0,0,0,0,0,0)),
                   ('two_strikes', Observation(1,0,0,0,0,0,2,0,0)),
                   ('late_runner_second', Observation(9,1,1,2,0,0,0,0,3))]
     return [{'situation': name, 'teams': [
-        {'swing': float(team[0].probabilities(obs, OFF)[1]),
+        {'swing': float(team[0].probabilities(obs,world.legal(obs))[1]),'offense':dict(zip(OFF,map(float,team[0].probabilities(obs,world.legal(obs))))),
          'defense': dict(zip(DEF, map(float, team[1].probabilities(obs, DEF))))}
         for team in teams]} for name, obs in situations]
 
@@ -237,14 +283,14 @@ def train(data,start,end,output,config):
     if data['manifest']['source_status']!='REAL_OBSERVED':raise ValueError('실제 자료가 필요합니다.')
     world=World(data);output.mkdir(parents=True,exist_ok=True)
     result={'schema':SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
-        'reward':'team final win +1 / loss -1 only; both A and B train','limitations':['No pitch type, location, velocity or batted-ball direction is inferred.','Conditional pitch outcomes remain observational associations, not proven causal effects.','The same fit-only world is used for new-random-seed game evaluations; future pitch prediction is tested separately.','Three fit-period pitchers form a symmetric experimental roster, not an MLB club roster.','Source regular innings 1-8 are transported to late innings and extras; that transport is unvalidated.','Rules: 9 innings, walkoff, home lead skips bottom ninth, extras start runner on second, 18-inning/100-pitch safety limits abort rather than invent outcomes.','Runner transitions use fitted observed frequencies; sparse states stop rather than fabricate outcomes.']}
+        'reward':'team final win +1 / loss -1 only; both A and B train','limitations':['No pitch type, location, velocity or batted-ball direction is inferred. Bunt and take-with-steal actions use observed count/state support; no chosen outcome is a policy action.','Conditional pitch outcomes remain observational associations, not proven causal effects.','The same fit-only world is used for new-random-seed game evaluations; future pitch prediction is tested separately.','Three fit-period pitchers form a symmetric experimental roster, not an MLB club roster.','Source regular innings 1-8 are transported to late innings and extras; that transport is unvalidated.','Rules: 9 innings, walkoff, home lead skips bottom ninth, extras start runner on second, 18-inning/100-pitch safety limits abort rather than invent outcomes.','Runner transitions use fitted observed frequencies; sparse states stop rather than fabricate outcomes.']}
     import subprocess
     source_root=Path(__file__).resolve().parents[3]
     result['source_hash']=content_hash({str(p.relative_to(source_root)):p.read_text(encoding='utf-8') for p in sorted(source_root.rglob('*.py'))})
     try:result['code_commit']=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     except (OSError,subprocess.CalledProcessError):result['code_commit']='unknown'
     result['run_id']=content_hash({'schema':SCHEMA,'data':data['manifest']['dataset_id'],'config':asdict(config),'code':result['source_hash']})
-    write_json(output/'world.json',{'evidence':world.evidence,'weights':world.w.tolist(),'frequency_counts':[{'balls':b,'strikes':s,'action':a,'counts':dict(c)} for (b,s,a),c in world.baseline.items()],'pooled_counts':{a:dict(c) for a,c in world.pooled.items()},'events':EVENTS,'supported_events':{a:sorted(v) for a,v in world.supported.items()},'runner_counts':[{'outs':o,'bases':b,'event':e,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,e),counter in world.runner.items()],'settings':{'optimizer':'minibatch gradient descent','iterations':500,'batch':1024,'learning_rate':.08,'l2':.0001,'random_seed':83,'selected_iterations':world.selected_iterations,'selection':'validation Brier only; frequency candidate included'}})
+    write_json(output/'world.json',{'evidence':world.evidence,'weights':world.w.tolist(),'frequency_counts':[{'balls':b,'strikes':s,'action':a,'counts':dict(c)} for (b,s,a),c in world.baseline.items()],'pooled_counts':{a:dict(c) for a,c in world.pooled.items()},'events':EVENTS,'supported_events':{a:sorted(v) for a,v in world.supported.items()},'running_counts':[{'outs':o,'bases':b,'balls':balls,'strikes':strikes,'action':a,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,balls,strikes,a),counter in world.running.items()],'runner_counts':[{'outs':o,'bases':b,'event':e,'bunt':bunt,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,e,bunt),counter in world.runner.items()],'settings':{'optimizer':'minibatch gradient descent','iterations':500,'batch':1024,'learning_rate':.08,'l2':.0001,'random_seed':83,'selected_iterations':world.selected_iterations,'selection':'validation Brier only; frequency candidate included'}})
     for seed in config.seeds:
         teams=[(policy('batter',seed+i*2),policy('pitcher',seed+i*2+1)) for i in range(2)];initial=[[a.frozen() for a in t] for t in teams];batches=[[[],[]],[[],[]]];history=[]
         def checkpoint(done):
@@ -260,7 +306,7 @@ def train(data,start,end,output,config):
                 against_initial.append({'games':comparison['games'],'wins':comparison['wins'][i]})
             history.append({'games':done,'A_wins':head['wins'][0],'B_wins':head['wins'][1],
                 'evaluation_games':head['games'],'against_initial':against_initial,
-                'choice_probes':choice_probes(teams),
+                'choice_probes':choice_probes(teams,world),
                 'evaluation_scope':'new simulated games in fit-only world; initial neural opponents are frozen, not human strategies',
                 'seed_bank':bank})
             write_json(output/'checkpoints'/f'{seed}-{done}.json',{'schema':SCHEMA,'teams':[[a.state_dict() for a in t] for t in teams]})

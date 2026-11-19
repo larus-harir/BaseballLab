@@ -47,6 +47,36 @@ def test_memory_fetch_only_accepts_reviewed_official_urls():
     with pytest.raises(ValueError,match='공식 시즌'):memory_source.fetch('https://example.invalid/MOCK_TEST_ONLY.zip')
 
 
+@pytest.mark.parametrize('error',[TimeoutError('MOCK_TEST_ONLY SSL handshake timed out'),ConnectionResetError(10054,'MOCK_TEST_ONLY reset')])
+def test_transient_transport_retries_without_writing_or_changing_source(tmp_path,error):
+    import io
+    from unittest.mock import MagicMock
+    from urllib.error import URLError
+    body=b'MOCK_TEST_ONLY complete distribution';response=io.BytesIO(body)
+    response.headers={'Content-Length':str(len(body))}
+    opener=MagicMock();opener.open.side_effect=[URLError(error),response]
+    url=compact.index()['mlb']['2025']['source_url']
+    with patch('urllib.request.build_opener',return_value=opener),patch.object(memory_source.time,'sleep') as pause:
+        assert memory_source.fetch(url)==body
+    assert opener.open.call_count==2 and pause.call_count==1
+    assert all(call.args[0].full_url==url for call in opener.open.call_args_list)
+    assert not list(tmp_path.rglob('*'))
+
+
+def test_retry_is_bounded_and_does_not_retry_access_or_certificate_rejections():
+    import ssl
+    from urllib.error import HTTPError,URLError
+    from unittest.mock import MagicMock
+    url=compact.index()['mlb']['2025']['source_url']
+    for error,attempts in [(URLError(TimeoutError('MOCK_TEST_ONLY timeout')),3),
+                           (HTTPError(url,403,'MOCK_TEST_ONLY denied',{},None),1),
+                           (URLError(ssl.SSLCertVerificationError('MOCK_TEST_ONLY certificate')),1)]:
+        opener=MagicMock();opener.open.side_effect=error
+        with patch('urllib.request.build_opener',return_value=opener),patch.object(memory_source.time,'sleep'):
+            with pytest.raises((ConnectionError,URLError)):memory_source.fetch(url)
+        assert opener.open.call_count==attempts
+
+
 def test_np_b_date_cutoff_has_no_future_observations():
     with pytest.raises(ValueError,match='검사 시작 전'):compact.npb_before('2025-01-01')
     data=compact.npb_before('2025-07-01')
