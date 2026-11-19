@@ -9,7 +9,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     browser=pw.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox']);page=browser.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     page.goto(base+'/match');page.locator('a[href="/match/team?study=pitch_game"]').first.click()
     expect(page.locator('#study')).to_have_value('pitch_game');expect(page.locator('#recordSeason')).to_have_value('collected:2025',timeout=30000)
-    page.locator('#episodes').fill('20');expect(page.locator('#trainBtn')).to_be_enabled(timeout=30000)
+    page.locator('#trainingData').select_option('legacy');page.locator('#episodes').fill('20');expect(page.locator('#trainBtn')).to_be_enabled(timeout=30000)
     original_popen=subprocess.Popen
     def connection_failure(command,**kwargs):
         if '--mode' not in command:return original_popen(command,**kwargs)

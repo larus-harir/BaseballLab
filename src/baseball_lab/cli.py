@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from baseball_lab.data.lineage import RawSource, utc_now
+from baseball_lab.data.lineage import RawSource, utc_now, content_hash
 from baseball_lab.experiments.registry import REPOSITORY_ROOT
 
 
@@ -19,6 +19,9 @@ def main():
     parser.add_argument('--model',type=Path,help='실제 데이터로 보정·독립 검증한 model.json')
     parser.add_argument('--start');parser.add_argument('--end')
     parser.add_argument('--collected-window',action='store_true',help='확보한 여러 시즌의 실제 플레이로 학습')
+    parser.add_argument('--pitch-corpus',action='store_true',help='정규화한 다중 리그·연도 투구 자료로 학습')
+    parser.add_argument('--corpus-leagues',nargs='+',choices=('MLB','KBO','NPB'))
+    parser.add_argument('--corpus-seasons',nargs='+',type=int)
     parser.add_argument('--league-mixture',help='이닝 학습의 리그 환경 비중 JSON. 예: {"MLB":1,"KBO":1,"NPB":1}')
     parser.add_argument('--train-before',default='2024-05-04');parser.add_argument('--test-from',default='2024-05-05')
     parser.add_argument('--usage-note',default='Local exploratory research; terms not independently verified by software; no redistribution grant')
@@ -63,7 +66,8 @@ def main():
             try:mixture=validate(REPOSITORY_ROOT,json.loads(args.league_mixture))
             except json.JSONDecodeError:raise ValueError('리그 비중 JSON을 확인하세요.') from None
             args.collected_window=True
-        if args.mode in ('scoring','inning','whole_game','pitch_game','simulate'):
+        if args.pitch_corpus and args.mode!='pitch_game':raise ValueError('공통 투구 자료는 매 공의 행동 학습에서 사용합니다.')
+        if args.mode in ('scoring','inning','whole_game','pitch_game','simulate') and not args.pitch_corpus:
             from baseball_lab.data.retrosheet_releases import validate_period
             minimum=1 if args.mode=='simulate' and args.observation_source=='observed' else 3
             if args.collected_window:
@@ -87,11 +91,21 @@ def main():
             from baseball_lab.data.memory_source import acquire as acquire_pitches
             from baseball_lab.experiments.match.pitch_game.research import train
             from baseball_lab.experiments.match.team_win.training import Config
-            validate_window(REPOSITORY_ROOT,args.start,args.end)
-            dataset=acquire_pitches(REPOSITORY_ROOT,args.start,args.end,sources(REPOSITORY_ROOT),pitch_actions=True)
-            print('단계 2 · 실제 투구 순서로 야구 결과 모델을 학습합니다.',flush=True)
+            world=None
+            if args.pitch_corpus:
+                from baseball_lab.experiments.match.pitch_game.corpus_world import CorpusWorld,ASSET_SHA256
+                print('단계 1 · 선택한 리그·연도의 투구와 진루 기록으로 경기 환경을 만듭니다.',flush=True)
+                world=CorpusWorld(args.corpus_leagues,args.corpus_seasons)
+                dataset={'manifest':{'schema':'multileague-pitch-counts-v2','source_status':'REAL_OBSERVED','asset_sha256':ASSET_SHA256,
+                    'dataset_id':content_hash({'asset_sha256':ASSET_SHA256,'selected_cohorts':sorted(world.cohorts)}),
+                    'selected_cohorts':list(world.cohorts),'source_sha256':[s['signature'] for s in world.evidence['sources']],
+                    'credit':[s['credit'] for s in world.evidence['sources']]}}
+            else:
+                validate_window(REPOSITORY_ROOT,args.start,args.end)
+                dataset=acquire_pitches(REPOSITORY_ROOT,args.start,args.end,sources(REPOSITORY_ROOT),pitch_actions=True)
+            print('단계 2 · 실제 기록으로 검사한 경기 환경에서 두 팀이 승리를 목표로 학습합니다.',flush=True)
             seeds=tuple(int(s) for s in args.seeds.split(',')) if args.seeds else (args.seed,args.seed+1,args.seed+2)
-            train(dataset,args.start,args.end,output,Config(args.episodes,seeds,args.evaluate_every,args.evaluation_n))
+            train(dataset,args.start,args.end,output,Config(args.episodes,seeds,args.evaluate_every,args.evaluation_n),world=world)
         elif args.mode=='whole_game':
             from baseball_lab.data.training_window import sources,validate_window
             from baseball_lab.data.memory_source import acquire as acquire_game

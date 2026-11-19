@@ -99,7 +99,7 @@ class Workbench:
                         from baseball_lab.experiments.match.reporting.summary import build_summary
                         reading=build_summary(data)
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
-                    elif data.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2'):
+                    elif data.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3'):
                         run['reading']={'headline':'매 공의 행동 학습 · '+('완료' if data.get('status')=='COMPLETED' else '진행 중')}
                     elif data.get('schema')=='Match-whole-game-v1':
                         data_runs=data.get('seeds',[]);completed=[s['test_after']['win_rate'] for s in data_runs if 'test_after' in s]
@@ -273,6 +273,9 @@ class Workbench:
                 if source not in ('statcast','retrosheet'):raise ValueError('지원하지 않는 자료 연결입니다.')
                 study=options.get('study','one_run')
                 if study not in ('one_run','half_inning','whole_game','pitch_game'):raise ValueError('학습 목표를 확인하세요.')
+                use_corpus=options.get('pitch_corpus',False)
+                if type(use_corpus) is not bool:raise ValueError('공통 투구 자료 선택을 확인하세요.')
+                if use_corpus and (kind!='run' or study!='pitch_game'):raise ValueError('공통 투구 자료는 매 공의 행동 학습에서 사용합니다.')
                 if study in ('half_inning','whole_game','pitch_game') and source!='retrosheet':raise ValueError('이닝 득점 학습은 공식 경기 기록으로 실행합니다.')
                 mixture=options.get('league_mixture')
                 if mixture is not None:
@@ -280,7 +283,15 @@ class Workbench:
                     if source!='retrosheet' or study!='half_inning' or kind!='run':raise ValueError('리그 혼합은 이닝 득점 학습에서 선택하세요.')
                     mixture=validate(self.root,mixture)
                     options={**options,'collected_window':True}
-                if source=='retrosheet':
+                if use_corpus:
+                    from baseball_lab.experiments.match.pitch_game.corpus_world import inventory
+                    catalog=inventory()['cohorts'];leagues=options.get('corpus_leagues',['MLB','KBO','NPB']);seasons=options.get('corpus_seasons')
+                    if not isinstance(leagues,list) or not leagues or any(not isinstance(l,str) or l not in ('MLB','KBO','NPB') for l in leagues):raise ValueError('학습할 리그를 하나 이상 선택하세요.')
+                    if seasons is not None and (not isinstance(seasons,list) or not seasons or any(type(s) is not int for s in seasons)):raise ValueError('학습할 연도를 확인하세요.')
+                    selected=[c for c in catalog if c['league'] in leagues and (not seasons or c['season'] in seasons)]
+                    if not selected:raise ValueError('선택한 리그·연도에 투구 학습 자료가 없습니다.')
+                    start=f'{min(c["season"] for c in selected)}-01-01';end=f'{max(c["season"] for c in selected)}-12-31';collected=False
+                elif source=='retrosheet':
                     from baseball_lab.data.retrosheet_releases import validate_period
                     minimum=1 if kind=='simulate' and options.get('observation_source')=='observed' else 3
                     collected=options.get('collected_window',False)
@@ -307,6 +318,9 @@ class Workbench:
                 if study in ('whole_game','pitch_game'):
                     extra[1]=study
                     if '--collected-window' not in extra:extra.append('--collected-window')
+                if use_corpus:
+                    extra.extend(['--pitch-corpus','--corpus-leagues',*leagues])
+                    if seasons:extra.extend(['--corpus-seasons',*map(str,seasons)])
                 if source=='retrosheet' and kind=='run':
                     if seed>2**31-3:raise ValueError('여러 재현 번호를 만들기 위해 seed는 2,147,483,645 이하여야 합니다.')
                     extra.extend(['--evaluation-n','20' if study in ('whole_game','pitch_game') else '100' if mixture is not None else '500'])
@@ -341,7 +355,7 @@ class Workbench:
             job={'id':job_id,'kind':kind,'status':'queued','started_at':utc_now(),'logs':[],
                       'report':None,'message':'작업을 준비하고 있어요.'}
             if kind in ('run','train'):
-                allowed={'source','study','start','end','episodes','seed','collected_window','league_mixture'}
+                allowed={'source','study','start','end','episodes','seed','collected_window','league_mixture','pitch_corpus','corpus_leagues','corpus_seasons'}
                 job['retry_request']={'kind':kind,'options':{key:value for key,value in options.items() if key in allowed}}
             if kind in ('run','simulate') and source=='retrosheet':job['source_year']=start[:4]
             if kind=='run':job['study']=study
@@ -472,6 +486,11 @@ def make_handler(workbench):
                 try:self._json(workbench.state(parse_qs(urlparse(self.path).query).get('project',[None])[0]))
                 except ValueError as exc:self._json({'error':str(exc)},400)
             elif path=='/api/storage':self._json(workbench.storage.inventory())
+            elif path=='/api/pitch-corpus':
+                try:
+                    from baseball_lab.experiments.match.pitch_game.corpus_world import inventory
+                    self._json(inventory())
+                except (ValueError,OSError,KeyError) as exc:self._json({'error':public_text(exc)},400)
             elif path=='/api/catalog':
                 try:self._json(public_view({'schema':'dataset-index-v1','sources':workbench.catalog.list_sources()}))
                 except (ValueError,KeyError,TypeError,OSError) as exc:self._json({'error':public_text(exc)},400)
@@ -535,7 +554,7 @@ def make_handler(workbench):
                             evidence['external_evaluation']=[r for r in external if r.get('run_id')==evidence['run_id']]
                             from baseball_lab.experiments.match.reporting.report import render
                             return self._html(render(evidence))
-                        if evidence.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2'):
+                        if evidence.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3'):
                             from baseball_lab.experiments.match.pitch_game.research import render
                             return self._html(render(evidence))
                         if evidence.get('schema')=='Match-whole-game-v1':

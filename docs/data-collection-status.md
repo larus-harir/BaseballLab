@@ -56,3 +56,29 @@ python scripts/collect_npb_community.py
 ```
 
 한 번에 최대 두 요청만 진행한다. 공식 자료 배포 여부·권리·실제 열 정의를 확인하며 확장한다. 누락된 피안타 세부 항목이나 투구 위치를 임의로 생성하지 않으며, NPB 투구 이닝의 `.1`·`.2`는 소수가 아니라 각각 아웃 1개·2개로 처리한다. 리그 간 보정되지 않은 기록을 동일한 실력 척도로 취급하지 않는다.
+
+
+## 다리그 투구 학습 자료 (2026-11-19)
+
+계획만 등록한 것이 아니라 아래 공개 CSV를 실제 내려받아 해시 확인·정규화했습니다. 원본은 `data/local/pitch-sources/`, 정규화 DB는 `data/local/pitch-corpus/`에 새 버전으로 보존합니다.
+
+| 출처 | 확보 범위 | 실제 CSV / 크기 | 정규화된 상세 투구 |
+|---|---|---|---|
+| [Peter Schale / MLB Gameday](https://www.kaggle.com/datasets/pschale/mlb-pitch-data-20152018), v2 | 2015~2019 | 8개 / 1,055,393,596바이트 | 3,595,930행 |
+| [NextPitchh / KBO_Crawler](https://github.com/NextPitchh/KBO_Crawler), `18a5810d188c81f989499844ef525dbb594a29d1` | 2016~2025 정규시즌 | canonical PBP 7,197개 / 286,682,618바이트 | 2,194,106행 |
+| [armstjc / NPB](https://github.com/armstjc/Nippon-Baseball-Data-Repository), `5f9108abdaf7db69d3ca976381cf5f59716e75e8` | 2019~2026 관측 범위 | PBP 73개 / 2,119,711,622바이트 | 1,911,161행 |
+
+원본 총 3,461,787,836바이트이며 미해석·중복·충돌 행을 보존한 채 학습 모집단에서 제외합니다. MLB는 14행, KBO는 54행의 투구 전 카운트가 모호했습니다. NPB는 정규시즌 외·비투구·상황 결측 등을 제외하고, 완전 중복 13,389행 및 충돌한 물리 투구 ID 451개를 격리했습니다. 충돌 ID의 모든 버전을 모델에서 제외하며 단순 중복과 별도로 셉니다. 최종 진루 연결 검사에서 다음 타석 첫 공 누락·연속 투구 행 누락이 확인된 NPB 97건·KBO 1건도 파생 진루 계수에서 제외했습니다. 파생 계수 원문에는 남아 있는 물리 규칙 불일치 진루 21건(예: 2루타 뒤 타자만 1루 잔류)은 환경 모델 작성 시 제외하며 결과의 `invalid_fit_movement_observations_excluded`에 기록합니다. 현 정규화 DB는 관측 보존 층이며 모든 행이 최종 모델에 사용된다는 뜻은 아닙니다.
+
+기존 Retrosheet 2000~2025도 연결했습니다. 겹치는 MLB 2015~2019의 상세 투구는 Gameday만 사용하고, MLB 진루는 Retrosheet만 사용합니다. 나머지 21개 MLB 연도는 실제 투구 코드의 카운트·타격·주루를 사용하며 구종·코스는 결측으로 남깁니다. 합계 44개 환경, **약 1,968만 개 투구**가 학습·중간 점검·최종 검사 계수에 포함됩니다. 상세 투구 DB와 기존 Retrosheet 코드의 합계이며 약 770만 개 상세 투구와 다시 더하지 않습니다.
+
+새 앱 기본 학습은 압축된 약 1.81MB 파생 계수만 읽습니다. 원본 전체를 사용자 PC에 설치하지 않습니다. 원본 SHA-256 목록·정규화 지문·검사 날짜·선택 제공자·필드별 한계를 계수 묶음에 보존합니다. 제공자의 공개 배포와 원천의 권리 확인은 구별합니다. MLB 배포자는 `Data files © Original Authors`, KBO 저장소는 명시된 데이터 라이선스 없음, NPB 배포자는 출처 표시를 포함한 MIT형 조건입니다. MLB/KBO/NPB의 upstream 권리를 모두 독립 검증했다고 주장하지 않으며 원본 CSV는 재배포하지 않습니다. 공식 KBO/NPB 수집 제한도 그대로 유지합니다.
+
+수집·정규화·파생 계수 작성의 재현 경로:
+
+```bash
+python scripts/collect_pitch_corpus.py --leagues MLB KBO NPB --normalize
+python scripts/prepare_pitch_corpus.py --output outputs/new-pitch-corpus.json.gz
+```
+
+이는 개발용 대용량 자료 준비 명령이며 일반 사용자는 실행할 필요가 없습니다. 고정 버전·파일 크기·Git blob·SHA-256을 검사하고, 새 출력에만 기록합니다. 기존 원본·결과·가중치는 수정하지 않습니다. 이후 자료가 늘어도 새 계수의 검증·해시 고정 후에만 앱에 반영합니다.

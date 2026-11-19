@@ -20,3 +20,21 @@ MLB display names: Retrosheet official biofile0.csv from
 https://www.retrosheet.org/downloads/biodata.zip
 Only player ID and published display name are retained; other personal fields are omitted.
 Source ZIP/CSV SHA-256 and parsing encoding are in mlb-names-v1.json.gz provenance.
+
+Pitch-pattern training counts v2 (derived counts, no raw CSV redistribution):
+MLB Gameday public CSV distribution by Peter Schale, Kaggle version 2:
+https://www.kaggle.com/datasets/pschale/mlb-pitch-data-20152018
+Publisher declaration: Data files © Original Authors. Upstream rights unverified.
+KBO public CSV distribution by NextPitchh KBO_Crawler, revision
+18a5810d188c81f989499844ef525dbb594a29d1 (Naver Sports derived):
+https://github.com/NextPitchh/KBO_Crawler
+No explicit dataset license identified; upstream rights unverified.
+NPB PBP: Copyright (c) 2023 Joseph Armstrong; see NPB_LICENSE.txt.
+This uses data sourced from the Nippon Baseball Data Repository, which can be accessed here:
+https://github.com/armstjc/Nippon-Baseball-Data-Repository
+Revision 5f9108abdaf7db69d3ca976381cf5f59716e75e8; upstream SPAIA rights unverified.
+Changes: source-specific pre-count normalization, nonregular/ambiguous/conflicting
+rows excluded, optional missing fields retained, fit-only speed bands and
+chronological categorical pitch/runner counts. Raw rows and trained weights omitted.
+Overlapping MLB providers are selected, never summed; Retrosheet attribution above
+also applies to MLB count-only years and native runner movements.

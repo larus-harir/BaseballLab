@@ -201,6 +201,7 @@ class World:
 @dataclass(frozen=True)
 class Observation:
     inning:int;bottom:int;outs:int;bases:int;difference:int;balls:int;strikes:int;pitcher:int;faced:int
+    league:str='';season:int=0;pitch_family_cue:str='';location_cue:str='';speed_cue:str=''
 FEATURES=('bias','inning','bottom','outs','first','second','third','difference','balls','strikes','pitcher','faced')
 def features(o,role):
     return np.array([1,o.inning/9,o.bottom,o.outs/2,*(int(bool(o.bases&(1<<i))) for i in range(3)),math.tanh((o.difference if role=='batter' else -o.difference)/5),o.balls/3,o.strikes/2,o.pitcher/2,min(o.faced/12,1)])
@@ -208,15 +209,16 @@ def policy(role,seed):return NeuralPolicy(role,seed,actions=OFF if role=='batter
 
 
 def play(world,teams,seed,record=False,home_team=1):
+    if hasattr(world,'begin_game'):world.begin_game(seed)
     order=(1-home_team,home_team);rng=Random(seed);score=[0,0];events=[];active=[0,0];used=[{0},{0}];faced=[0,0];half_ended=[True,True];counts=[Counter(),Counter()]
     for inning in range(1,19):
         for batting in (0,1):
-            if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order)
+            if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None))
             fielding=1-batting;outs=0;bases=2 if inning>9 else 0
             for pa in range(200):
                 balls=strikes=0
                 for pitch in range(100):
-                    o=Observation(inning,batting,outs,bases,score[batting]-score[fielding],balls,strikes,active[fielding],faced[fielding]);legal=['pitch','intentional_walk']
+                    o=Observation(inning,batting,outs,bases,score[batting]-score[fielding],balls,strikes,active[fielding],faced[fielding],getattr(world,'league',''),getattr(world,'season',0));legal=world.defense_legal(o) if hasattr(world,'defense_legal') else ['pitch','intentional_walk']
                     if faced[fielding]>=3 or half_ended[fielding]:legal.extend('change_'+str(i) for i in (1,2) if i not in used[fielding])
                     p=teams[order[fielding]][1].act(o,legal,rng)
                     counts[order[fielding]][p]+=1
@@ -225,23 +227,27 @@ def play(world,teams,seed,record=False,home_team=1):
                         if record:events.append({'inning':inning,'bottom':batting,'balls':balls,'strikes':strikes,'outs':outs,'bases':bases,'offense':None,'defense':p,'pitcher_id':world.pitchers[active[fielding]],'event':'pitcher_change','batting_team':order[batting],'scores_before':[score[order.index(i)] for i in (0,1)]})
                         continue
                     half_ended[fielding]=False
+                    if p!='intentional_walk' and hasattr(world,'prepare'):o=world.prepare(o,p,rng)
                     offense_legal=world.legal(o)
                     b=None if p=='intentional_walk' else teams[order[batting]][0].act(o,offense_legal,rng)
                     if b is not None:counts[order[batting]][b]+=1
-                    running=b in ('steal_2','steal_3')
-                    if running:event,run_outs,run_bases=world.run(o,b,rng)
-                    else:event='walk' if p=='intentional_walk' else world.pitch(balls,strikes,b,world.pitchers[active[fielding]],rng)
+                    running=bool(b and b.startswith('steal_'));running_runs=0
+                    if running:
+                        joint=world.run(o,b,rng);event,run_outs,run_bases=joint[:3]
+                        if len(joint)>3:running_runs=joint[3]
+                    else:event='walk' if p=='intentional_walk' else world.deliver(balls,strikes,b,world.pitchers[active[fielding]],p,rng) if hasattr(world,'deliver') else world.pitch(balls,strikes,b,world.pitchers[active[fielding]],rng)
                     rule_event='strike' if event=='bunt_foul' and strikes==2 else 'foul' if event=='bunt_foul' else event
                     state=State(4,strikes,'walk') if event in ('walk','hbp') else transition(State(balls,strikes),rule_event,RuleSet());terminal=state.result
                     if record:events.append({'inning':inning,'bottom':batting,'balls':balls,'strikes':strikes,'outs':outs,'bases':bases,'offense':b,'defense':p,'pitcher_id':world.pitchers[active[fielding]],'event':event,'batting_team':order[batting],'scores_before':[score[order.index(i)] for i in (0,1)]})
                     if record and b is not None:
                         events[-1]['legal_offense']=list(offense_legal)
                         actor=teams[order[batting]][0]
-                        if hasattr(actor,'probabilities'):events[-1]['offense_probabilities']=dict(zip(OFF,map(float,actor.probabilities(o,offense_legal))))
+                        if hasattr(actor,'probabilities'):events[-1]['offense_probabilities']=dict(zip(actor.actions,map(float,actor.probabilities(o,offense_legal))))
+                        events[-1].update(environment=getattr(world,'key',None),pitch_family_cue=o.pitch_family_cue,location_cue=o.location_cue,speed_cue=o.speed_cue)
                     balls,strikes=state.balls,state.strikes
                     if running:
-                        outs+=run_outs;bases=run_bases
-                        if record:events[-1].update(after_outs=outs,after_bases=bases,running_outs=run_outs)
+                        outs+=run_outs;bases=run_bases;score[batting]+=running_runs
+                        if record:events[-1].update(after_outs=outs,after_bases=bases,running_outs=run_outs,runs=running_runs,scores=[score[order.index(i)] for i in (0,1)])
                         if outs>=3:break
                     if terminal:
                         outs,bases,runs=world.advance(outs,bases,'hbp' if event=='hbp' else terminal,rng,**({'bunt':True} if b=='bunt' else {}))
@@ -250,23 +256,33 @@ def play(world,teams,seed,record=False,home_team=1):
                         if record:events[-1].update(scores=[score[order.index(i)] for i in (0,1)],runs=runs,after_outs=outs,after_bases=bases)
                         break
                 else:raise RuntimeError('한 타석 100구 한도: 임의 결과 없이 중단합니다.')
-                if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order)
+                if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None))
                 if outs>=3:half_ended[fielding]=True;break
             else:raise RuntimeError('한 이닝 안전 한도 초과')
-        if inning>=9 and score[0]!=score[1]:return finish(score,events,counts,order)
+        if inning>=9 and score[0]!=score[1]:return finish(score,events,counts,order,getattr(world,'key',None))
     raise RuntimeError('18회 동점: 임의 승패 없이 중단합니다.')
 
-def finish(score,events,counts,order):return {'scores':[score[order.index(i)] for i in (0,1)],'winner':order[int(score[1]>score[0])],'events':events,'choices':[dict(c) for c in counts]}
+def finish(score,events,counts,order,environment=None):
+    result={'scores':[score[order.index(i)] for i in (0,1)],'winner':order[int(score[1]>score[0])],'events':events,'choices':[dict(c) for c in counts]}
+    if environment is not None:result['environment']=environment
+    return result
 
 
 def evaluate(world, teams, n, seed):
     """Fresh simulated games, alternating venues; no collection or updates."""
     frozen = [[agent.frozen() for agent in team] for team in teams]
-    games = [play(world, frozen, seed+i*7919, home_team=i%2) for i in range(n)]
-    return {'games': n, 'wins': [sum(g['winner'] == team for g in games) for team in (0, 1)]}
+    schedule=world.evaluation_contexts(n) if hasattr(world,'evaluation_contexts') else [None]*n
+    games=[]
+    for i,context in enumerate(schedule):
+        if context is not None:world.requested_context=context
+        games.append(play(world,frozen,seed+i*7919,home_team=i%2))
+    result={'games': len(games), 'wins': [sum(g['winner'] == team for g in games) for team in (0, 1)]}
+    if any('environment' in g for g in games):result['environments']=dict(Counter(g.get('environment') for g in games))
+    return result
 
 
 def choice_probes(teams,world):
+    if hasattr(world,'probes'):return world.probes(teams)
     """Compare the same situations over time, independent of visited states."""
     situations = [('first_pitch', Observation(1,0,0,0,0,0,0,0,0)),
                   ('two_strikes', Observation(1,0,0,0,0,0,2,0,0)),
@@ -277,23 +293,30 @@ def choice_probes(teams,world):
         for team in teams]} for name, obs in situations]
 
 
-def train(data,start,end,output,config):
+def train(data,start,end,output,config,*,world=None):
     config.validate();output=Path(output)
     if output.exists() and any(output.iterdir()):raise ValueError('기존 결과 덮어쓰기 거부')
     if data['manifest']['source_status']!='REAL_OBSERVED':raise ValueError('실제 자료가 필요합니다.')
-    world=World(data);output.mkdir(parents=True,exist_ok=True)
-    result={'schema':SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
+    world=world if world is not None else World(data);output.mkdir(parents=True,exist_ok=True)
+    result={'schema':'Match-pitch-decision-game-v3' if world.evidence.get('corpus') else SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
         'reward':'team final win +1 / loss -1 only; both A and B train','limitations':['No pitch type, location, velocity or batted-ball direction is inferred. Bunt and take-with-steal actions use observed count/state support; no chosen outcome is a policy action.','Conditional pitch outcomes remain observational associations, not proven causal effects.','The same fit-only world is used for new-random-seed game evaluations; future pitch prediction is tested separately.','Three fit-period pitchers form a symmetric experimental roster, not an MLB club roster.','Source regular innings 1-8 are transported to late innings and extras; that transport is unvalidated.','Rules: 9 innings, walkoff, home lead skips bottom ninth, extras start runner on second, 18-inning/100-pitch safety limits abort rather than invent outcomes.','Runner transitions use fitted observed frequencies; sparse states stop rather than fabricate outcomes.']}
+    if world.evidence.get('corpus'):
+        result['limitations']=[*world.evidence['assumptions'],world.evidence['roster_model'],world.evidence['perception_model'],world.evidence['running_model'],world.evidence['rules'],world.evidence['transition_backoff']]
+        result['action_space']={'offense':list(world.offense_actions),'defense':list(world.defense_actions)}
     import subprocess
     source_root=Path(__file__).resolve().parents[3]
     result['source_hash']=content_hash({str(p.relative_to(source_root)):p.read_text(encoding='utf-8') for p in sorted(source_root.rglob('*.py'))})
     try:result['code_commit']=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     except (OSError,subprocess.CalledProcessError):result['code_commit']='unknown'
-    result['run_id']=content_hash({'schema':SCHEMA,'data':data['manifest']['dataset_id'],'config':asdict(config),'code':result['source_hash']})
-    write_json(output/'world.json',{'evidence':world.evidence,'weights':world.w.tolist(),'frequency_counts':[{'balls':b,'strikes':s,'action':a,'counts':dict(c)} for (b,s,a),c in world.baseline.items()],'pooled_counts':{a:dict(c) for a,c in world.pooled.items()},'events':EVENTS,'supported_events':{a:sorted(v) for a,v in world.supported.items()},'running_counts':[{'outs':o,'bases':b,'balls':balls,'strikes':strikes,'action':a,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,balls,strikes,a),counter in world.running.items()],'runner_counts':[{'outs':o,'bases':b,'event':e,'bunt':bunt,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,e,bunt),counter in world.runner.items()],'settings':{'optimizer':'minibatch gradient descent','iterations':500,'batch':1024,'learning_rate':.08,'l2':.0001,'random_seed':83,'selected_iterations':world.selected_iterations,'selection':'validation Brier only; frequency candidate included'}})
+    result['run_id']=content_hash({'schema':result['schema'],'data':data['manifest']['dataset_id'],'config':asdict(config),'code':result['source_hash']})
+    if hasattr(world,'state_dict'):write_json(output/'world.json',world.state_dict())
+    else:write_json(output/'world.json',{'evidence':world.evidence,'weights':world.w.tolist(),'frequency_counts':[{'balls':b,'strikes':s,'action':a,'counts':dict(c)} for (b,s,a),c in world.baseline.items()],'pooled_counts':{a:dict(c) for a,c in world.pooled.items()},'events':EVENTS,'supported_events':{a:sorted(v) for a,v in world.supported.items()},'running_counts':[{'outs':o,'bases':b,'balls':balls,'strikes':strikes,'action':a,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,balls,strikes,a),counter in world.running.items()],'runner_counts':[{'outs':o,'bases':b,'event':e,'bunt':bunt,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,e,bunt),counter in world.runner.items()],'settings':{'optimizer':'minibatch gradient descent','iterations':500,'batch':1024,'learning_rate':.08,'l2':.0001,'random_seed':83,'selected_iterations':world.selected_iterations,'selection':'validation Brier only; frequency candidate included'}})
     for seed in config.seeds:
-        teams=[(policy('batter',seed+i*2),policy('pitcher',seed+i*2+1)) for i in range(2)];initial=[[a.frozen() for a in t] for t in teams];batches=[[[],[]],[[],[]]];history=[]
+        teams=[world.new_team(seed+i*2) if hasattr(world,'new_team') else (policy('batter',seed+i*2),policy('pitcher',seed+i*2+1)) for i in range(2)];initial=[[a.frozen() for a in t] for t in teams];batches=[[[],[]],[[],[]]];history=[]
         def checkpoint(done):
+            if world.evidence.get('corpus'):
+                stage='학습 전' if done==0 else str(done)+'경기 학습 후'
+                print(f'평가 · {stage} 성적을 확인합니다. 선택한 모든 환경에서 홈·원정을 바꿔 두 팀과 저장 상대를 비교합니다.',flush=True)
             for t in teams:
                 for a in t:a.collect=False
             # Final games use a different seed bank from progress monitoring.
@@ -305,18 +328,23 @@ def train(data,start,end,output,config):
                 comparison=evaluate(world,pair,config.evaluation_n,bank+10000+i*10000)
                 against_initial.append({'games':comparison['games'],'wins':comparison['wins'][i]})
             history.append({'games':done,'A_wins':head['wins'][0],'B_wins':head['wins'][1],
-                'evaluation_games':head['games'],'against_initial':against_initial,
+                'evaluation_games':head['games'],'evaluation_environments':head.get('environments',{}),'against_initial':against_initial,
                 'choice_probes':choice_probes(teams,world),
                 'evaluation_scope':'new simulated games in fit-only world; initial neural opponents are frozen, not human strategies',
                 'seed_bank':bank})
-            write_json(output/'checkpoints'/f'{seed}-{done}.json',{'schema':SCHEMA,'teams':[[a.state_dict() for a in t] for t in teams]})
+            write_json(output/'checkpoints'/f'{seed}-{done}.json',{'schema':result['schema'],'teams':[[a.state_dict() for a in t] for t in teams]})
             write_json(output/'research.json',result);report(output,result)
-        run={'seed':seed,'history':history};result['seeds'].append(run);checkpoint(0)
+        run={'seed':seed,'history':history,'training_environments':{},'training_choices':[{},{}]};result['seeds'].append(run);checkpoint(0)
         rng=Random(seed)
         for episode in range(1,config.episodes+1):
             for t in teams:
                 for a in t:a.collect=True;a.decisions=[]
+            if hasattr(world,'training_context'):world.requested_context=world.training_context(seed,episode)
             game=play(world,teams,rng.randrange(2**31),home_team=episode%2)
+            if game.get('environment'):
+                e=game['environment'];run['training_environments'][e]=run['training_environments'].get(e,0)+1
+            for i,counts in enumerate(game['choices']):
+                for action,n in counts.items():run['training_choices'][i][action]=run['training_choices'][i].get(action,0)+n
             for i,t in enumerate(teams):
                 for j,a in enumerate(t):batches[i][j].append((list(a.decisions),1 if game['winner']==i else -1))
             if episode%config.batch_size==0 or episode==config.episodes or episode%config.evaluate_every==0:
