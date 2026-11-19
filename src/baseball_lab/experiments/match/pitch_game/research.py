@@ -201,7 +201,7 @@ class World:
 @dataclass(frozen=True)
 class Observation:
     inning:int;bottom:int;outs:int;bases:int;difference:int;balls:int;strikes:int;pitcher:int;faced:int
-    league:str='';season:int=0;pitch_family_cue:str='';location_cue:str='';speed_cue:str=''
+    league:str='';season:int=0;pitch_family_cue:str='';location_cue:str='';speed_cue:str='';bat_hand:str=''
 FEATURES=('bias','inning','bottom','outs','first','second','third','difference','balls','strikes','pitcher','faced')
 def features(o,role):
     return np.array([1,o.inning/9,o.bottom,o.outs/2,*(int(bool(o.bases&(1<<i))) for i in range(3)),math.tanh((o.difference if role=='batter' else -o.difference)/5),o.balls/3,o.strikes/2,o.pitcher/2,min(o.faced/12,1)])
@@ -210,20 +210,24 @@ def policy(role,seed):return NeuralPolicy(role,seed,actions=OFF if role=='batter
 
 def play(world,teams,seed,record=False,home_team=1):
     if hasattr(world,'begin_game'):world.begin_game(seed)
+    from . import strategy as strategy_metrics
+    strategy=strategy_metrics.new_stats() if getattr(world,'track_strategy',False) else None
     order=(1-home_team,home_team);rng=Random(seed);score=[0,0];events=[];active=[0,0];used=[{0},{0}];faced=[0,0];half_ended=[True,True];counts=[Counter(),Counter()]
     for inning in range(1,19):
         for batting in (0,1):
-            if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None))
+            if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None),strategy)
             fielding=1-batting;outs=0;bases=2 if inning>9 else 0
             for pa in range(200):
                 balls=strikes=0
+                if hasattr(world,'begin_pa'):world.begin_pa(rng)
                 for pitch in range(100):
-                    o=Observation(inning,batting,outs,bases,score[batting]-score[fielding],balls,strikes,active[fielding],faced[fielding],getattr(world,'league',''),getattr(world,'season',0));legal=world.defense_legal(o) if hasattr(world,'defense_legal') else ['pitch','intentional_walk']
+                    o=Observation(inning,batting,outs,bases,score[batting]-score[fielding],balls,strikes,active[fielding],faced[fielding],getattr(world,'league',''),getattr(world,'season',0),bat_hand=getattr(world,'bat_hand',''));legal=world.defense_legal(o) if hasattr(world,'defense_legal') else ['pitch','intentional_walk']
                     if faced[fielding]>=3 or half_ended[fielding]:legal.extend('change_'+str(i) for i in (1,2) if i not in used[fielding])
                     p=teams[order[fielding]][1].act(o,legal,rng)
                     counts[order[fielding]][p]+=1
                     if p.startswith('change_'):
                         active[fielding]=int(p[-1]);used[fielding].add(active[fielding]);faced[fielding]=0;half_ended[fielding]=False
+                        if strategy is not None:strategy_metrics.observe(strategy,order[batting],p,None,'pitcher_change',(),legal,o,None,world.key)
                         if record:events.append({'inning':inning,'bottom':batting,'balls':balls,'strikes':strikes,'outs':outs,'bases':bases,'offense':None,'defense':p,'pitcher_id':world.pitchers[active[fielding]],'event':'pitcher_change','batting_team':order[batting],'scores_before':[score[order.index(i)] for i in (0,1)]})
                         continue
                     half_ended[fielding]=False
@@ -236,6 +240,8 @@ def play(world,teams,seed,record=False,home_team=1):
                         joint=world.run(o,b,rng);event,run_outs,run_bases=joint[:3]
                         if len(joint)>3:running_runs=joint[3]
                     else:event='walk' if p=='intentional_walk' else world.deliver(balls,strikes,b,world.pitchers[active[fielding]],p,rng) if hasattr(world,'deliver') else world.pitch(balls,strikes,b,world.pitchers[active[fielding]],rng)
+                    contact=getattr(world,'last_contact',None) if event in ('out','single','double','triple','home_run') else None
+                    if strategy is not None:strategy_metrics.observe(strategy,order[batting],p,b,event,offense_legal,legal,o,contact,world.key)
                     rule_event='strike' if event=='bunt_foul' and strikes==2 else 'foul' if event=='bunt_foul' else event
                     state=State(4,strikes,'walk') if event in ('walk','hbp') else transition(State(balls,strikes),rule_event,RuleSet());terminal=state.result
                     if record:events.append({'inning':inning,'bottom':batting,'balls':balls,'strikes':strikes,'outs':outs,'bases':bases,'offense':b,'defense':p,'pitcher_id':world.pitchers[active[fielding]],'event':event,'batting_team':order[batting],'scores_before':[score[order.index(i)] for i in (0,1)]})
@@ -243,7 +249,7 @@ def play(world,teams,seed,record=False,home_team=1):
                         events[-1]['legal_offense']=list(offense_legal)
                         actor=teams[order[batting]][0]
                         if hasattr(actor,'probabilities'):events[-1]['offense_probabilities']=dict(zip(actor.actions,map(float,actor.probabilities(o,offense_legal))))
-                        events[-1].update(environment=getattr(world,'key',None),pitch_family_cue=o.pitch_family_cue,location_cue=o.location_cue,speed_cue=o.speed_cue)
+                        events[-1].update(environment=getattr(world,'key',None),pitch_family_cue=o.pitch_family_cue,location_cue=o.location_cue,speed_cue=o.speed_cue,batting_hand=o.bat_hand,batted_ball=contact)
                     balls,strikes=state.balls,state.strikes
                     if running:
                         outs+=run_outs;bases=run_bases;score[batting]+=running_runs
@@ -256,15 +262,16 @@ def play(world,teams,seed,record=False,home_team=1):
                         if record:events[-1].update(scores=[score[order.index(i)] for i in (0,1)],runs=runs,after_outs=outs,after_bases=bases)
                         break
                 else:raise RuntimeError('한 타석 100구 한도: 임의 결과 없이 중단합니다.')
-                if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None))
+                if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None),strategy)
                 if outs>=3:half_ended[fielding]=True;break
             else:raise RuntimeError('한 이닝 안전 한도 초과')
-        if inning>=9 and score[0]!=score[1]:return finish(score,events,counts,order,getattr(world,'key',None))
+        if inning>=9 and score[0]!=score[1]:return finish(score,events,counts,order,getattr(world,'key',None),strategy)
     raise RuntimeError('18회 동점: 임의 승패 없이 중단합니다.')
 
-def finish(score,events,counts,order,environment=None):
+def finish(score,events,counts,order,environment=None,strategy=None):
     result={'scores':[score[order.index(i)] for i in (0,1)],'winner':order[int(score[1]>score[0])],'events':events,'choices':[dict(c) for c in counts]}
     if environment is not None:result['environment']=environment
+    if strategy is not None:result['strategy']=strategy
     return result
 
 
@@ -298,10 +305,10 @@ def train(data,start,end,output,config,*,world=None):
     if output.exists() and any(output.iterdir()):raise ValueError('기존 결과 덮어쓰기 거부')
     if data['manifest']['source_status']!='REAL_OBSERVED':raise ValueError('실제 자료가 필요합니다.')
     world=world if world is not None else World(data);output.mkdir(parents=True,exist_ok=True)
-    result={'schema':'Match-pitch-decision-game-v3' if world.evidence.get('corpus') else SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
+    result={'schema':'Match-pitch-decision-game-v4' if getattr(world,'track_strategy',False) else 'Match-pitch-decision-game-v3' if world.evidence.get('corpus') else SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
         'reward':'team final win +1 / loss -1 only; both A and B train','limitations':['No pitch type, location, velocity or batted-ball direction is inferred. Bunt and take-with-steal actions use observed count/state support; no chosen outcome is a policy action.','Conditional pitch outcomes remain observational associations, not proven causal effects.','The same fit-only world is used for new-random-seed game evaluations; future pitch prediction is tested separately.','Three fit-period pitchers form a symmetric experimental roster, not an MLB club roster.','Source regular innings 1-8 are transported to late innings and extras; that transport is unvalidated.','Rules: 9 innings, walkoff, home lead skips bottom ninth, extras start runner on second, 18-inning/100-pitch safety limits abort rather than invent outcomes.','Runner transitions use fitted observed frequencies; sparse states stop rather than fabricate outcomes.']}
     if world.evidence.get('corpus'):
-        result['limitations']=[*world.evidence['assumptions'],world.evidence['roster_model'],world.evidence['perception_model'],world.evidence['running_model'],world.evidence['rules'],world.evidence['transition_backoff']]
+        result['limitations']=[*world.evidence['assumptions'],*world.evidence.get('contact_assumptions',[]),world.evidence.get('batting_model',''),world.evidence['roster_model'],world.evidence['perception_model'],world.evidence['running_model'],world.evidence['rules'],world.evidence['transition_backoff']]
         result['action_space']={'offense':list(world.offense_actions),'defense':list(world.defense_actions)}
     import subprocess
     source_root=Path(__file__).resolve().parents[3]
@@ -316,31 +323,43 @@ def train(data,start,end,output,config,*,world=None):
         def checkpoint(done):
             if world.evidence.get('corpus'):
                 stage='학습 전' if done==0 else str(done)+'경기 학습 후'
-                print(f'평가 · {stage} 성적을 확인합니다. 선택한 모든 환경에서 홈·원정을 바꿔 두 팀과 저장 상대를 비교합니다.',flush=True)
+                print(f'전략 기록 · {stage}에 같은 상황의 선택 확률과 실제 사용 행동을 저장합니다.',flush=True)
             for t in teams:
                 for a in t:a.collect=False
-            # Final games use a different seed bank from progress monitoring.
-            bank=seed+(700000 if done==config.episodes else 100000)
-            head=evaluate(world,teams,config.evaluation_n,bank)
-            against_initial=[]
-            for i in (0,1):
-                pair=[teams[0],initial[1]] if i==0 else [initial[0],teams[1]]
-                comparison=evaluate(world,pair,config.evaluation_n,bank+10000+i*10000)
-                against_initial.append({'games':comparison['games'],'wins':comparison['wins'][i]})
-            history.append({'games':done,'A_wins':head['wins'][0],'B_wins':head['wins'][1],
-                'evaluation_games':head['games'],'evaluation_environments':head.get('environments',{}),'against_initial':against_initial,
-                'choice_probes':choice_probes(teams,world),
-                'evaluation_scope':'new simulated games in fit-only world; initial neural opponents are frozen, not human strategies',
-                'seed_bank':bank})
+            if getattr(world,'track_strategy',False):
+                from copy import deepcopy
+                history.append({'games':done,'strategy':deepcopy(training_strategy),
+                    'strategy_probes':world.strategy_probes(teams),
+                    'training_outcomes':dict(run['training_outcomes']),
+                    'evaluation_scope':'choice-focused study: identical-state policy probes and executed training behavior; no opponent-ranking tournament'})
+                result['strategy_analysis']=strategy_metrics.analyze(result)
+            else:
+                # Final games use a different seed bank from progress monitoring.
+                bank=seed+(700000 if done==config.episodes else 100000)
+                head=evaluate(world,teams,config.evaluation_n,bank)
+                against_initial=[]
+                for i in (0,1):
+                    pair=[teams[0],initial[1]] if i==0 else [initial[0],teams[1]]
+                    comparison=evaluate(world,pair,config.evaluation_n,bank+10000+i*10000)
+                    against_initial.append({'games':comparison['games'],'wins':comparison['wins'][i]})
+                history.append({'games':done,'A_wins':head['wins'][0],'B_wins':head['wins'][1],
+                    'evaluation_games':head['games'],'evaluation_environments':head.get('environments',{}),'against_initial':against_initial,
+                    'choice_probes':choice_probes(teams,world),
+                    'evaluation_scope':'new simulated games in fit-only world; initial neural opponents are frozen, not human strategies',
+                    'seed_bank':bank})
             write_json(output/'checkpoints'/f'{seed}-{done}.json',{'schema':result['schema'],'teams':[[a.state_dict() for a in t] for t in teams]})
             write_json(output/'research.json',result);report(output,result)
-        run={'seed':seed,'history':history,'training_environments':{},'training_choices':[{},{}]};result['seeds'].append(run);checkpoint(0)
+        from . import strategy as strategy_metrics
+        training_strategy=strategy_metrics.new_stats()
+        run={'seed':seed,'history':history,'training_environments':{},'training_choices':[{},{}],'training_outcomes':{'A':0,'B':0}};result['seeds'].append(run);checkpoint(0)
         rng=Random(seed)
         for episode in range(1,config.episodes+1):
             for t in teams:
                 for a in t:a.collect=True;a.decisions=[]
             if hasattr(world,'training_context'):world.requested_context=world.training_context(seed,episode)
             game=play(world,teams,rng.randrange(2**31),home_team=episode%2)
+            run['training_outcomes']['A' if game['winner']==0 else 'B']+=1
+            if 'strategy' in game:strategy_metrics.merge(training_strategy,game['strategy'])
             if game.get('environment'):
                 e=game['environment'];run['training_environments'][e]=run['training_environments'].get(e,0)+1
             for i,counts in enumerate(game['choices']):
@@ -361,5 +380,5 @@ def train(data,start,end,output,config,*,world=None):
 def render(result):
     import json
     encoded=json.dumps(result,ensure_ascii=False).replace('<','\\u003c')
-    return Path(__file__).with_name('results.html').read_text(encoding='utf-8').replace('__DATA__',encoded)
+    return Path(__file__).with_name('strategy_results.html' if result.get('schema')=='Match-pitch-decision-game-v4' else 'results.html').read_text(encoding='utf-8').replace('__DATA__',encoded)
 def report(output,result):Path(output/'report.html').write_text(render(result),encoding='utf-8')

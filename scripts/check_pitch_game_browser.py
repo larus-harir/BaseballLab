@@ -10,6 +10,13 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     page.goto(base+'/match');page.locator('a[href="/match/team?study=pitch_game"]').first.click()
     expect(page.locator('#study')).to_have_value('pitch_game');expect(page.locator('#recordSeason')).to_have_value('collected:2025',timeout=30000)
     page.locator('#trainingData').select_option('legacy');page.locator('#episodes').fill('20');expect(page.locator('#trainBtn')).to_be_enabled(timeout=30000)
+    # MOCK_TEST_ONLY delayed range discovery: full-season dates follow newly
+    # discovered bounds; user-entered dates must remain unchanged.
+    page.evaluate("periodStart.min=periodStart.value='2025-01-01';periodEnd.max=periodEnd.value='2025-12-31';setDateLimits(false)")
+    expect(page.locator('#periodStart')).to_have_value('2025-03-18');expect(page.locator('#periodEnd')).to_have_value('2025-09-28')
+    page.evaluate("periodStart.value='2025-04-01';periodEnd.value='2025-06-01';setDateLimits(false)")
+    expect(page.locator('#periodStart')).to_have_value('2025-04-01')
+    page.evaluate('setDateLimits(true);preview()');expect(page.locator('#trainBtn')).to_be_enabled(timeout=30000)
     original_popen=subprocess.Popen
     def connection_failure(command,**kwargs):
         if '--mode' not in command:return original_popen(command,**kwargs)

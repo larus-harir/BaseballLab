@@ -16,8 +16,8 @@ from .research import OFF,DEF,EVENTS,FEATURES,Observation,features as original_f
 
 ASSET='pitch-corpus-counts-v2.json.gz'
 ASSET_SHA256='c3f5ddab9e8656f305690544510d732b850c35bcdd8b8af6a82a308f4ff53f13'
-OBS_SCHEMA='multileague-pitch-observation-v2'
-ACTION_SCHEMA='observed-pitch-patterns-v2'
+OBS_SCHEMA='multileague-pitch-observation-v3'
+ACTION_SCHEMA='observed-pitch-and-contact-patterns-v3'
 FAMILY_CUES=('fastball','sinker','cutter','slider','curve','changeup','splitter','knuckle')
 LOCATION_CUES=tuple(h+'_'+v for h in ('inside','middle','outside') for v in ('low','middle','high'))
 
@@ -35,14 +35,14 @@ def inventory():
     return {'schema':'pitch-training-inventory-v1','cohorts':[
         {'id':key,'league':c['league'],'season':c['season'],'rows':c['source_rows'],
          'fit_pitches':c['used_pitches']['fit'],'native_movements':c['used_movements']['fit'],
-         'location':'카운트·타격·주루 (구종·코스 미수집)' if c['source']=='retrosheet' else '구종·구속 (코스 미수집)' if c['league']=='KBO' else '구종·기록상 구역 (화면 좌표는 별도 보존)' if c['league']=='NPB' else '구종·통과 구역·구속'}
+         'location':'타격 방향·카운트·주루 (구종·코스 미수집)' if c['source']=='retrosheet' else '구종·구속·타구 구역 (코스 미수집)' if c['league']=='KBO' else '구종·기록상 구역·타구 방향 (화면 좌표는 별도 보존)' if c['league']=='NPB' else '구종·통과 구역·구속'}
         for key,c in corpus()['cohorts'].items()],
         'bytes':files('baseball_lab').joinpath('data','resources',ASSET).stat().st_size}
 
 
 def features(o,role):
     return np.concatenate((original_features(o,role),[float(o.league==l) for l in ('MLB','KBO','NPB')],[(o.season-2000)/50],
-        [float(o.pitch_family_cue==f) for f in FAMILY_CUES],[float(o.location_cue==r) for r in LOCATION_CUES],[float(o.speed_cue==v) for v in ('slow','middle','fast')]))
+        [float(o.pitch_family_cue==f) for f in FAMILY_CUES],[float(o.location_cue==r) for r in LOCATION_CUES],[float(o.speed_cue==v) for v in ('slow','middle','fast')],[float(o.bat_hand==h) for h in ('L','R')]))
 
 
 def pattern(family,location,speed=None):return 'pitch:'+family+':'+(location or 'any')+':'+(speed or 'missing')
@@ -168,10 +168,19 @@ class CorpusWorld:
         if set(leagues)-{'MLB','KBO','NPB'}:raise ValueError('학습할 리그를 확인하세요.')
         selected={k:v for k,v in raw['cohorts'].items() if v['league'] in leagues and (not seasons or v['season'] in seasons)}
         if not selected:raise ValueError('선택한 리그·연도에 실제 투구 자료가 없습니다.')
+        from .directional_contact import directions,ContactModel,ASSET_SHA256 as CONTACT_SHA
+        contact=directions()
+        if contact['base_asset_sha256']!=ASSET_SHA256:raise ValueError('투구·타구 자료 버전이 맞지 않습니다.')
+        self.contacts={k:ContactModel(contact['cohorts'][k]) for k in selected}
+        self.track_strategy=True;self.bat_hand='U';self.last_contact=None
         self.cohorts={k:Cohort(v) for k,v in selected.items()}
-        self.offense_actions=tuple(dict.fromkeys((*OFF,*(key[-1] for c in self.cohorts.values() for key in c.running.get('fit',{})))))
+        self.offense_actions=tuple(dict.fromkeys((*OFF,*('swing:'+a for a in ('pull','center','opposite','left','right')),*(key[-1] for c in self.cohorts.values() for key in c.running.get('fit',{})))))
         self.defense_actions=tuple(dict.fromkeys((*DEF,*(a for c in self.cohorts.values() for a in c.patterns))))
-        self.evidence={'corpus':True,'model':'multileague-pitch-pattern-world-v2','asset_sha256':ASSET_SHA256,
+        self.evidence={'corpus':True,'model':'multileague-pitch-contact-world-v3','asset_sha256':ASSET_SHA256,
+            'batting_model':'One shared offense policy per team; virtual PA stance is sampled from fit-only reported stance frequencies. No named batter identity or player ability is assigned.',
+            'contact_asset_sha256':CONTACT_SHA,'contact_assumptions':contact['assumptions'],
+            'contact_coverage':{k:m.value['coverage'] for k,m in self.contacts.items()},
+            'contact_holdout':{k:m.metrics for k,m in self.contacts.items()},
             'pitcher_names':{pid:name for c in selected.values() for pid,name in c['pitcher_names'].items()},
             'cohorts':[{**{k:v[k] for k in ('league','season','source','source_rows','used_pitches','used_movements','split')},'speed_fit_summary':v.get('speed_fit_summary',{}),'speed_cutpoints_mps':v.get('speed_cutpoints_mps',{}),
                         'shrinkage':self.cohorts[key].strength} for key,v in selected.items()],
@@ -186,13 +195,17 @@ class CorpusWorld:
                'rules':'Shared E01 nine-inning rules, extra runner on second, walkoff and safety limits; not a reconstruction of each historical league ruleset.',
                'transition_backoff':'Within-cohort event/base/out pooling enforces conservation, no backwards movement and no passing. Sparse bunt advancement may pool same-event ordinary contact movements.',
                'initial_policy':'Uniform legal-action exploration through zero initial output logits; no target baseball strategy.',
-               'evaluation_sampling':'At least one home/away pair for every selected cohort; training cycles randomly permute all selected cohorts without replacement.'}
+               'evaluation_sampling':'Choice-focused checkpoints compare identical-state policy probabilities and record executed training behavior; no ranking tournament. Explicit legacy evaluator, if called separately, covers each cohort home/away. Training cycles randomly permute selected cohorts without replacement.'}
         self.visits=Counter();self.begin_game(0)
 
     def begin_game(self,seed):
         from random import Random
         self.key=getattr(self,'requested_context',None) or Random(seed).choice(sorted(self.cohorts));self.requested_context=None;self.current=self.cohorts[self.key]
         v=self.current.value;self.league=v['league'];self.season=v['season'];self.pitchers=v['pitchers'];self.visits[self.key]+=1
+
+    def begin_pa(self,rng):
+        counts=self.contacts[self.key].value['hand_counts']['fit']
+        self.bat_hand=rng.choices(tuple(counts),weights=tuple(counts.values()),k=1)[0] if counts else 'U'
 
     def training_context(self,seed,episode):
         from random import Random
@@ -205,7 +218,7 @@ class CorpusWorld:
 
     def new_team(self,seed):
         team=tuple(NeuralPolicy(role,seed+i,actions=self.offense_actions if role=='batter' else self.defense_actions,
-            feature_encoder=features,feature_names=(*FEATURES,'MLB','KBO','NPB','season',*('cue_'+f for f in FAMILY_CUES),*('cue_'+r for r in LOCATION_CUES),'cue_slow','cue_middle_speed','cue_fast'),
+            feature_encoder=features,feature_names=(*FEATURES,'MLB','KBO','NPB','season',*('cue_'+f for f in FAMILY_CUES),*('cue_'+r for r in LOCATION_CUES),'cue_slow','cue_middle_speed','cue_fast','bat_left','bat_right'),
             observation_schema=OBS_SCHEMA,action_schema=ACTION_SCHEMA) for i,role in enumerate(('batter','pitcher')))
         # Broad, masked action spaces should not start with arbitrary large
         # advantages for one legal action. Zero logits give uniform exploration;
@@ -214,7 +227,7 @@ class CorpusWorld:
         return team
 
     def legal(self,o):
-        legal=['take','swing']
+        legal=['take','swing',*self.contacts[self.key].legal(o.balls,o.strikes,o.bat_hand or 'U')]
         # No optimistic bunt-only-contact model for providers without known misses.
         if self.league=='MLB' and sum(self.current.base['fit'].get((o.balls,o.strikes,'bunt'),{}).values())>=10:
             try:
@@ -242,13 +255,31 @@ class CorpusWorld:
                 arrivals=Counter()
                 for cells in self.current.arrivals.values():arrivals.update(cells)
             selected=rng.choices(tuple(arrivals),weights=tuple(arrivals.values()),k=1)[0]
-        self.pending_pattern=selected
+        self.pending_pattern=selected;self.last_contact=None
         return replace(o,pitch_family_cue=selected[0],location_cue=selected[1] or '',speed_cue=selected[2] or '')
 
+    def pitch_probabilities(self,b,s,action,*,hand=None,selected=None):
+        from baseball_lab.data.batting_directions import CONTACT
+        family,location,speed=selected or self.pending_pattern
+        base_action='swing' if action.startswith('swing:') else action
+        q=self.current.probabilities(b,s,base_action,family,location,self.current.strength,speed=speed)
+        if action.startswith('swing:'):
+            outcomes=self.contacts[self.key].outcomes(b,s,hand or self.bat_hand,action.split(':')[1])
+            if not outcomes:raise ValueError('해당 타격 방향의 실제 표본이 없습니다.')
+            mass=sum(q[e] for e in CONTACT)
+            q={e:mass*outcomes.get(e,0.) if e in CONTACT else p for e,p in q.items()}
+        return q
+
     def deliver(self,b,s,action,pitcher,defense,rng):
-        family,location,speed=self.pending_pattern
-        probs=self.current.probabilities(b,s,action,family,location,self.current.strength,speed=speed)
-        return rng.choices(tuple(probs),weights=tuple(probs.values()),k=1)[0]
+        from baseball_lab.data.batting_directions import CONTACT
+        probs=self.pitch_probabilities(b,s,action)
+        event=rng.choices(tuple(probs),weights=tuple(probs.values()),k=1)[0]
+        self.last_contact=None
+        if event in CONTACT and action!='bunt':
+            aim=action.split(':')[1] if action.startswith('swing:') else None
+            self.last_contact=self.contacts[self.key].sample(b,s,self.bat_hand,aim,event,rng)
+            self.last_contact.update(target=aim,hand=self.bat_hand)
+        return event
 
     def run(self,o,action,rng):
         counts=self.current.running['fit'][o.outs,o.bases,o.balls,o.strikes,action]
@@ -264,7 +295,7 @@ class CorpusWorld:
         delta,end,runs=rng.choices(tuple(counts),weights=tuple(counts.values()),k=1)[0]
         return outs+delta,end,runs
 
-    def state_dict(self):return {'schema':'multileague-pitch-pattern-world-v2','evidence':self.evidence,'asset_sha256':ASSET_SHA256}
+    def state_dict(self):return {'schema':'multileague-pitch-contact-world-v3','evidence':self.evidence,'asset_sha256':ASSET_SHA256,'contact_asset_sha256':self.evidence['contact_asset_sha256']}
 
     def probes(self,teams):
         key=self.key;answer=[]
@@ -276,10 +307,32 @@ class CorpusWorld:
             self.league=league;self.season=self.current.value['season'];self.pitchers=self.current.value['pitchers']
             cues=[p for p,n in self.current.arrivals[0,0].most_common(2)]
             for family,location,speed in cues:
-                obs=Observation(1,0,0,0,0,0,0,0,0,league,self.season,family or '',location or '',speed or '')
-                legal=self.legal(obs);defense=self.defense_legal(obs);defense_obs=replace(obs,pitch_family_cue='',location_cue='',speed_cue='')
-                answer.append({'situation':'first_pitch','environment':self.key,'cue':pattern(family,location,speed) if family else None,'teams':[
-                    {'swing':float(t[0].probabilities(obs,legal)[1]),'offense':dict(zip(self.offense_actions,map(float,t[0].probabilities(obs,legal)))),
-                     'defense':dict(zip(self.defense_actions,map(float,t[1].probabilities(defense_obs,defense))))} for t in teams]})
+                for hand in sorted(self.contacts[self.key].value['hand_counts']['fit']):
+                    obs=Observation(1,0,0,0,0,0,0,0,0,league,self.season,family or '',location or '',speed or '',hand)
+                    legal=self.legal(obs);defense=self.defense_legal(obs);defense_obs=replace(obs,pitch_family_cue='',location_cue='',speed_cue='')
+                    answer.append({'situation':'first_pitch','environment':self.key,'bat_hand':hand,'cue':pattern(family,location,speed) if family else None,'teams':[
+                        {'swing':float(sum(p for a,p in zip(self.offense_actions,t[0].probabilities(obs,legal)) if a=='swing' or a.startswith('swing:'))),'offense':dict(zip(self.offense_actions,map(float,t[0].probabilities(obs,legal)))),
+                         'defense':dict(zip(self.defense_actions,map(float,t[1].probabilities(defense_obs,defense))))} for t in teams]})
         self.key=key;self.current=self.cohorts[key];self.league=self.current.value['league'];self.season=self.current.value['season'];self.pitchers=self.current.value['pitchers']
+        return answer
+
+    def strategy_probes(self,teams):
+        # Cover every selected year, retaining only legal nonzero probabilities.
+        # No rollouts, collection or optimizer updates are performed here.
+        saved=(self.key,self.current,self.league,self.season,self.pitchers,self.bat_hand);answer=[]
+        try:
+            for key,c in sorted(self.cohorts.items(),key=lambda item:({'MLB':0,'KBO':1,'NPB':2}[item[1].value['league']],-item[1].value['season'])):
+                self.key=key;self.current=c;self.league=c.value['league'];self.season=c.value['season'];self.pitchers=c.value['pitchers']
+                incoming=c.arrivals[0,0].most_common(1)
+                family,location,speed=incoming[0][0] if incoming else (None,None,None)
+                for hand in sorted(self.contacts[key].value['hand_counts']['fit']):
+                    obs=Observation(1,0,0,0,0,0,0,0,0,self.league,self.season,family or '',location or '',speed or '',hand)
+                    defense_obs=replace(obs,pitch_family_cue='',location_cue='',speed_cue='')
+                    legal=self.legal(obs);defense=self.defense_legal(obs)
+                    cue=pattern(family,location,speed) if family else None
+                    answer.append({'id':key+'|'+hand+'|'+str(cue),
+                        'context':{'environment':key,'hand':hand,'cue':cue,'balls':0,'strikes':0,'outs':0,'bases':0},
+                        'teams':[{role:{a:float(p) for a,p in zip(agent.actions,agent.probabilities(observation,actions)) if p>0}
+                            for role,agent,observation,actions in (('offense',team[0],obs,legal),('defense',team[1],defense_obs,defense))} for team in teams]})
+        finally:self.key,self.current,self.league,self.season,self.pitchers,self.bat_hand=saved
         return answer

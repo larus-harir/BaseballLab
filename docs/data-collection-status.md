@@ -82,3 +82,12 @@ python scripts/prepare_pitch_corpus.py --output outputs/new-pitch-corpus.json.gz
 ```
 
 이는 개발용 대용량 자료 준비 명령이며 일반 사용자는 실행할 필요가 없습니다. 고정 버전·파일 크기·Git blob·SHA-256을 검사하고, 새 출력에만 기록합니다. 기존 원본·결과·가중치는 수정하지 않습니다. 이후 자료가 늘어도 새 계수의 검증·해시 고정 후에만 앱에 반영합니다.
+
+
+## 타격 방향 자료의 학습 연결 (2026-11-19)
+
+새 원본이 필요한지 기존 실제 원본 열부터 검사했습니다. Retrosheet에 `loc`·`bathand`·`hittype`, KBO에 실제 인플레이 중계·타석 좌우, NPB에 일본어 타구 서술·타석 좌우가 있어 기존 검증 원본을 재사용했습니다. 공식 Baseball Savant CSV·설명 페이지는 이번 접근에서도 403이었으며 우회하지 않았습니다. Retrosheet 공식 [파싱 열 정의](https://www.retrosheet.org/downloads/plays.html)에서는 `loc`=알려진 타구 위치, `bathand`=B/L/R, `hittype`의 G/F/L/P 등을 확인했습니다. 구역 단순화와 타격 의도 가정은 위의 실제 열 정의와 구별합니다.
+
+44개 환경의 날짜 앞 학습 구간에서 접촉 타구 **2,074,209건**을 연결했습니다. 미확인 구역·타석 방향을 별도로 세고 중간 점검·최종 검사는 따로 저장합니다. 기존 1.81MB 투구 자료는 변경하지 않고 약 0.58MB 방향 계수만 새로 포함합니다. 새 설치에서 별도 원본 다운로드가 필요하지 않습니다. MLB의 구종 없는 연도도 타구 방향 학습에는 사용합니다. NPB 과거 자료에서 `switch`만 보고된 경우 좌우를 추측하지 않습니다.
+
+재현 명령: `python scripts/prepare_batting_directions.py --output outputs/new-batting-directions.json.gz`. 고정된 원본 해시를 확인한 후 새 파일에만 쓰며 기존 결과는 덮어쓰지 않습니다. 현재 레코드가 과거 인간의 타격 의도나 방향 변경의 인과 효과를 제공한다는 뜻은 아닙니다. 파생 자료의 출처·원천 권리 상태는 기존 투구 자료와 같습니다.

@@ -45,7 +45,7 @@ def main():
     args=parser.parse_args()
     args.start=args.start or ('2024-03-20' if args.mode in ('scoring','inning','whole_game','pitch_game','simulate') else '2024-05-01')
     args.end=args.end or ('2024-09-30' if args.mode in ('scoring','inning','whole_game','pitch_game','simulate') else '2024-05-06')
-    args.evaluate_every=args.evaluate_every or (max(200,args.episodes//3) if args.mode in ('scoring','inning','whole_game','pitch_game') else 200)
+    args.evaluate_every=args.evaluate_every or (max(1,args.episodes//4) if args.pitch_corpus else max(200,args.episodes//3) if args.mode in ('scoring','inning','whole_game','pitch_game') else 200)
     if args.list:
         print('E01 · 실제 경기 기록으로 득점·실점 방어를 배우는 상황 실험. 웹에서 AI 학습 시작을 누르세요. 전체 경기 승리 학습과 별도 한 이닝 연구를 선택할 수 있습니다.')
         return
@@ -96,8 +96,9 @@ def main():
                 from baseball_lab.experiments.match.pitch_game.corpus_world import CorpusWorld,ASSET_SHA256
                 print('단계 1 · 선택한 리그·연도의 투구와 진루 기록으로 경기 환경을 만듭니다.',flush=True)
                 world=CorpusWorld(args.corpus_leagues,args.corpus_seasons)
-                dataset={'manifest':{'schema':'multileague-pitch-counts-v2','source_status':'REAL_OBSERVED','asset_sha256':ASSET_SHA256,
-                    'dataset_id':content_hash({'asset_sha256':ASSET_SHA256,'selected_cohorts':sorted(world.cohorts)}),
+                dataset={'manifest':{'schema':'multileague-pitch-contact-counts-v3','source_status':'REAL_OBSERVED','asset_sha256':ASSET_SHA256,
+                    'contact_asset_sha256':world.evidence['contact_asset_sha256'],
+                    'dataset_id':content_hash({'asset_sha256':ASSET_SHA256,'contact_asset_sha256':world.evidence['contact_asset_sha256'],'selected_cohorts':sorted(world.cohorts)}),
                     'selected_cohorts':list(world.cohorts),'source_sha256':[s['signature'] for s in world.evidence['sources']],
                     'credit':[s['credit'] for s in world.evidence['sources']]}}
             else:

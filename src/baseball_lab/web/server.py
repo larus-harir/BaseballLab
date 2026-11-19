@@ -99,8 +99,8 @@ class Workbench:
                         from baseball_lab.experiments.match.reporting.summary import build_summary
                         reading=build_summary(data)
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
-                    elif data.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3'):
-                        run['reading']={'headline':'매 공의 행동 학습 · '+('완료' if data.get('status')=='COMPLETED' else '진행 중')}
+                    elif data.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4'):
+                        run['reading']={'headline':('투구·타격 선택과 성장 · ' if data.get('schema')=='Match-pitch-decision-game-v4' else '매 공의 행동 학습 · ')+('완료' if data.get('status')=='COMPLETED' else '진행 중')}
                     elif data.get('schema')=='Match-whole-game-v1':
                         data_runs=data.get('seeds',[]);completed=[s['test_after']['win_rate'] for s in data_runs if 'test_after' in s]
                         run['reading']={'headline':'전체 경기 전략 학습'+(' · 평가 승률 '+str(round(100*sum(completed)/len(completed),1))+'%' if completed else ' · 진행 중')}
@@ -554,7 +554,7 @@ def make_handler(workbench):
                             evidence['external_evaluation']=[r for r in external if r.get('run_id')==evidence['run_id']]
                             from baseball_lab.experiments.match.reporting.report import render
                             return self._html(render(evidence))
-                        if evidence.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3'):
+                        if evidence.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4'):
                             from baseball_lab.experiments.match.pitch_game.research import render
                             return self._html(render(evidence))
                         if evidence.get('schema')=='Match-whole-game-v1':

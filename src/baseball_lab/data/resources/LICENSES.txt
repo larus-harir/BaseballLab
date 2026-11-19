@@ -38,3 +38,10 @@ rows excluded, optional missing fields retained, fit-only speed bands and
 chronological categorical pitch/runner counts. Raw rows and trained weights omitted.
 Overlapping MLB providers are selected, never summed; Retrosheet attribution above
 also applies to MLB count-only years and native runner movements.
+
+Batting-direction counts v1: derived from the same Retrosheet, NextPitchh KBO
+and Joseph Armstrong NPB releases credited above. No new redistribution grant
+is claimed. Changes: fit/validation/test separation, actual contact areas and
+reported batting stance grouped; switch/unknown stance and unknown areas retained.
+Narrated fielder areas are qualitative. Historical contact direction is not
+observed batting intention or a measured launch angle. No raw rows are included.

@@ -29,21 +29,40 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
         page.wait_for_timeout(1000)
     assert job['status']=='completed',job
     data=json.loads((ROOT/'outputs/workbench'/job['id']/'result/research.json').read_text(encoding='utf-8'))
-    assert data['schema']=='Match-pitch-decision-game-v3' and len(data['seeds'])==3
+    assert data['schema']=='Match-pitch-decision-game-v4' and len(data['seeds'])==3
     assert {c['league'] for c in data['world']['cohorts']}=={'MLB','KBO','NPB'}
     assert {c['season'] for c in data['world']['cohorts']}=={2019}
     assert all(len(s['training_environments'])==3 for s in data['seeds'])
     assert all(all(all(v) for v in s['parameters_changed']) for s in data['seeds'])
     assert all(any(k.startswith('pitch:') for counts in s['training_choices'] for k in counts) for s in data['seeds'])
-    page.goto(base+job['report']);expect(page.locator('#verdict')).to_contain_text('총 60경기')
-    expect(page.locator('#coverage')).to_contain_text('KBO 2019')
-    page.locator('#strategy').locator('..').locator('summary').click()
-    expect(page.locator('#strategy')).to_contain_text('가장 달라진 투구 패턴')
-    assert 'undefined' not in page.locator('#strategy').inner_text()
-    page.locator('#pos').focus();page.keyboard.press('ArrowRight');expect(page.locator('#pos')).to_have_value('1')
-    page.reload();expect(page.locator('#verdict')).to_contain_text('총 60경기')
+    for seed in data['seeds']:
+        assert len(seed['history'])==5
+        assert 'A_wins' not in seed['history'][-1]
+        assert seed['training_outcomes']['A']+seed['training_outcomes']['B']==20
+        for i,t in enumerate(seed['history'][-1]['strategy']):
+            observed={**t['offense'],**t['defense']}
+            assert observed==seed['training_choices'][i]
+            assert t['targets'] and t['batted_area']
+    assert data['strategy_analysis']['preferences']
+    page.goto(base+job['report']);expect(page.locator('#teamCards')).to_contain_text('타격 방향 목표')
+    expect(page.locator('#preferences')).to_contain_text('학습 전')
+    assert not page.locator('#verdict').count()
+    assert page.locator('#context option').count()>0
+    assert 'undefined' not in page.locator('#summary').inner_text()
+    page.locator('#tab-growth').focus();page.keyboard.press('Enter')
+    expect(page.locator('#growth')).to_be_visible()
+    page.locator('#growthRole').select_option('defense')
+    expect(page.locator('#growthCharts')).to_contain_text('투구·수비 선택')
+    page.keyboard.press('Tab')
+    page.locator('#tab-scene').click();expect(page.locator('#batChoice')).to_contain_text('시도')
+    assert page.locator('#sceneField svg').count()==1
+    position=int(page.locator('#position').input_value());page.locator('#position').focus();page.keyboard.press('ArrowRight')
+    expect(page.locator('#position')).to_have_value(str(position+1))
+    page.locator('#tab-scene').focus();page.keyboard.press('ArrowRight')
+    expect(page.locator('#evidence')).to_be_visible();expect(page.locator('#coverage')).to_contain_text('KBO 2019')
+    page.reload();expect(page.locator('#summary')).to_be_visible()
     page.set_viewport_size({'width':390,'height':844})
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     assert not errors,errors
-    print('PASS: all44 default inventory, corpus/legacy/inning switching, filtered3league actual neural training, type/speed/region actions, final results/reopen/mobile/keyboard. Report:',job['report'])
+    print('PASS: 3league real training; no ranking tournaments; all executed actions counted; directional targets and outcomes; preference/growth tabs; pitch zone/field sectors; keyboard/mobile/saved reopen. Report:',job['report'])
     browser.close()
