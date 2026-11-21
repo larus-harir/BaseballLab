@@ -97,7 +97,7 @@ def main():
                 if args.legacy_corpus:
                     from baseball_lab.experiments.match.pitch_game.corpus_world import CorpusWorld,ASSET_SHA256
                 else:
-                    from baseball_lab.experiments.match.pitch_game.tracking_world import TrackingWorld as CorpusWorld,ASSET_SHA256
+                    from baseball_lab.experiments.match.pitch_game.modern_world import ModernWorld as CorpusWorld,ASSET_SHA256
                 print('단계 1 · 선택한 리그·연도의 투구와 진루 기록으로 경기 환경을 만듭니다.',flush=True)
                 world=CorpusWorld(args.corpus_leagues,args.corpus_seasons)
                 dataset={'manifest':{'schema':'multileague-pitch-contact-counts-v3','source_status':'REAL_OBSERVED','asset_sha256':ASSET_SHA256,

@@ -45,3 +45,13 @@ is claimed. Changes: fit/validation/test separation, actual contact areas and
 reported batting stance grouped; switch/unknown stance and unknown areas retained.
 Narrated fielder areas are qualitative. Historical contact direction is not
 observed batting intention or a measured launch angle. No raw rows are included.
+
+Additional modern KBO structured pitch observations:
+slothman3878/kbo_playbyplay, revision e2cd82b064902a4d42de128de6bf9043e62c6d80
+https://huggingface.co/datasets/slothman3878/kbo_playbyplay
+Publisher license: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+Derived count tables reprocessed by BaseballLab. Original Parquet files, source
+commentary and player biographies are not bundled. Publisher-derived plate
+height and source tracking noise retain their documented limitations. Original
+NAVER/Daum rights are separate and not certified by this project.

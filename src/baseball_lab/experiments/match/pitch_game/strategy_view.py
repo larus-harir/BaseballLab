@@ -76,7 +76,8 @@ def preference_changes(preferences,team,role):
 
 def build(result):
     analysis=result.get('strategy_analysis',{});teams=analysis.get('teams',new_stats())
-    shared=result.get('schema')=='Match-pitch-decision-game-v5'
+    shared=result.get('schema') in ('Match-pitch-decision-game-v5','Match-pitch-decision-game-v6')
+    unified=result.get('schema')=='Match-pitch-decision-game-v6'
     games=sum(s['history'][-1]['games'] for s in result['seeds'] if s['history'])
     areas=tuple(h+'_'+v for v in ('high','middle','low') for h in ('left','middle','right')) if shared else AREAS
     if shared:
@@ -96,16 +97,16 @@ def build(result):
                 'selected_partition':selected['reconciled'],'generated_partition':generated['reconciled'],
                 'target_count':sum(targets.values())==sum(n for k,n in offense.items() if k.startswith('swing:')),
                 'management':management(t,role_games,result.get('management_rules'))['consistent']}
-        if shared:
+        if shared and not unified:
             checks['observed_course_only']=selected['known']==selected['total'] and generated['known']==generated['total']
-        rows.append({'offense':offense,'targets':targets,'families':dict(families),'actual_pitches':actual_pitches,
+        rows.append({'offense':offense,'targets':targets,'families':dict(families) if not unified else {k:v for k,v in t.get('pitch_family',{}).items() if k!='unknown'},'actual_pitches':actual_pitches,
             'unspecified_pitches':defense.get('pitch',0),'field':t.get('batted_area',{}),
             'changes':{role:preference_changes(analysis.get('preferences',[]),i,role) for role in ('offense','defense')},
             'environments':t.get('environments',{}),'batted_kind':t.get('batted_kind',{}),
             'management':management(t,role_games,result.get('management_rules')),'checks':checks})
     joint=all('pitch_bins' in t for t in teams)
     leagues=sorted({c['league'] for c in result['world']['cohorts']}) if joint else []
-    maps={};family_keys=sorted(set().union(*(r['families'] for r in rows),*(t.get('pitch_family',{}) for t in teams)))
+    maps={};family_keys=sorted(set().union(*(r['families'] for r in rows),*(t.get('pitch_family',{}) for t in teams)) - ({'unknown'} if unified else set()))
     for mode in ('selected','generated'):
         for league in [None,*leagues]:
             for family in [None,*family_keys]:
@@ -126,11 +127,12 @@ def build(result):
         return answer
     # This projection omits repetitive raw counters, long hash lists and model
     # internals from the HTML. They remain unchanged in the saved research JSON.
-    return {'schema':'strategy-report-view-v3' if shared else 'strategy-report-view-v2','shared_learning':shared,'status':result['status'],'teams':rows,'games':games,
+    return {'schema':'strategy-report-view-v3' if shared else 'strategy-report-view-v2','shared_learning':shared,'unified':unified,'status':result['status'],'teams':rows,'games':games,
         'contexts':probes(analysis.get('preferences',[])),'heatmaps':maps,'joint_pitch_bins':joint,'leagues':leagues,'families':family_keys,
         'growth':[{'seed':s['seed'],'history':[{'games':h['games'],'probes':probes(h.get('strategy_probes',[]))} for h in s['history']]} for s in result['seeds']],
         'runs':[{'seed':s['seed'],'replay':{k:v for k,v in (s.get('replay') or {}).items() if k in ('events','environment','management')}} for s in result['seeds']],
         'cohorts':cohorts,'experienced':sorted({k for s in result['seeds'] for k in s.get('training_environments',{})}),
-        'evidence':{'quality':result['world'].get('quality',{}),'assumptions':result['world'].get('assumptions',[]),
+        'evidence':{'quality':result['world'].get('quality',{}),'capabilities':result['world'].get('capabilities',{}),
+                    'annual_coverage':result['world'].get('annual_coverage',{}),'historical_context':result['world'].get('historical_context',{}),'assumptions':result['world'].get('assumptions',[]),
                     'holdout':result['world']['holdout_prediction']['test'],'asset_sha256':result['world']['asset_sha256'],
                     'contact_asset_sha256':result['world'].get('contact_asset_sha256'),'contact_coverage':result['world'].get('contact_coverage',{})}}

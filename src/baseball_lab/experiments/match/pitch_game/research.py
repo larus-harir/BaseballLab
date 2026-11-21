@@ -315,7 +315,7 @@ def train(data,start,end,output,config,*,world=None):
     if output.exists() and any(output.iterdir()):raise ValueError('기존 결과 덮어쓰기 거부')
     if data['manifest']['source_status']!='REAL_OBSERVED':raise ValueError('실제 자료가 필요합니다.')
     world=world if world is not None else World(data);output.mkdir(parents=True,exist_ok=True)
-    result={'management_rules':'pitcher-entry-after-appearance-v2','schema':'Match-pitch-decision-game-v5' if getattr(world,'shared_learning',False) else 'Match-pitch-decision-game-v4' if getattr(world,'track_strategy',False) else 'Match-pitch-decision-game-v3' if world.evidence.get('corpus') else SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
+    result={'management_rules':'pitcher-entry-after-appearance-v2','schema':getattr(world,'result_schema','Match-pitch-decision-game-v5') if getattr(world,'shared_learning',False) else 'Match-pitch-decision-game-v4' if getattr(world,'track_strategy',False) else 'Match-pitch-decision-game-v3' if world.evidence.get('corpus') else SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
         'reward':'terminal team win +1 / loss -1 only; shared policies pool both trajectory roles' if getattr(world,'shared_learning',False) else 'team final win +1 / loss -1 only; both A and B train','limitations':['No pitch type, location, velocity or batted-ball direction is inferred. Bunt and take-with-steal actions use observed count/state support; no chosen outcome is a policy action.','Conditional pitch outcomes remain observational associations, not proven causal effects.','The same fit-only world is used for new-random-seed game evaluations; future pitch prediction is tested separately.','Three fit-period pitchers form a symmetric experimental roster, not an MLB club roster.','Source regular innings 1-8 are transported to late innings and extras; that transport is unvalidated.','Rules: 9 innings, walkoff, home lead skips bottom ninth, extras start runner on second, 18-inning/100-pitch safety limits abort rather than invent outcomes.','Runner transitions use fitted observed frequencies; sparse states stop rather than fabricate outcomes.']}
     if world.evidence.get('corpus'):
         result['limitations']=[*world.evidence['assumptions'],*world.evidence.get('contact_assumptions',[]),world.evidence.get('batting_model',''),world.evidence['roster_model'],world.evidence['perception_model'],world.evidence['running_model'],world.evidence['rules'],world.evidence['transition_backoff']]
@@ -403,7 +403,7 @@ def train(data,start,end,output,config,*,world=None):
 
 def render(result):
     import json
-    if result.get('schema') in ('Match-pitch-decision-game-v4','Match-pitch-decision-game-v5'):
+    if result.get('schema') in ('Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6'):
         from .strategy_view import build
         result=build(result)
     encoded=json.dumps(result,ensure_ascii=False).replace('<','\\u003c')

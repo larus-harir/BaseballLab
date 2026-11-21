@@ -99,8 +99,8 @@ class Workbench:
                         from baseball_lab.experiments.match.reporting.summary import build_summary
                         reading=build_summary(data)
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
-                    elif data.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4','Match-pitch-decision-game-v5'):
-                        run['reading']={'headline':('통합 AI의 학습 변화 · ' if data.get('schema')=='Match-pitch-decision-game-v5' else '투구·타격 선택과 성장 · ' if data.get('schema')=='Match-pitch-decision-game-v4' else '매 공의 행동 학습 · ')+('완료' if data.get('status')=='COMPLETED' else '진행 중')}
+                    elif data.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6'):
+                        run['reading']={'headline':('통합 AI의 학습 변화 · ' if data.get('schema') in ('Match-pitch-decision-game-v5','Match-pitch-decision-game-v6') else '투구·타격 선택과 성장 · ' if data.get('schema')=='Match-pitch-decision-game-v4' else '매 공의 행동 학습 · ')+('완료' if data.get('status')=='COMPLETED' else '진행 중')}
                     elif data.get('schema')=='Match-whole-game-v1':
                         data_runs=data.get('seeds',[]);completed=[s['test_after']['win_rate'] for s in data_runs if 'test_after' in s]
                         run['reading']={'headline':'전체 경기 전략 학습'+(' · 평가 승률 '+str(round(100*sum(completed)/len(completed),1))+'%' if completed else ' · 진행 중')}
@@ -284,7 +284,7 @@ class Workbench:
                     mixture=validate(self.root,mixture)
                     options={**options,'collected_window':True}
                 if use_corpus:
-                    from baseball_lab.experiments.match.pitch_game.tracking_world import inventory
+                    from baseball_lab.experiments.match.pitch_game.modern_world import inventory
                     catalog=inventory()['cohorts'];leagues=options.get('corpus_leagues',['MLB','KBO','NPB']);seasons=options.get('corpus_seasons')
                     if not isinstance(leagues,list) or not leagues or any(not isinstance(l,str) or l not in ('MLB','KBO','NPB') for l in leagues):raise ValueError('학습할 리그를 하나 이상 선택하세요.')
                     if seasons is not None and (not isinstance(seasons,list) or not seasons or any(type(s) is not int for s in seasons)):raise ValueError('학습할 연도를 확인하세요.')
@@ -488,7 +488,7 @@ def make_handler(workbench):
             elif path=='/api/storage':self._json(workbench.storage.inventory())
             elif path=='/api/pitch-corpus':
                 try:
-                    from baseball_lab.experiments.match.pitch_game.tracking_world import inventory
+                    from baseball_lab.experiments.match.pitch_game.modern_world import inventory
                     self._json(inventory())
                 except (ValueError,OSError,KeyError) as exc:self._json({'error':public_text(exc)},400)
             elif path=='/api/catalog':
@@ -554,7 +554,7 @@ def make_handler(workbench):
                             evidence['external_evaluation']=[r for r in external if r.get('run_id')==evidence['run_id']]
                             from baseball_lab.experiments.match.reporting.report import render
                             return self._html(render(evidence))
-                        if evidence.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4','Match-pitch-decision-game-v5'):
+                        if evidence.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6'):
                             from baseball_lab.experiments.match.pitch_game.research import render
                             return self._html(render(evidence))
                         if evidence.get('schema')=='Match-whole-game-v1':
