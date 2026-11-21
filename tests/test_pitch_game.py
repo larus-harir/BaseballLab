@@ -47,6 +47,9 @@ def test_count_progresses_and_pitcher_cannot_reenter_or_change_before_three_batt
     a=Management();b=Management()
     with pytest.raises(RuntimeError,match='18회 동점'):play(StrikeWorld(),[(Take(),a),(Take(),b)],41)
     assert any(o.strikes==2 for o,legal in a.seen)
+    # The named starter must appear; choosing a different starter is not a substitution.
+    assert not any(x.startswith('change_') for x in a.seen[0][1])
+    assert not any(x.startswith('change_') for x in b.seen[0][1])
     # After replacing the starter, both bench pitchers cannot be used immediately.
     assert any(o.pitcher==1 and o.faced==0 and not any(x.startswith('change_') for x in legal) for o,legal in a.seen)
     assert all('change_0' not in legal for o,legal in a.seen)
@@ -144,3 +147,10 @@ def test_evaluation_does_not_change_or_collect_policy_parameters(monkeypatch):
     assert result=={'games':20,'wins':[10,10]}
     assert homes==[0,1]*10
     assert before==[[a.state_dict() for a in team] for team in teams]
+
+
+def test_legacy_pitch_policy_starts_neutral_over_legal_choices():
+    for role,legal in [('batter',['take','swing','bunt']),('pitcher',['pitch','intentional_walk'])]:
+        a=policy(role,41);obs=Observation(1,0,0,0,0,0,0,0,0)
+        probabilities=a.probabilities(obs,legal)
+        assert all(probabilities[a.actions.index(k)]==pytest.approx(1/len(legal)) for k in legal)

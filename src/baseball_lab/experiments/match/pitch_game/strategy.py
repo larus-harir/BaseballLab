@@ -4,6 +4,7 @@ from baseball_lab.data.batting_directions import CONTACT
 
 def new_stats():
     return [{'offense':{},'defense':{},'opportunities':{'offense':{},'defense':{}},'pitch_family':{},'pitch_area':{},
+             'pitch_bins':{'selected':{},'generated':{}},'management':{'games':0,'changes':0,'histogram':{},'invalid_changes':0},
              'targets':{},'batted_area':{},'batted_kind':{},'feedback':{'offense':{},'defense':{}},'environments':{}} for _ in (0,1)]
 
 
@@ -27,6 +28,10 @@ def observe(stats,batting,defense,offense,event,legal_offense,legal_defense,obse
     if defense=='pitch' or defense.startswith('pitch:'):
         team=stats[1-batting];increment(team['pitch_family'],observation.pitch_family_cue or 'unknown')
         increment(team['pitch_area'],observation.location_cue or 'unknown')
+        for mode,family,area in (('generated',observation.pitch_family_cue or 'unknown',observation.location_cue or 'unknown'),
+                                ('selected',*(defense.split(':')[1:3] if defense.startswith('pitch:') else ('unspecified','unknown')))):
+            bins=team['pitch_bins'][mode].setdefault(environment,{}).setdefault(family,{})
+            increment(bins,area)
 
 
 def merge(target,source):
@@ -53,3 +58,17 @@ def analyze(result):
         phases.append({'seed':seed['seed'],'checkpoints':[{'games':h['games'],'strategy':h.get('strategy',new_stats())} for h in history]})
     return {'schema':'baseball-strategy-analysis-v1','teams':combined,'preferences':probes,'growth':phases,
         'interpretation':'Choice frequency describes executed behavior; same-state policy probabilities describe learned preference, not proven optimality or a transcript of reasoning.'}
+
+
+def complete_game(stats,choices,traces):
+    """Each completed game must reconcile its actual substitution decisions."""
+    for team,counts,trace in zip(stats,choices,traces):
+        count=sum(counts.get(k,0) for k in ('change_1','change_2'))
+        used={0};previous=0
+        if count!=len(trace) or count>2:raise ValueError('투수 교체 원장과 행동 집계가 맞지 않습니다.')
+        for change in trace:
+            if (change['from_slot']!=previous or change['to_slot'] in used or change['to_slot'] not in (1,2)
+                    or not change.get('has_appeared') or not (change['inning_break'] or change['batters_faced']>=3)):
+                raise ValueError('투수 재등판·최소 상대 타자 규칙 검사 실패')
+            used.add(change['to_slot']);previous=change['to_slot']
+        m=team['management'];m['games']+=1;m['changes']+=count;increment(m['histogram'],str(count))

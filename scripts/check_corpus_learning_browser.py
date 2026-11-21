@@ -43,26 +43,52 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
             observed={**t['offense'],**t['defense']}
             assert observed==seed['training_choices'][i]
             assert t['targets'] and t['batted_area']
+            assert t['management']['games']==20 and t['management']['changes']<=40
+            assert sum(t['management']['histogram'].values())==20
     assert data['strategy_analysis']['preferences']
-    page.goto(base+job['report']);expect(page.locator('#teamCards')).to_contain_text('타격 방향 목표')
-    expect(page.locator('#preferences')).to_contain_text('학습 전')
+    page.goto(base+job['report']);expect(page.locator('#teamCards')).to_contain_text('가장 많이 시도한 방향')
+    view=page.locator('#data').text_content();view=json.loads(view)
+    assert view['schema']=='strategy-report-view-v2'
+    assert all(all(t['checks'].values()) for t in view['teams'])
     assert not page.locator('#verdict').count()
     assert page.locator('#context option').count()>0
     assert 'undefined' not in page.locator('#summary').inner_text()
-    page.locator('#tab-growth').focus();page.keyboard.press('Enter')
-    expect(page.locator('#growth')).to_be_visible()
-    page.locator('#growthRole').select_option('defense')
-    expect(page.locator('#growthCharts')).to_contain_text('투구·수비 선택')
-    page.keyboard.press('Tab')
-    page.locator('#tab-scene').click();expect(page.locator('#batChoice')).to_contain_text('시도')
-    assert page.locator('#sceneField svg').count()==1
-    position=int(page.locator('#position').input_value());page.locator('#position').focus();page.keyboard.press('ArrowRight')
-    expect(page.locator('#position')).to_have_value(str(position+1))
-    page.locator('#tab-scene').focus();page.keyboard.press('ArrowRight')
-    expect(page.locator('#evidence')).to_be_visible();expect(page.locator('#coverage')).to_contain_text('KBO 2019')
+    expect(page.locator('#auditBadge')).to_contain_text('일치')
+    page.screenshot(path='/tmp/strategy-review-summary.png')
+    page.locator('#tab-pitch').click();expect(page.locator('#heatmaps')).to_contain_text('직접 지정')
+    page.locator('#pitchLeague').select_option('MLB')
+    assert page.locator('#heatmaps svg').count()==2
+    for m in view['heatmaps']['selected|MLB|all']:
+        assert m['known']+m['missing']+m['unspecified']==m['total']
+        assert abs(sum(x or 0 for x in m['shares'].values())-1)<1e-9
+    colors=page.locator('#heatmaps svg g').evaluate_all("els=>els.map(e=>({color:e.querySelector('rect').getAttribute('fill'),ink:e.querySelector('text').getAttribute('fill')}))")
+    import re
+    def luminance(rgb):
+        x=[v/255 for v in rgb];return sum(w*(v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4) for v,w in zip(x,(.2126,.7152,.0722)))
+    for c in colors:
+        lum=luminance([int(v) for v in re.findall(r'\d+',c['color'])]);ratio=1.05/(lum+.05) if c['ink']=='#fff' else (lum+.05)/.05
+        assert ratio>=4.5
+    page.screenshot(path='/tmp/strategy-review-heatmap.png')
+    page.locator('#pitchLeague').select_option('KBO');expect(page.locator('#heatmaps .empty')).to_have_count(2)
+    assert '0.0%' not in page.locator('#heatmaps svg').first.text_content()
+    page.locator('#pitchMode').select_option('generated');page.locator('#pitchLeague').select_option('MLB');page.locator('#pitchFamily').select_option('fastball')
+    page.locator('#tab-growth').focus();page.keyboard.press('Enter');expect(page.locator('#growth')).to_be_visible()
+    page.locator('#growthRole').select_option('defense');expect(page.locator('#growthCharts')).to_contain_text('투구·수비 선택')
+    expect(page.locator('#batChoice')).to_contain_text('시도');assert page.locator('#sceneField svg').count()==1
+    position=int(page.locator('#position').input_value());page.locator('#position').focus();page.keyboard.press('ArrowRight');expect(page.locator('#position')).to_have_value(str(position+1))
+    page.locator('#tab-growth').focus();page.keyboard.press('ArrowRight');expect(page.locator('#evidence')).to_be_visible()
+    expect(page.locator('#management')).to_contain_text('대조 일치');expect(page.locator('#coverage')).to_contain_text('KBO')
     page.reload();expect(page.locator('#summary')).to_be_visible()
     page.set_viewport_size({'width':390,'height':844})
-    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    for tab in ('summary','pitch','growth','evidence'):
+        page.locator('#tab-'+tab).click();assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),tab
+    old=next((p for p in (ROOT/'outputs/workbench').glob('*/result/research.json') if (lambda d:d.get('schema')=='Match-pitch-decision-game-v4' and 'pitch_bins' not in d['strategy_analysis']['teams'][0])(json.loads(p.read_text(encoding='utf-8')))),None)
+    if old:
+        original=old.read_bytes();page.goto(base+'/reports/'+old.parents[1].name+'/result/report.html')
+        page.locator('#tab-pitch').click();assert page.locator('#pitchLeague option').count()==1
+        page.locator('#pitchMode').select_option('generated');expect(page.locator('#pitchFamily')).to_be_disabled()
+        page.locator('#tab-evidence').click();expect(page.locator('#management')).to_contain_text('이전 기록은 합계만')
+        assert old.read_bytes()==original
     assert not errors,errors
-    print('PASS: 3league real training; no ranking tournaments; all executed actions counted; directional targets and outcomes; preference/growth tabs; pitch zone/field sectors; keyboard/mobile/saved reopen. Report:',job['report'])
+    print('PASS: compact summary; real joint heatmaps/contrast; missing KBO data stays missing; games-based substitution audits; growth/replay; keyboard/mobile; old reports read-only. Report:',job['report'])
     browser.close()

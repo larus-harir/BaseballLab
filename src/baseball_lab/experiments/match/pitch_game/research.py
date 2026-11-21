@@ -205,32 +205,39 @@ class Observation:
 FEATURES=('bias','inning','bottom','outs','first','second','third','difference','balls','strikes','pitcher','faced')
 def features(o,role):
     return np.array([1,o.inning/9,o.bottom,o.outs/2,*(int(bool(o.bases&(1<<i))) for i in range(3)),math.tanh((o.difference if role=='batter' else -o.difference)/5),o.balls/3,o.strikes/2,o.pitcher/2,min(o.faced/12,1)])
-def policy(role,seed):return NeuralPolicy(role,seed,actions=OFF if role=='batter' else DEF,feature_encoder=features,feature_names=FEATURES,observation_schema=SCHEMA,action_schema='pitch-bunt-running-and-management-v2')
+def policy(role,seed):
+    agent=NeuralPolicy(role,seed,actions=OFF if role=='batter' else DEF,feature_encoder=features,feature_names=FEATURES,observation_schema=SCHEMA,action_schema='pitch-bunt-running-and-management-v2')
+    # Legal choices start uniformly, like the corpus learner. Random hidden
+    # features must not impose a large initial preference for repeated walks.
+    agent.params[-2].fill(0.)
+    return agent
 
 
 def play(world,teams,seed,record=False,home_team=1):
     if hasattr(world,'begin_game'):world.begin_game(seed)
     from . import strategy as strategy_metrics
     strategy=strategy_metrics.new_stats() if getattr(world,'track_strategy',False) else None
-    order=(1-home_team,home_team);rng=Random(seed);score=[0,0];events=[];active=[0,0];used=[{0},{0}];faced=[0,0];half_ended=[True,True];counts=[Counter(),Counter()]
+    management=[[],[]] if strategy is not None else None
+    order=(1-home_team,home_team);rng=Random(seed);score=[0,0];events=[];active=[0,0];used=[{0},{0}];faced=[0,0];half_ended=[True,True];appeared=[False,False];counts=[Counter(),Counter()]
     for inning in range(1,19):
         for batting in (0,1):
-            if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None),strategy)
+            if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None),strategy,management)
             fielding=1-batting;outs=0;bases=2 if inning>9 else 0
             for pa in range(200):
                 balls=strikes=0
                 if hasattr(world,'begin_pa'):world.begin_pa(rng)
                 for pitch in range(100):
                     o=Observation(inning,batting,outs,bases,score[batting]-score[fielding],balls,strikes,active[fielding],faced[fielding],getattr(world,'league',''),getattr(world,'season',0),bat_hand=getattr(world,'bat_hand',''));legal=world.defense_legal(o) if hasattr(world,'defense_legal') else ['pitch','intentional_walk']
-                    if faced[fielding]>=3 or half_ended[fielding]:legal.extend('change_'+str(i) for i in (1,2) if i not in used[fielding])
+                    if appeared[fielding] and (faced[fielding]>=3 or half_ended[fielding]):legal.extend('change_'+str(i) for i in (1,2) if i not in used[fielding])
                     p=teams[order[fielding]][1].act(o,legal,rng)
                     counts[order[fielding]][p]+=1
                     if p.startswith('change_'):
-                        active[fielding]=int(p[-1]);used[fielding].add(active[fielding]);faced[fielding]=0;half_ended[fielding]=False
+                        if management is not None:management[order[fielding]].append({'from_slot':active[fielding],'to_slot':int(p[-1]),'inning':inning,'outs':outs,'balls':balls,'strikes':strikes,'batters_faced':faced[fielding],'inning_break':half_ended[fielding],'has_appeared':appeared[fielding]})
+                        active[fielding]=int(p[-1]);used[fielding].add(active[fielding]);faced[fielding]=0;half_ended[fielding]=False;appeared[fielding]=False
                         if strategy is not None:strategy_metrics.observe(strategy,order[batting],p,None,'pitcher_change',(),legal,o,None,world.key)
                         if record:events.append({'inning':inning,'bottom':batting,'balls':balls,'strikes':strikes,'outs':outs,'bases':bases,'offense':None,'defense':p,'pitcher_id':world.pitchers[active[fielding]],'event':'pitcher_change','batting_team':order[batting],'scores_before':[score[order.index(i)] for i in (0,1)]})
                         continue
-                    half_ended[fielding]=False
+                    half_ended[fielding]=False;appeared[fielding]=True
                     if p!='intentional_walk' and hasattr(world,'prepare'):o=world.prepare(o,p,rng)
                     offense_legal=world.legal(o)
                     b=None if p=='intentional_walk' else teams[order[batting]][0].act(o,offense_legal,rng)
@@ -262,16 +269,19 @@ def play(world,teams,seed,record=False,home_team=1):
                         if record:events[-1].update(scores=[score[order.index(i)] for i in (0,1)],runs=runs,after_outs=outs,after_bases=bases)
                         break
                 else:raise RuntimeError('한 타석 100구 한도: 임의 결과 없이 중단합니다.')
-                if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None),strategy)
+                if batting and inning>=9 and score[1]>score[0]:return finish(score,events,counts,order,getattr(world,'key',None),strategy,management)
                 if outs>=3:half_ended[fielding]=True;break
             else:raise RuntimeError('한 이닝 안전 한도 초과')
-        if inning>=9 and score[0]!=score[1]:return finish(score,events,counts,order,getattr(world,'key',None),strategy)
+        if inning>=9 and score[0]!=score[1]:return finish(score,events,counts,order,getattr(world,'key',None),strategy,management)
     raise RuntimeError('18회 동점: 임의 승패 없이 중단합니다.')
 
-def finish(score,events,counts,order,environment=None,strategy=None):
+def finish(score,events,counts,order,environment=None,strategy=None,management=None):
     result={'scores':[score[order.index(i)] for i in (0,1)],'winner':order[int(score[1]>score[0])],'events':events,'choices':[dict(c) for c in counts]}
     if environment is not None:result['environment']=environment
-    if strategy is not None:result['strategy']=strategy
+    if strategy is not None:
+        from .strategy import complete_game
+        complete_game(strategy,counts,management)
+        result['strategy']=strategy;result['management']=management
     return result
 
 
@@ -305,7 +315,7 @@ def train(data,start,end,output,config,*,world=None):
     if output.exists() and any(output.iterdir()):raise ValueError('기존 결과 덮어쓰기 거부')
     if data['manifest']['source_status']!='REAL_OBSERVED':raise ValueError('실제 자료가 필요합니다.')
     world=world if world is not None else World(data);output.mkdir(parents=True,exist_ok=True)
-    result={'schema':'Match-pitch-decision-game-v4' if getattr(world,'track_strategy',False) else 'Match-pitch-decision-game-v3' if world.evidence.get('corpus') else SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
+    result={'management_rules':'pitcher-entry-after-appearance-v2','schema':'Match-pitch-decision-game-v4' if getattr(world,'track_strategy',False) else 'Match-pitch-decision-game-v3' if world.evidence.get('corpus') else SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
         'reward':'team final win +1 / loss -1 only; both A and B train','limitations':['No pitch type, location, velocity or batted-ball direction is inferred. Bunt and take-with-steal actions use observed count/state support; no chosen outcome is a policy action.','Conditional pitch outcomes remain observational associations, not proven causal effects.','The same fit-only world is used for new-random-seed game evaluations; future pitch prediction is tested separately.','Three fit-period pitchers form a symmetric experimental roster, not an MLB club roster.','Source regular innings 1-8 are transported to late innings and extras; that transport is unvalidated.','Rules: 9 innings, walkoff, home lead skips bottom ninth, extras start runner on second, 18-inning/100-pitch safety limits abort rather than invent outcomes.','Runner transitions use fitted observed frequencies; sparse states stop rather than fabricate outcomes.']}
     if world.evidence.get('corpus'):
         result['limitations']=[*world.evidence['assumptions'],*world.evidence.get('contact_assumptions',[]),world.evidence.get('batting_model',''),world.evidence['roster_model'],world.evidence['perception_model'],world.evidence['running_model'],world.evidence['rules'],world.evidence['transition_backoff']]
@@ -379,6 +389,9 @@ def train(data,start,end,output,config,*,world=None):
 
 def render(result):
     import json
+    if result.get('schema')=='Match-pitch-decision-game-v4':
+        from .strategy_view import build
+        result=build(result)
     encoded=json.dumps(result,ensure_ascii=False).replace('<','\\u003c')
-    return Path(__file__).with_name('strategy_results.html' if result.get('schema')=='Match-pitch-decision-game-v4' else 'results.html').read_text(encoding='utf-8').replace('__DATA__',encoded)
+    return Path(__file__).with_name('strategy_results.html' if result.get('schema')=='strategy-report-view-v2' else 'results.html').read_text(encoding='utf-8').replace('__DATA__',encoded)
 def report(output,result):Path(output/'report.html').write_text(render(result),encoding='utf-8')
