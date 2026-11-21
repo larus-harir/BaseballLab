@@ -163,22 +163,23 @@ class Cohort:
 
 
 class CorpusWorld:
-    def __init__(self,leagues=None,seasons=None):
-        raw=corpus();leagues=leagues or ['MLB','KBO','NPB']
+    def __init__(self,leagues=None,seasons=None,*,dataset=None,contact_data=None):
+        raw=dataset or corpus();leagues=leagues or ['MLB','KBO','NPB']
         if set(leagues)-{'MLB','KBO','NPB'}:raise ValueError('학습할 리그를 확인하세요.')
         selected={k:v for k,v in raw['cohorts'].items() if v['league'] in leagues and (not seasons or v['season'] in seasons)}
         if not selected:raise ValueError('선택한 리그·연도에 실제 투구 자료가 없습니다.')
         from .directional_contact import directions,ContactModel,ASSET_SHA256 as CONTACT_SHA
-        contact=directions()
-        if contact['base_asset_sha256']!=ASSET_SHA256:raise ValueError('투구·타구 자료 버전이 맞지 않습니다.')
+        contact=contact_data or directions()
+        asset_sha=raw.get('_asset_sha256',ASSET_SHA256)
+        if contact['base_asset_sha256']!=asset_sha:raise ValueError('투구·타구 자료 버전이 맞지 않습니다.')
         self.contacts={k:ContactModel(contact['cohorts'][k]) for k in selected}
         self.track_strategy=True;self.bat_hand='U';self.last_contact=None
         self.cohorts={k:Cohort(v) for k,v in selected.items()}
         self.offense_actions=tuple(dict.fromkeys((*OFF,*('swing:'+a for a in ('pull','center','opposite','left','right')),*(key[-1] for c in self.cohorts.values() for key in c.running.get('fit',{})))))
         self.defense_actions=tuple(dict.fromkeys((*DEF,*(a for c in self.cohorts.values() for a in c.patterns))))
-        self.evidence={'corpus':True,'model':'multileague-pitch-contact-world-v3','asset_sha256':ASSET_SHA256,
+        self.evidence={'corpus':True,'model':'multileague-pitch-contact-world-v3','asset_sha256':asset_sha,
             'batting_model':'One shared offense policy per team; virtual PA stance is sampled from fit-only reported stance frequencies. No named batter identity or player ability is assigned.',
-            'contact_asset_sha256':CONTACT_SHA,'contact_assumptions':contact['assumptions'],
+            'contact_asset_sha256':contact.get('_asset_sha256',CONTACT_SHA),'contact_assumptions':contact['assumptions'],
             'contact_coverage':{k:m.value['coverage'] for k,m in self.contacts.items()},
             'contact_holdout':{k:m.metrics for k,m in self.contacts.items()},
             'pitcher_names':{pid:name for c in selected.values() for pid,name in c['pitcher_names'].items()},

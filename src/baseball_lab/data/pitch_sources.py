@@ -28,25 +28,28 @@ SOURCES={
 HOSTS={'api.github.com','raw.githubusercontent.com','codeload.github.com','www.kaggle.com','storage.googleapis.com'}
 
 
-def safe(url):
+def safe(url,hosts=None):
     p=urlparse(url)
-    if p.scheme!='https' or p.hostname not in HOSTS or p.username or p.port not in (None,443):
+    if p.scheme!='https' or p.hostname not in (HOSTS if hosts is None else hosts) or p.username or p.port not in (None,443):
         raise ValueError('등록된 공개 배포 호스트만 읽습니다.')
 
 
 class Redirect(urllib.request.HTTPRedirectHandler):
+    def __init__(self,hosts=None):
+        super().__init__();self.hosts=hosts
+
     def redirect_request(self,req,fp,code,msg,headers,newurl):
-        safe(newurl)
+        safe(newurl,self.hosts)
         return super().redirect_request(req,fp,code,msg,headers,newurl)
 
 
-def download(url,path,limit):
-    safe(url);path=Path(path)
+def download(url,path,limit,*,hosts=None):
+    safe(url,hosts);path=Path(path)
     if path.exists() or path.is_symlink():raise FileExistsError('기존 배포 원본을 덮어쓰지 않습니다.')
     for attempt in range(3):
         part=path.with_suffix(path.suffix+'.part')
         try:
-            with urllib.request.build_opener(Redirect()).open(urllib.request.Request(url,headers={'User-Agent':'BaseballLab public dataset research'}),timeout=45) as response,open_private(part) as out:
+            with urllib.request.build_opener(Redirect(hosts)).open(urllib.request.Request(url,headers={'User-Agent':'BaseballLab public dataset research'}),timeout=45) as response,open_private(part) as out:
                 size=0
                 while chunk:=response.read(1024*1024):
                     size+=len(chunk)

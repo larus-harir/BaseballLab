@@ -14,6 +14,7 @@ baseball-lab = "baseball_lab.cli:main"
 [project.optional-dependencies]
 dev = ["pytest==8.3.5", "numpy>=1.26,<3"]
 learning = ["numpy>=1.26,<3"]
+data-preparation = ["pyarrow==23.0.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

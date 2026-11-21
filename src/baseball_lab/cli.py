@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--model',type=Path,help='실제 데이터로 보정·독립 검증한 model.json')
     parser.add_argument('--start');parser.add_argument('--end')
     parser.add_argument('--collected-window',action='store_true',help='확보한 여러 시즌의 실제 플레이로 학습')
+    parser.add_argument('--legacy-corpus',action='store_true',help='이전 다리그 원천 연구 재현 경로')
     parser.add_argument('--pitch-corpus',action='store_true',help='정규화한 다중 리그·연도 투구 자료로 학습')
     parser.add_argument('--corpus-leagues',nargs='+',choices=('MLB','KBO','NPB'))
     parser.add_argument('--corpus-seasons',nargs='+',type=int)
@@ -93,7 +94,10 @@ def main():
             from baseball_lab.experiments.match.team_win.training import Config
             world=None
             if args.pitch_corpus:
-                from baseball_lab.experiments.match.pitch_game.corpus_world import CorpusWorld,ASSET_SHA256
+                if args.legacy_corpus:
+                    from baseball_lab.experiments.match.pitch_game.corpus_world import CorpusWorld,ASSET_SHA256
+                else:
+                    from baseball_lab.experiments.match.pitch_game.tracking_world import TrackingWorld as CorpusWorld,ASSET_SHA256
                 print('단계 1 · 선택한 리그·연도의 투구와 진루 기록으로 경기 환경을 만듭니다.',flush=True)
                 world=CorpusWorld(args.corpus_leagues,args.corpus_seasons)
                 dataset={'manifest':{'schema':'multileague-pitch-contact-counts-v3','source_status':'REAL_OBSERVED','asset_sha256':ASSET_SHA256,
@@ -104,7 +108,7 @@ def main():
             else:
                 validate_window(REPOSITORY_ROOT,args.start,args.end)
                 dataset=acquire_pitches(REPOSITORY_ROOT,args.start,args.end,sources(REPOSITORY_ROOT),pitch_actions=True)
-            print('단계 2 · 실제 기록으로 검사한 경기 환경에서 두 팀이 승리를 목표로 학습합니다.',flush=True)
+            print('단계 2 · 실제 기록으로 검사한 경기 환경에서 '+('통합 AI가 양쪽 역할의 경험을 함께 학습합니다.' if getattr(world,'shared_learning',False) else '두 팀이 승리를 목표로 학습합니다.'),flush=True)
             seeds=tuple(int(s) for s in args.seeds.split(',')) if args.seeds else (args.seed,args.seed+1,args.seed+2)
             train(dataset,args.start,args.end,output,Config(args.episodes,seeds,args.evaluate_every,args.evaluation_n),world=world)
         elif args.mode=='whole_game':

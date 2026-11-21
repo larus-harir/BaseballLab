@@ -315,8 +315,8 @@ def train(data,start,end,output,config,*,world=None):
     if output.exists() and any(output.iterdir()):raise ValueError('기존 결과 덮어쓰기 거부')
     if data['manifest']['source_status']!='REAL_OBSERVED':raise ValueError('실제 자료가 필요합니다.')
     world=world if world is not None else World(data);output.mkdir(parents=True,exist_ok=True)
-    result={'management_rules':'pitcher-entry-after-appearance-v2','schema':'Match-pitch-decision-game-v4' if getattr(world,'track_strategy',False) else 'Match-pitch-decision-game-v3' if world.evidence.get('corpus') else SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
-        'reward':'team final win +1 / loss -1 only; both A and B train','limitations':['No pitch type, location, velocity or batted-ball direction is inferred. Bunt and take-with-steal actions use observed count/state support; no chosen outcome is a policy action.','Conditional pitch outcomes remain observational associations, not proven causal effects.','The same fit-only world is used for new-random-seed game evaluations; future pitch prediction is tested separately.','Three fit-period pitchers form a symmetric experimental roster, not an MLB club roster.','Source regular innings 1-8 are transported to late innings and extras; that transport is unvalidated.','Rules: 9 innings, walkoff, home lead skips bottom ninth, extras start runner on second, 18-inning/100-pitch safety limits abort rather than invent outcomes.','Runner transitions use fitted observed frequencies; sparse states stop rather than fabricate outcomes.']}
+    result={'management_rules':'pitcher-entry-after-appearance-v2','schema':'Match-pitch-decision-game-v5' if getattr(world,'shared_learning',False) else 'Match-pitch-decision-game-v4' if getattr(world,'track_strategy',False) else 'Match-pitch-decision-game-v3' if world.evidence.get('corpus') else SCHEMA,'status':'RUNNING','created_at':utc_now(),'dataset':data['manifest'],'world':world.evidence,'config':asdict(config),'seeds':[],
+        'reward':'terminal team win +1 / loss -1 only; shared policies pool both trajectory roles' if getattr(world,'shared_learning',False) else 'team final win +1 / loss -1 only; both A and B train','limitations':['No pitch type, location, velocity or batted-ball direction is inferred. Bunt and take-with-steal actions use observed count/state support; no chosen outcome is a policy action.','Conditional pitch outcomes remain observational associations, not proven causal effects.','The same fit-only world is used for new-random-seed game evaluations; future pitch prediction is tested separately.','Three fit-period pitchers form a symmetric experimental roster, not an MLB club roster.','Source regular innings 1-8 are transported to late innings and extras; that transport is unvalidated.','Rules: 9 innings, walkoff, home lead skips bottom ninth, extras start runner on second, 18-inning/100-pitch safety limits abort rather than invent outcomes.','Runner transitions use fitted observed frequencies; sparse states stop rather than fabricate outcomes.']}
     if world.evidence.get('corpus'):
         result['limitations']=[*world.evidence['assumptions'],*world.evidence.get('contact_assumptions',[]),world.evidence.get('batting_model',''),world.evidence['roster_model'],world.evidence['perception_model'],world.evidence['running_model'],world.evidence['rules'],world.evidence['transition_backoff']]
         result['action_space']={'offense':list(world.offense_actions),'defense':list(world.defense_actions)}
@@ -328,8 +328,10 @@ def train(data,start,end,output,config,*,world=None):
     result['run_id']=content_hash({'schema':result['schema'],'data':data['manifest']['dataset_id'],'config':asdict(config),'code':result['source_hash']})
     if hasattr(world,'state_dict'):write_json(output/'world.json',world.state_dict())
     else:write_json(output/'world.json',{'evidence':world.evidence,'weights':world.w.tolist(),'frequency_counts':[{'balls':b,'strikes':s,'action':a,'counts':dict(c)} for (b,s,a),c in world.baseline.items()],'pooled_counts':{a:dict(c) for a,c in world.pooled.items()},'events':EVENTS,'supported_events':{a:sorted(v) for a,v in world.supported.items()},'running_counts':[{'outs':o,'bases':b,'balls':balls,'strikes':strikes,'action':a,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,balls,strikes,a),counter in world.running.items()],'runner_counts':[{'outs':o,'bases':b,'event':e,'bunt':bunt,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,e,bunt),counter in world.runner.items()],'settings':{'optimizer':'minibatch gradient descent','iterations':500,'batch':1024,'learning_rate':.08,'l2':.0001,'random_seed':83,'selected_iterations':world.selected_iterations,'selection':'validation Brier only; frequency candidate included'}})
+    shared=getattr(world,'shared_learning',False)
+    result['shared_learning']=shared
     for seed in config.seeds:
-        teams=[world.new_team(seed+i*2) if hasattr(world,'new_team') else (policy('batter',seed+i*2),policy('pitcher',seed+i*2+1)) for i in range(2)];initial=[[a.frozen() for a in t] for t in teams];batches=[[[],[]],[[],[]]];history=[]
+        teams=[world.new_team(seed if shared else seed+i*2) if hasattr(world,'new_team') else (policy('batter',seed+i*2),policy('pitcher',seed+i*2+1)) for i in range(2)];initial=[[a.frozen() for a in t] for t in teams];batches=[[[],[]],[[],[]]];history=[]
         def checkpoint(done):
             if world.evidence.get('corpus'):
                 stage='학습 전' if done==0 else str(done)+'경기 학습 후'
@@ -357,7 +359,7 @@ def train(data,start,end,output,config,*,world=None):
                     'choice_probes':choice_probes(teams,world),
                     'evaluation_scope':'new simulated games in fit-only world; initial neural opponents are frozen, not human strategies',
                     'seed_bank':bank})
-            write_json(output/'checkpoints'/f'{seed}-{done}.json',{'schema':result['schema'],'teams':[[a.state_dict() for a in t] for t in teams]})
+            write_json(output/'checkpoints'/f'{seed}-{done}.json',{'schema':result['schema'],**({'shared_policy':[a.state_dict() for a in teams[0]],'trajectory_roles':2} if shared else {'teams':[[a.state_dict() for a in t] for t in teams]})})
             write_json(output/'research.json',result);report(output,result)
         from . import strategy as strategy_metrics
         training_strategy=strategy_metrics.new_stats()
@@ -377,11 +379,23 @@ def train(data,start,end,output,config,*,world=None):
             for i,t in enumerate(teams):
                 for j,a in enumerate(t):batches[i][j].append((list(a.decisions),1 if game['winner']==i else -1))
             if episode%config.batch_size==0 or episode==config.episodes or episode%config.evaluate_every==0:
-                for i,t in enumerate(teams):
-                    for j,a in enumerate(t):a.update(batches[i][j]);batches[i][j]=[]
+                if shared:
+                    for role,learner in enumerate(teams[0]):
+                        learner.update([*batches[0][role],*batches[1][role]])
+                        replica=teams[1][role]
+                        for name in ('params','m','v'):setattr(replica,name,[v.copy() for v in getattr(learner,name)])
+                        replica.steps=learner.steps
+                        batches[0][role]=[];batches[1][role]=[]
+                else:
+                    for i,t in enumerate(teams):
+                        for j,a in enumerate(t):a.update(batches[i][j]);batches[i][j]=[]
             if episode%config.evaluate_every==0 or episode==config.episodes:
-                print(f'학습 {episode}/{config.episodes}경기 · A팀과 B팀이 매 공의 행동을 학습합니다.',flush=True);checkpoint(episode)
+                print(f'학습 {episode}/{config.episodes}경기 · '+('공동 AI가 양쪽 역할의 경험을 함께 학습합니다.' if shared else 'A팀과 B팀이 매 공의 행동을 학습합니다.'),flush=True);checkpoint(episode)
         run['replay']=play(world,[[a.frozen() for a in t] for t in teams],seed+900000,record=True)
+        if shared:
+            run['shared_policy_consistent']=all(np.array_equal(a,b) for left,right in zip(teams[0],teams[1]) for a,b in zip(left.params,right.params))
+            if not run['shared_policy_consistent']:raise RuntimeError('공동 정책의 역할 복제본 지문이 다릅니다.')
+            run['pooled_role_episodes']=2*config.episodes
         run['optimizer_steps']=[[a.steps for a in t] for t in teams]
         run['parameters_changed']=[[any(not np.array_equal(x,y) for x,y in zip(old.params,a.params)) for old,a in zip(initial[i],t)] for i,t in enumerate(teams)]
     result['status']='COMPLETED';write_json(output/'research.json',result);report(output,result);return result
@@ -389,9 +403,10 @@ def train(data,start,end,output,config,*,world=None):
 
 def render(result):
     import json
-    if result.get('schema')=='Match-pitch-decision-game-v4':
+    if result.get('schema') in ('Match-pitch-decision-game-v4','Match-pitch-decision-game-v5'):
         from .strategy_view import build
         result=build(result)
     encoded=json.dumps(result,ensure_ascii=False).replace('<','\\u003c')
-    return Path(__file__).with_name('strategy_results.html' if result.get('schema')=='strategy-report-view-v2' else 'results.html').read_text(encoding='utf-8').replace('__DATA__',encoded)
+    template={'strategy-report-view-v2':'strategy_results.html','strategy-report-view-v3':'shared_strategy_results.html'}.get(result.get('schema'),'results.html')
+    return Path(__file__).with_name(template).read_text(encoding='utf-8').replace('__DATA__',encoded)
 def report(output,result):Path(output/'report.html').write_text(render(result),encoding='utf-8')
