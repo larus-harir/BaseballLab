@@ -28,11 +28,14 @@ class WinPolicy(NeuralPolicy):
         active=np.where(advantages>=0,ratio<=1+clip,ratio>=1-clip)
         effective=advantages*ratio*active
         delta=probs.copy();delta[np.arange(len(x)),actions]-=1;delta*=effective[:,None]/len(x)
+        delta=self.output_gradient(delta)
         _,h1,h2=cache;w1,b1,w2,b2,w3,b3=self.params
         g3,gb3=h2.T@delta,delta.sum(axis=0);d2=(delta@w3.T)*(1-h2*h2)
         g2,gb2=h1.T@d2,d2.sum(axis=0);d1=(d2@w2.T)*(1-h1*h1)
         loss=-np.mean(np.minimum(ratio*advantages,np.clip(ratio,1-clip,1+clip)*advantages))
         return float(loss),[x.T@d1,d1.sum(axis=0),g2,gb2,g3,gb3],float(np.mean(~active))
+
+    def output_gradient(self,delta):return delta
 
     @staticmethod
     def adam(params,m,v,grads,step,rate):
@@ -69,6 +72,17 @@ class WinPolicy(NeuralPolicy):
             'clip_fraction':clip_fraction,'value_error_before':float(np.mean((returns-old_values)**2)),
             'value_explained_variance_before':1-float(np.var(returns-old_values))/variance if variance else None,
             'parameter_delta':float(np.sqrt(sum(np.sum((a-b)**2) for a,b in zip(self.params,before))))}
+        signals={}
+        for j,a in enumerate(self.actions):
+            if not isinstance(a,str):continue
+            keys=([('family',a.split(':')[1]),('course',a.split(':')[2])] if a.startswith('pitch:') else [('offense','swing' if a.startswith('swing:') else 'steal' if a.startswith('steal_') else a)] if self.role=='batter' else [('defense',a)])
+            if a.startswith('swing:'):keys.append(('direction',a.split(':')[1]))
+            chosen=actions==j
+            for group,key in keys:
+                if key=='any':continue
+                v=signals.setdefault(group+':'+key,{'decisions':0,'wins':0,'advantage_sum':0.})
+                v['decisions']+=int(chosen.sum());v['wins']+=int(np.sum(returns[chosen]>0));v['advantage_sum']+=float(advantages[chosen].sum())
+        self.last_update['choice_signals']=signals
         if not all(np.isfinite(p).all() for p in (*self.params,*self.value_params)):raise RuntimeError('Nonfinite win-policy parameters')
         return loss
 
@@ -96,3 +110,42 @@ class WinPolicy(NeuralPolicy):
             if type(value) is not int or value<0:raise ValueError('Invalid value optimizer step')
             setattr(p,name,value)
         p.rng.bit_generator.state=copy.deepcopy(data['rng_state']);return p
+
+
+class PitchWinPolicy(WinPolicy):
+    """Joint-action residuals plus shared pitch-family/course/speed logits.
+
+    All original joint choices remain. Shared factors transfer win gradients
+    across compatible choices, without targets, outcome bonuses or new evidence.
+    """
+    algorithm='terminal-win-ppo-shared-pitch-v1'
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        factors={}
+        for i,a in enumerate(self.actions):
+            if a.startswith('pitch:'):
+                for kind,value in zip(('family','course','speed'),a.split(':')[1:]):factors.setdefault(kind+':'+value,[]).append(i)
+        self.factor_labels=tuple(sorted(factors));self.factor_columns=[np.array(factors[k]) for k in self.factor_labels]
+        self.factor_indices=np.full((len(self.actions),3),len(self.actions)+len(factors),dtype=int)
+        for i,(label,columns) in enumerate(zip(self.factor_labels,self.factor_columns)):
+            self.factor_indices[columns,('family','course','speed').index(label.split(':')[0])]=len(self.actions)+i
+        self.params[-2]=np.pad(self.params[-2],((0,0),(0,len(factors))));self.params[-1]=np.pad(self.params[-1],(0,len(factors)))
+        self.m=[np.zeros_like(v) for v in self.params];self.v=[np.zeros_like(v) for v in self.params]
+
+    def forward(self,x):
+        w1,b1,w2,b2,w3,b3=self.params;h1=np.tanh(x@w1+b1);h2=np.tanh(h1@w2+b2);raw=h2@w3+b3
+        logits=raw[:,:len(self.actions)].copy()
+        logits+=np.pad(raw,((0,0),(0,1)))[:,self.factor_indices].sum(axis=2)/np.sqrt(3.)
+        logits-=np.max(logits,axis=-1,keepdims=True);probs=np.exp(logits);probs/=probs.sum(axis=-1,keepdims=True)
+        return probs,(x,h1,h2)
+
+    def output_gradient(self,delta):
+        return np.concatenate((delta,np.stack([delta[:,c].sum(axis=1)/np.sqrt(3.) for c in self.factor_columns],axis=1)),axis=1)
+
+    def state_dict(self):return {**super().state_dict(),'pitch_factors':list(self.factor_labels),'joint_residuals':True}
+
+    @classmethod
+    def from_state_dict(cls,data,**kwargs):
+        p=super().from_state_dict(data,**kwargs)
+        if data.get('pitch_factors')!=list(p.factor_labels) or data.get('joint_residuals') is not True:raise ValueError('Incompatible shared pitch factors')
+        return p

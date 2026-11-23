@@ -19,6 +19,8 @@ def observe(stats,batting,defense,offense,event,legal_offense,legal_defense,obse
         feedback=team['feedback'][role].setdefault(action,{'decisions':0,'contact':0,'hits':0,'home_runs':0})
         feedback['decisions']+=1;feedback['contact']+=int(event in CONTACT)
         feedback['hits']+=int(event in ('single','double','triple','home_run'));feedback['home_runs']+=int(event=='home_run')
+        increment(feedback.setdefault('events',{}),event)
+        if event in CONTACT and contact and contact.get('kind'):increment(feedback.setdefault('kinds',{}),contact['kind'])
     if offense is not None:
         team=stats[batting]
         if offense.startswith('swing:'):increment(team['targets'],offense.split(':')[1])
@@ -32,6 +34,14 @@ def observe(stats,batting,defense,offense,event,legal_offense,legal_defense,obse
                                 ('selected',*(defense.split(':')[1:3] if defense.startswith('pitch:') else ('unspecified','unknown')))):
             bins=team['pitch_bins'][mode].setdefault(environment,{}).setdefault(family,{})
             increment(bins,area)
+
+
+def settle(stats,batting,defense,offense,outs,runs,terminal=None):
+    for i,role,action in ((batting,'offense',offense),(1-batting,'defense',defense)):
+        if action is None:continue
+        row=stats[i]['feedback'][role][action]
+        if terminal:increment(row.setdefault('terminal_results',{}),terminal)
+        for key,n in (('outs',outs),('runs',runs),('strikeouts',int(terminal=='strikeout'))):increment(row,key,n)
 
 
 def merge(target,source):

@@ -57,13 +57,13 @@ def features(o,role):
 
 
 class ModernWorld(TrackingWorld):
-    result_schema='Match-pitch-decision-game-v7'
+    result_schema='Match-pitch-decision-game-v8'
     def __init__(self,leagues=None,seasons=None,*,learner='ppo',cached_validation=True):
         from .validated_world import load
         validation=load(ASSET_SHA256) if cached_validation else None
         self.learner=learner
         if learner not in ('ppo','reinforce'):raise ValueError('Unsupported learner')
-        self.result_schema='Match-pitch-decision-game-v7' if learner=='ppo' else 'Match-pitch-decision-game-v6'
+        self.result_schema='Match-pitch-decision-game-v8' if learner=='ppo' else 'Match-pitch-decision-game-v6'
         raw=data();contact={'base_asset_sha256':ASSET_SHA256,'_asset_sha256':ASSET_SHA256,'cohorts':raw['contacts'],
             'assumptions':['Contact targets use observed directional samples, not recorded intention. Non-contact probabilities remain shared with ordinary swings. KBO directional supplementary samples retain their own population.']}
         CorpusWorld.__init__(self,leagues,seasons,dataset=raw,contact_data=contact,validation_data=validation)
@@ -88,6 +88,8 @@ class ModernWorld(TrackingWorld):
             coordinate_contract='Source-normalized left/center/right; derived KBO height and SPAIA display positions remain separately documented.',
             evaluation_sampling='Equal league opportunities, within-league year cycles and identical-state preference probes; no team ranking tournament.')
         if learner=='ppo':
+            self.evidence['policy_head']='Joint pitch logits plus shared family/course/speed residual factors; no fixed preference or auxiliary baseball reward.'
+            self.evidence['feedback_contract']='Executed outcomes and pre-update terminal-win advantages. Contact-kind associations are not identified causal effects of pitch choice.'
             self.evidence['transition_backoff']+=' If native support is empty, use exact base/out/event/bunt observations from completed earlier seasons of the same league, fit splits only. Never use a future season, other league or invented transition.'
             self.evidence['supplemental_movement_backoffs']=[]
 
@@ -95,10 +97,10 @@ class ModernWorld(TrackingWorld):
         names=(*FEATURES,'MLB','KBO','NPB','season',*('cue_'+f for f in FAMILY_CUES),*('cue_'+v for v in LOCATIONS),
            'cue_slow','cue_middle_speed','cue_fast','bat_left','bat_right','has_family_cue','has_course_cue','has_speed_cue',
            *(n for f in HISTORY_FIELDS for n in ('history_'+f,'has_history_'+f)))
-        from baseball_lab.agents.win_policy import WinPolicy
-        policy_class=WinPolicy if self.learner=='ppo' else NeuralPolicy
-        agents=tuple(policy_class(role,seed+i,actions=self.offense_actions if role=='batter' else self.defense_actions,
-            feature_encoder=features,feature_names=names,observation_schema='unified-modern-observation-v1',action_schema='unified-modern-actions-v2' if self.learner=='ppo' else 'unified-modern-actions-v1') for i,role in enumerate(('batter','pitcher')))
+        from baseball_lab.agents.win_policy import WinPolicy,PitchWinPolicy
+        agents=tuple((WinPolicy if role=='batter' else PitchWinPolicy)(role,seed+i,actions=self.offense_actions if role=='batter' else self.defense_actions,
+            feature_encoder=features,feature_names=names,observation_schema='unified-modern-observation-v1',action_schema='unified-modern-actions-v3') if self.learner=='ppo' else NeuralPolicy(role,seed+i,actions=self.offense_actions if role=='batter' else self.defense_actions,
+            feature_encoder=features,feature_names=names,observation_schema='unified-modern-observation-v1',action_schema='unified-modern-actions-v1') for i,role in enumerate(('batter','pitcher')))
         for agent in agents:agent.params[-2].fill(0.)
         return agents
 
@@ -169,7 +171,7 @@ class ModernWorld(TrackingWorld):
         if self.learner!='ppo':return answer
         from .research import Observation
         saved=(self.key,self.current,self.league,self.season,self.pitchers,self.bat_hand)
-        scenarios=(('two_strikes',6,1,1,2,-1,0,2),('hitter_count',4,0,0,0,0,3,1),
+        scenarios=tuple((f'count_{b}_{s}',4,0,1,0,0,b,s) for b in range(4) for s in range(3))+(('two_strikes',6,1,1,2,-1,0,2),('hitter_count',4,0,0,0,0,3,1),
                    ('double_play',7,0,0,1,0,1,1),('late_lead',9,0,2,0,-1,1,2))
         try:
             for league in sorted({c.value['league'] for c in self.cohorts.values()}):

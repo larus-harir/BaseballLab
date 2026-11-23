@@ -35,7 +35,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
         page.wait_for_timeout(1000)
     assert job['status']=='completed',job
     data=json.loads((ROOT/'outputs/workbench'/job['id']/'result/research.json').read_text(encoding='utf-8'))
-    assert data['schema']=='Match-pitch-decision-game-v7' and len(data['seeds'])==3
+    assert data['schema']=='Match-pitch-decision-game-v8' and len(data['seeds'])==3
     assert {c['league'] for c in data['world']['cohorts']}=={'MLB','KBO','NPB'}
     assert {c['season'] for c in data['world']['cohorts']}==set(range(2010,2027))
     assert all(len(s['training_environments'])==36 and s['shared_policy_consistent'] and s['shared_value_consistent'] for s in data['seeds'])
@@ -61,11 +61,14 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     assert not page.locator('#verdict').count()
     assert 'A팀' not in page.locator('main').inner_text() and 'B팀' not in page.locator('main').inner_text()
     assert '코스 미확인' not in page.locator('main').inner_text()
-    assert page.locator('#context option').count()>0
+    assert page.locator('select').count()==0
+    assert view['overview']['games']==153 and view['overview']['runs']==3
+    assert page.locator('#countOverview tbody tr').count()==12
+    assert all(c['preferences']['course']['states']>0 for c in view['overview']['counts'])
+    assert any(row.get('reward_observations',0)>0 for row in view['overview']['feedback']['course'].values())
     assert 'undefined' not in page.locator('#summary').inner_text()
-    expect(page.locator('#auditBadge')).to_contain_text('선택 변화')
-    page.locator('#tab-pitch').click();expect(page.locator('#heatmaps')).to_contain_text('코스 지정')
-    page.locator('#pitchLeague').select_option('MLB')
+    expect(page.locator('#auditBadge')).to_contain_text('집계 일치')
+    page.locator('#tab-pitch').click();expect(page.locator('#courseDenominator')).to_contain_text('코스 직접 선택')
     assert page.locator('#heatmaps svg').count()==1
     for m in view['heatmaps']['generated|MLB|all']:
         assert m['known']+m['missing']+m['unspecified']==m['total']
@@ -77,13 +80,13 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     for c in colors:
         lum=luminance([int(v) for v in re.findall(r'\d+',c['color'])]);ratio=1.05/(lum+.05) if c['ink']=='#fff' else (lum+.05)/.05
         assert ratio>=4.5
-    page.locator('#pitchLeague').select_option('KBO');expect(page.locator('#heatmaps svg')).to_have_count(1)
     assert view['heatmaps']['generated|KBO|all'][0]['known']>0
-    page.locator('#pitchLeague').select_option('MLB');page.locator('#pitchFamily').select_option('fastball')
     page.locator('#tab-growth').focus();page.keyboard.press('Enter');expect(page.locator('#growth')).to_be_visible()
-    page.locator('#growthRole').select_option('defense');expect(page.locator('#preferenceHeadline')).to_contain_text('선택 확률')
+    assert page.locator('#growthCharts svg').count()==4
+    assert page.locator('#courseComparison svg').count()==2
+    assert '학습 신호' in page.locator('#summary').inner_text()
     page.locator('#replayDetail > summary').click()
-    expect(page.locator('#batChoice')).to_contain_text('공격');assert page.locator('#sceneField svg').count()==1
+    expect(page.locator('#batChoice')).to_contain_text('공격');assert page.locator('#sceneField').inner_text()
     position=int(page.locator('#position').input_value());page.locator('#position').focus();page.keyboard.press('ArrowRight');expect(page.locator('#position')).to_have_value(str(position+1))
     page.locator('#tab-growth').focus();page.keyboard.press('ArrowRight');expect(page.locator('#evidence')).to_be_visible()
     page.locator('#evidence details').nth(0).locator('summary').click()
@@ -94,6 +97,12 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     page.set_viewport_size({'width':390,'height':844})
     for tab in ('summary','pitch','growth','evidence'):
         page.locator('#tab-'+tab).click();assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),tab
+    old_shared=next((p for p in (ROOT/'outputs/workbench').glob('*/result/research.json') if json.loads(p.read_text(encoding='utf-8')).get('schema')=='Match-pitch-decision-game-v7'),None)
+    if old_shared:
+        original=old_shared.read_bytes();page.goto(base+'/reports/'+old_shared.parents[1].name+'/result/report.html')
+        assert page.locator('select').count()==0 and page.locator('#countOverview tbody tr').count()==12
+        assert 'undefined' not in page.locator('main').inner_text() and 'NaN' not in page.locator('main').inner_text()
+        assert old_shared.read_bytes()==original
     old=next((p for p in (ROOT/'outputs/workbench').glob('*/result/research.json') if (lambda d:d.get('schema')=='Match-pitch-decision-game-v4' and 'pitch_bins' not in d['strategy_analysis']['teams'][0])(json.loads(p.read_text(encoding='utf-8')))),None)
     if old:
         original=old.read_bytes();page.goto(base+'/reports/'+old.parents[1].name+'/result/report.html')

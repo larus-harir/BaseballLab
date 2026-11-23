@@ -113,9 +113,9 @@ def recent_stats(result):
 
 def build(result):
     analysis=result.get('strategy_analysis',{});teams=analysis.get('teams',new_stats())
-    learned=result.get('schema')=='Match-pitch-decision-game-v7'
-    shared=result.get('schema') in ('Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7')
-    unified=result.get('schema') in ('Match-pitch-decision-game-v6','Match-pitch-decision-game-v7')
+    learned=result.get('schema') in ('Match-pitch-decision-game-v7','Match-pitch-decision-game-v8')
+    shared=result.get('schema') in ('Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7','Match-pitch-decision-game-v8')
+    unified=result.get('schema') in ('Match-pitch-decision-game-v6','Match-pitch-decision-game-v7','Match-pitch-decision-game-v8')
     games=sum(s['history'][-1]['games'] for s in result['seeds'] if s['history'])
     areas=tuple(h+'_'+v for v in ('high','middle','low') for h in ('left','middle','right')) if shared else AREAS
     if shared:
@@ -182,7 +182,8 @@ def build(result):
             for role,stages in e['values'].items():
                 for stage in stages:stages[stage]={k:v/e['runs'] for k,v in stages[stage].items()}
                 e['max_change']=max(e['max_change'],max((abs(stages['after'].get(k,0)-stages['before'].get(k,0)) for k in stages['before'].keys()|stages['after'].keys()),default=0.))
-    return {'schema':'strategy-report-view-v3' if shared else 'strategy-report-view-v2','shared_learning':shared,'unified':unified,'learning_review':learned,'status':result['status'],'teams':rows,'games':games,
+    from .learning_overview import build as overview
+    return {'overview':overview(result) if learned else None,'schema':'strategy-report-view-v3' if shared else 'strategy-report-view-v2','shared_learning':shared,'unified':unified,'learning_review':learned,'status':result['status'],'teams':rows,'games':games,
         'recent':recent_stats(result) if learned else None,
         'learning':{'max_change':max((e['max_change'] for e in comparison.values()),default=0.),
                     'individual_max':max((abs(values['after'].get(k,0)-values['before'].get(k,0)) for p in contexts for values in p['teams'][0].values() for k in values['before'].keys()|values['after'].keys()),default=0.) if learned else 0.,

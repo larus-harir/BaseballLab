@@ -264,11 +264,14 @@ def play(world,teams,seed,record=False,home_team=1):
                     balls,strikes=state.balls,state.strikes
                     if running:
                         outs+=run_outs;bases=run_bases;score[batting]+=running_runs
+                        if strategy is not None:strategy_metrics.settle(strategy,order[batting],p,b,run_outs,running_runs)
                         if record:events[-1].update(after_outs=outs,after_bases=bases,running_outs=run_outs,runs=running_runs,scores=[score[order.index(i)] for i in (0,1)])
                         if outs>=3:break
                     if terminal:
+                        previous_outs=outs
                         outs,bases,runs=world.advance(outs,bases,'hbp' if event=='hbp' else terminal,rng,**({'bunt':True} if b=='bunt' else {}))
                         if batting and inning>=9 and score[1]+runs>score[0] and terminal!='home_run':runs=min(runs,score[0]-score[1]+1)
+                        if strategy is not None:strategy_metrics.settle(strategy,order[batting],p,b,outs-previous_outs,runs,'hbp' if event=='hbp' else terminal)
                         score[batting]+=runs;faced[fielding]+=1
                         if record:events[-1].update(scores=[score[order.index(i)] for i in (0,1)],runs=runs,after_outs=outs,after_bases=bases)
                         break
@@ -408,13 +411,13 @@ def train(data,start,end,output,config,*,world=None):
                 if not run['shared_value_consistent']:raise RuntimeError('공동 가치 함수가 동기화되지 않았습니다.')
         run['optimizer_steps']=[[a.steps for a in t] for t in teams]
         run['parameters_changed']=[[any(not np.array_equal(x,y) for x,y in zip(old.params,a.params)) for old,a in zip(initial[i],t)] for i,t in enumerate(teams)]
-    if result['schema']=='Match-pitch-decision-game-v7':write_json(output/'world.json',world.state_dict())
+    if result['schema'] in ('Match-pitch-decision-game-v7','Match-pitch-decision-game-v8'):write_json(output/'world.json',world.state_dict())
     result['status']='COMPLETED';write_json(output/'research.json',result);report(output,result);return result
 
 
 def render(result):
     import json
-    if result.get('schema') in ('Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7'):
+    if result.get('schema') in ('Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7','Match-pitch-decision-game-v8'):
         from .strategy_view import build
         result=build(result)
     encoded=json.dumps(result,ensure_ascii=False).replace('<','\\u003c')
