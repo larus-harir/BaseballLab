@@ -543,8 +543,16 @@ def make_handler(workbench):
             elif path.startswith('/reports/'):
                 from urllib.parse import unquote
                 resolved=(workbench.outputs/unquote(path[len('/reports/'):])).resolve()
-                if not resolved.is_relative_to(workbench.outputs.resolve()) or resolved.name not in ('report.html','summary.md','output.log'):
+                if not resolved.is_relative_to(workbench.outputs.resolve()) or resolved.name not in ('report.html','overview.html','summary.md','output.log'):
                     return self._json({'error':'허용하지 않는 경로'},403)
+                if resolved.name=='overview.html':
+                    source=resolved.parent/'research.json'
+                    if not source.resolve().is_relative_to(workbench.outputs.resolve()):return self._json({'error':'허용하지 않는 경로'},403)
+                    if not source.is_file():return self._json({'error':'요약할 학습 기록이 없습니다.'},404)
+                    try:
+                        from baseball_lab.experiments.match.pitch_game.glance import render
+                        return self._html(render(json.loads(source.read_text(encoding='utf-8'))))
+                    except (OSError,ValueError,KeyError,TypeError) as exc:return self._json({'error':public_text(exc)},409)
                 if resolved.name=='report.html' and (resolved.parent/'analysis.json').is_file():
                     try:
                         from baseball_lab.matchup.web import render

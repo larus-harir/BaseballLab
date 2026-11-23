@@ -427,4 +427,11 @@ def render(result):
     if result.get('learning_review'):return Path(__file__).with_name('learning_results.html').read_text(encoding='utf-8').replace('__DATA__',encoded)
     template={'strategy-report-view-v2':'strategy_results.html','strategy-report-view-v3':'shared_strategy_results.html'}.get(result.get('schema'),'results.html')
     return Path(__file__).with_name(template).read_text(encoding='utf-8').replace('__DATA__',encoded)
-def report(output,result):Path(output/'report.html').write_text(render(result),encoding='utf-8')
+def report(output,result):
+    if result.get('schema') in ('Match-pitch-decision-game-v7','Match-pitch-decision-game-v8'):
+        from .strategy_view import build
+        from .glance import render as glance
+        view=build(result)
+        Path(output/'report.html').write_text(render(view),encoding='utf-8')
+        Path(output/'overview.html').write_text(glance(view),encoding='utf-8')
+    else:Path(output/'report.html').write_text(render(result),encoding='utf-8')

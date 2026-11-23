@@ -1,5 +1,5 @@
 """Real packaged multi-league learning: no raw acquisition, filters and reports."""
-import json,time
+import json,time,sys
 from check_incremental_browser import ROOT,local_server
 from playwright.sync_api import sync_playwright,expect
 
@@ -29,16 +29,24 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     page.locator('#corpusYear').select_option('all')
     expect(page.locator('#corpusSummary')).to_contain_text('NPB 2019~2026')
     page.locator('#episodes').fill('51');expect(page.locator('#trainBtn')).to_be_enabled(timeout=30000)
-    with page.expect_response(lambda r:r.url.endswith('/api/start')) as response:page.locator('#trainBtn').click()
-    assert response.value.ok,response.value.text()
-    deadline=time.monotonic()+240;last_done=0
-    while time.monotonic()<deadline:
-        job=page.request.get(base+'/api/state?project=match').json()['job']
-        if job.get('progress_scope')=='all_runs':
-            assert job['completed_episodes']>=last_done
-            last_done=job['completed_episodes'];assert job['target_episodes']==153
-        if job['status'] not in ('queued','running'):break
-        page.wait_for_timeout(1000)
+    if '--reuse-latest' in sys.argv:
+        job=None
+        for source in sorted((ROOT/'outputs/workbench').glob('*/result/research.json'),reverse=True):
+            value=json.loads(source.read_text(encoding='utf-8'))
+            if value.get('schema')=='Match-pitch-decision-game-v8' and value.get('status')=='COMPLETED' and value.get('config',{}).get('episodes')==51 and (source.parent/'overview.html').is_file():
+                job=json.loads((source.parents[1]/'task.json').read_text(encoding='utf-8'));break
+        assert job,'A completed 51-game x 3 real run with saved overview is required'
+    else:
+        with page.expect_response(lambda r:r.url.endswith('/api/start')) as response:page.locator('#trainBtn').click()
+        assert response.value.ok,response.value.text()
+        deadline=time.monotonic()+240;last_done=0
+        while time.monotonic()<deadline:
+            job=page.request.get(base+'/api/state?project=match').json()['job']
+            if job.get('progress_scope')=='all_runs':
+                assert job['completed_episodes']>=last_done
+                last_done=job['completed_episodes'];assert job['target_episodes']==153
+            if job['status'] not in ('queued','running'):break
+            page.wait_for_timeout(1000)
     assert job['status']=='completed',job
     assert job['completed_episodes']==job['target_episodes']==153
     data=json.loads((ROOT/'outputs/workbench'/job['id']/'result/research.json').read_text(encoding='utf-8'))
@@ -64,6 +72,15 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     page.goto(base+job['report']);expect(page.locator('#teamCards')).to_contain_text('공격')
     view=page.locator('#data').text_content();view=json.loads(view)
     assert view['schema']=='strategy-report-view-v3'
+    original=(ROOT/'outputs/workbench'/job['id']/'result/research.json').read_bytes()
+    page.locator('#glanceLink').click();expect(page).to_have_url(base+job['report'].replace('report.html','overview.html'))
+    expect(page.locator('h1')).to_be_visible();assert page.locator('.grids svg').count()==2
+    assert '한눈에 보기' in page.title() and not page.locator('select').count()
+    page.locator('a[href="report.html#pitch"]').first.click();expect(page.locator('#pitch')).to_be_visible()
+    page.locator('#glanceLink').click();page.locator('.interpretation a[href="report.html#evidence"]').click();expect(page.locator('#evidence')).to_be_visible()
+    page.locator('#tab-summary').click()
+    assert (ROOT/'outputs/workbench'/job['id']/'result/research.json').read_bytes()==original
+    assert (ROOT/'outputs/workbench'/job['id']/'result/overview.html').is_file()
     assert all(all(t['checks'].values()) for t in view['teams'])
     assert not page.locator('#verdict').count()
     assert 'A팀' not in page.locator('main').inner_text() and 'B팀' not in page.locator('main').inner_text()
@@ -100,7 +117,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     expect(page.locator('#management')).to_contain_text('대조 일치')
     page.locator('#evidence details').nth(1).locator('summary').click()
     expect(page.locator('#quality')).to_contain_text('KBO 2016')
-    page.reload();expect(page.locator('#summary')).to_be_visible()
+    page.reload();expect(page.locator('#evidence')).to_be_visible()
     page.set_viewport_size({'width':390,'height':844})
     for tab in ('summary','pitch','growth','evidence'):
         page.locator('#tab-'+tab).click();assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),tab
