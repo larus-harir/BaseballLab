@@ -13,7 +13,11 @@ from baseball_lab.agents.neural import NeuralPolicy
 from baseball_lab.core.engine import State,transition
 from baseball_lab.core.contracts import RuleSet
 from baseball_lab.r1.data import walk
-from baseball_lab.data.lineage import content_hash,write_json,utc_now
+from baseball_lab.data.lineage import content_hash,write_json as original_write_json,utc_now
+
+
+def write_json(path,payload):
+    return original_write_json(path,payload,compact=True)
 
 SCHEMA='Match-pitch-decision-game-v2'
 EVENTS=('ball','strike','foul','out','single','double','triple','home_run','hbp','bunt_foul')
@@ -383,8 +387,11 @@ def train(data,start,end,output,config,*,world=None):
                     for role,learner in enumerate(teams[0]):
                         learner.update([*batches[0][role],*batches[1][role]])
                         replica=teams[1][role]
-                        for name in ('params','m','v'):setattr(replica,name,[v.copy() for v in getattr(learner,name)])
-                        replica.steps=learner.steps
+                        if hasattr(replica,'synchronize'):replica.synchronize(learner)
+                        else:
+                            for name in ('params','m','v'):setattr(replica,name,[v.copy() for v in getattr(learner,name)])
+                            replica.steps=learner.steps
+                        if hasattr(learner,'last_update'):run.setdefault('learning_updates',[]).append({'games':episode,'role':learner.role,**learner.last_update})
                         batches[0][role]=[];batches[1][role]=[]
                 else:
                     for i,t in enumerate(teams):
@@ -396,17 +403,22 @@ def train(data,start,end,output,config,*,world=None):
             run['shared_policy_consistent']=all(np.array_equal(a,b) for left,right in zip(teams[0],teams[1]) for a,b in zip(left.params,right.params))
             if not run['shared_policy_consistent']:raise RuntimeError('공동 정책의 역할 복제본 지문이 다릅니다.')
             run['pooled_role_episodes']=2*config.episodes
+            if hasattr(teams[0][0],'value_params'):
+                run['shared_value_consistent']=all(np.array_equal(a,b) for left,right in zip(teams[0],teams[1]) for a,b in zip(left.value_params,right.value_params))
+                if not run['shared_value_consistent']:raise RuntimeError('공동 가치 함수가 동기화되지 않았습니다.')
         run['optimizer_steps']=[[a.steps for a in t] for t in teams]
         run['parameters_changed']=[[any(not np.array_equal(x,y) for x,y in zip(old.params,a.params)) for old,a in zip(initial[i],t)] for i,t in enumerate(teams)]
+    if result['schema']=='Match-pitch-decision-game-v7':write_json(output/'world.json',world.state_dict())
     result['status']='COMPLETED';write_json(output/'research.json',result);report(output,result);return result
 
 
 def render(result):
     import json
-    if result.get('schema') in ('Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6'):
+    if result.get('schema') in ('Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7'):
         from .strategy_view import build
         result=build(result)
     encoded=json.dumps(result,ensure_ascii=False).replace('<','\\u003c')
+    if result.get('learning_review'):return Path(__file__).with_name('learning_results.html').read_text(encoding='utf-8').replace('__DATA__',encoded)
     template={'strategy-report-view-v2':'strategy_results.html','strategy-report-view-v3':'shared_strategy_results.html'}.get(result.get('schema'),'results.html')
     return Path(__file__).with_name(template).read_text(encoding='utf-8').replace('__DATA__',encoded)
 def report(output,result):Path(output/'report.html').write_text(render(result),encoding='utf-8')

@@ -19,15 +19,15 @@ def directions():
 
 
 class ContactModel:
-    def __init__(self,value):
+    def __init__(self,value,*,validation=None):
         self.value=value;self.counts={};self.pool={}
         for part,rows in value['counts'].items():
             fine=defaultdict(Counter);pool=defaultdict(Counter)
             for b,s,hand,aim,side,kind,event,n in rows:
                 fine[b,s,hand,aim][side,kind,event]+=n;pool[hand,aim][side,kind,event]+=n
             self.counts[part]=fine;self.pool[part]=pool
-        self.strength=min((None,10,50,200),key=lambda a:self.check('validation',a)['brier'] or 0.)
-        self.metrics={p:self.check(p,self.strength) for p in ('validation','test')}
+        self.strength=validation['strength'] if validation is not None else min((None,10,50,200),key=lambda a:self.check('validation',a)['brier'] or 0.)
+        self.metrics=validation['metrics'] if validation is not None else {p:self.check(p,self.strength) for p in ('validation','test')}
 
     @lru_cache(maxsize=2048)
     def distribution(self,b,s,hand,aim,strength):

@@ -10,6 +10,8 @@ from baseball_lab.experiments.registry import REPOSITORY_ROOT
 
 
 def main():
+    for name in ('OPENBLAS_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS'):
+        os.environ.setdefault(name,'1')
     if os.name=='posix':os.umask(0o077)
     parser=argparse.ArgumentParser(description='야구 AI 연구실 · 실제 데이터와 실행 근거로 관찰하는 E01')
     parser.add_argument('--mode',choices=('prepare','audit','fit','inspect','train','replay','baseline','web','run','scoring','inning','whole_game','pitch_game','simulate'),default='web')

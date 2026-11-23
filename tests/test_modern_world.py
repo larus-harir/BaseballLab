@@ -67,7 +67,7 @@ def test_all_years_are_scheduled_and_coarse_records_cannot_invent_course(world):
         key=next(k for k,c in world.cohorts.items() if c.value['league']==league and c.value['season']==year)
         world.requested_context=key;world.begin_game(0)
         obs=Observation(1,0,0,0,0,0,0,0,0,league,year)
-        legal=world.defense_legal(obs);assert 'pitch' in legal
+        legal=world.defense_legal(obs);assert 'intentional_walk' in legal
         if league=='KBO' and year==2016:
             assert all(not a.startswith('pitch:') or ':any:' in a for a in legal)
             assert world.prepare(obs,'pitch',Random(3)).location_cue==''
@@ -109,3 +109,42 @@ def test_partial_or_unpinned_supplement_cache_is_not_treated_as_complete(tmp_pat
     for files in ([],[{'year':y,'sha256':'MOCK_TEST_ONLY'} for y in PITCH_FILES]):
         path.write_text(json.dumps({'status':'ACQUIRED','revision':REVISION,'files':files}))
         with pytest.raises(ValueError,match='고정 배포'):collect(tmp_path)
+
+
+def test_sparse_native_movement_uses_only_exact_earlier_same_league_observations():
+    from baseball_lab.experiments.match.pitch_game.corpus_world import legal_movement
+    w=ModernWorld(['KBO'],[2026]);w.begin_game(0)
+    with pytest.raises(ValueError):w.current.movement(1,7,'triple')
+    result=w.advance(1,7,'triple',Random(71));record=w.evidence['supplemental_movement_backoffs'][0]
+    expected=Counter()
+    for name,c in data()['cohorts'].items():
+        if c['league']!='KBO' or c['season']>=2026:continue
+        for outs,bases,event,bunt,values in c['movements']['fit']:
+            if (outs,bases,event,bunt)!=(1,7,'triple',False):continue
+            for delta,end,runs,n in values:
+                if legal_movement(1,7,'triple',delta,end,runs):expected[delta,end,runs]+=n
+    assert expected and Counter({tuple(v[:3]):v[3] for v in record['outcomes']})==expected
+    assert (result[0]-1,*result[1:]) in expected and all(s['environment'].startswith('KBO:') and int(s['environment'].split(':')[1])<2026 for s in record['sources'])
+    assert sum(s['observations'] for s in record['sources'])==sum(expected.values())
+    assert all(s['fit_end']<w.current.value['split']['fit'][0] for s in record['sources'])
+    w.advance(1,7,'triple',Random(72));assert len(w.evidence['supplemental_movement_backoffs'])==1
+
+
+def test_every_native_base_out_and_hit_state_has_audited_movement_support(world):
+    from baseball_lab.experiments.match.pitch_game.corpus_world import legal_movement
+    for key,c in world.cohorts.items():
+        world.requested_context=key;world.begin_game(0)
+        for outs in range(3):
+            for bases in range(8):
+                assert world.advance(outs,bases,'strikeout',Random(5))==(outs+1,bases if outs<2 else 0,0)
+                assert world.advance(outs,bases,'home_run',Random(5))==(outs,0,1+bases.bit_count())
+                for event in ('out','single','double','triple'):
+                    end_outs,end_bases,runs=world.advance(outs,bases,event,Random(5))
+                    assert legal_movement(outs,bases,event,end_outs-outs,end_bases,runs)
+
+
+def test_absent_past_movement_is_not_replaced_by_invented_or_future_outcomes(monkeypatch):
+    w=ModernWorld(['MLB'],[2010]);w.begin_game(0)
+    def absent(*args,**kwargs):raise ValueError('MOCK_TEST_ONLY unsupported transition')
+    monkeypatch.setattr(w.current,'movement',absent)
+    with pytest.raises(ValueError,match='과거 관측도 없습니다'):w.advance(0,0,'triple',Random(4))

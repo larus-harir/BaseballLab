@@ -16,6 +16,11 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     expect(page.locator('#sourcePreview')).to_contain_text('연도별 학습 표본 확인')
     expect(page.locator('#trainingData')).to_be_hidden()
     expect(page.locator('#sourcePreview')).to_contain_text('코스가 없는 시즌도')
+    page.locator('#trainingOptions > summary').click()
+    page.locator('#corpusMLB').uncheck();page.locator('#corpusKBO').uncheck()
+    expect(page.locator('#corpusYear option')).to_have_count(9)
+    page.locator('#corpusMLB').check();page.locator('#corpusKBO').check()
+    expect(page.locator('#corpusYear option')).to_have_count(18)
     page.locator('#study').select_option('half_inning');expect(page.locator('#trainingDataWrap')).to_be_hidden()
     page.locator('#study').select_option('pitch_game')
     page.locator('#corpusYear').select_option('all')
@@ -30,10 +35,10 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
         page.wait_for_timeout(1000)
     assert job['status']=='completed',job
     data=json.loads((ROOT/'outputs/workbench'/job['id']/'result/research.json').read_text(encoding='utf-8'))
-    assert data['schema']=='Match-pitch-decision-game-v6' and len(data['seeds'])==3
+    assert data['schema']=='Match-pitch-decision-game-v7' and len(data['seeds'])==3
     assert {c['league'] for c in data['world']['cohorts']}=={'MLB','KBO','NPB'}
     assert {c['season'] for c in data['world']['cohorts']}==set(range(2010,2027))
-    assert all(len(s['training_environments'])==36 and s['shared_policy_consistent'] for s in data['seeds'])
+    assert all(len(s['training_environments'])==36 and s['shared_policy_consistent'] and s['shared_value_consistent'] for s in data['seeds'])
     assert all(all(all(v) for v in s['parameters_changed']) for s in data['seeds'])
     assert all(any(k.startswith('pitch:') for counts in s['training_choices'] for k in counts) for s in data['seeds'])
     for seed in data['seeds']:
@@ -49,7 +54,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     assert data['strategy_analysis']['preferences']
     assert any(c['fit']['course']==0 for c in data['world']['capabilities'].values())
     assert any(c['fit']['course']>0 for c in data['world']['capabilities'].values())
-    page.goto(base+job['report']);expect(page.locator('#teamCards')).to_contain_text('통합 공격 AI')
+    page.goto(base+job['report']);expect(page.locator('#teamCards')).to_contain_text('공격')
     view=page.locator('#data').text_content();view=json.loads(view)
     assert view['schema']=='strategy-report-view-v3'
     assert all(all(t['checks'].values()) for t in view['teams'])
@@ -58,8 +63,8 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     assert '코스 미확인' not in page.locator('main').inner_text()
     assert page.locator('#context option').count()>0
     assert 'undefined' not in page.locator('#summary').inner_text()
-    expect(page.locator('#auditBadge')).to_contain_text('일치')
-    page.locator('#tab-pitch').click();expect(page.locator('#heatmaps')).to_contain_text('분모:')
+    expect(page.locator('#auditBadge')).to_contain_text('선택 변화')
+    page.locator('#tab-pitch').click();expect(page.locator('#heatmaps')).to_contain_text('코스 지정')
     page.locator('#pitchLeague').select_option('MLB')
     assert page.locator('#heatmaps svg').count()==1
     for m in view['heatmaps']['generated|MLB|all']:
@@ -77,10 +82,14 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     page.locator('#pitchLeague').select_option('MLB');page.locator('#pitchFamily').select_option('fastball')
     page.locator('#tab-growth').focus();page.keyboard.press('Enter');expect(page.locator('#growth')).to_be_visible()
     page.locator('#growthRole').select_option('defense');expect(page.locator('#preferenceHeadline')).to_contain_text('선택 확률')
-    expect(page.locator('#batChoice')).to_contain_text('시도');assert page.locator('#sceneField svg').count()==1
+    page.locator('#replayDetail > summary').click()
+    expect(page.locator('#batChoice')).to_contain_text('공격');assert page.locator('#sceneField svg').count()==1
     position=int(page.locator('#position').input_value());page.locator('#position').focus();page.keyboard.press('ArrowRight');expect(page.locator('#position')).to_have_value(str(position+1))
     page.locator('#tab-growth').focus();page.keyboard.press('ArrowRight');expect(page.locator('#evidence')).to_be_visible()
-    expect(page.locator('#management')).to_contain_text('대조 일치');expect(page.locator('#quality')).to_contain_text('KBO 2016')
+    page.locator('#evidence details').nth(0).locator('summary').click()
+    expect(page.locator('#management')).to_contain_text('대조 일치')
+    page.locator('#evidence details').nth(1).locator('summary').click()
+    expect(page.locator('#quality')).to_contain_text('KBO 2016')
     page.reload();expect(page.locator('#summary')).to_be_visible()
     page.set_viewport_size({'width':390,'height':844})
     for tab in ('summary','pitch','growth','evidence'):

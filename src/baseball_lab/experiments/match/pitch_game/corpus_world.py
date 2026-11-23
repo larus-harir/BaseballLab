@@ -64,7 +64,7 @@ def legal_movement(outs,bases,event,delta,end,runs):
 
 
 class Cohort:
-    def __init__(self,value):
+    def __init__(self,value,*,validation=None):
         self.value=value;self.counts={};self.base={};self.pooled={};self.by_action={}
         for part,rows in value['counts'].items():
             fine=defaultdict(Counter);base=defaultdict(Counter);pooled=defaultdict(Counter)
@@ -84,17 +84,20 @@ class Cohort:
             self.moves[part]=exact;self.move_pool[part]=pooled
         # Shrink observed pattern cells toward a fit-only count/action model.
         # Only validation chooses strength; the final test never selects it.
-        options=[0,10,50,200,None]
-        candidates=[(self.check('validation',strength)['brier'],strength) for strength in options]
-        self.strength=min(candidates,key=lambda v:(v[0],v[1] is not None))[1]
-        self.metrics={p:self.check(p,self.strength) for p in ('validation','test')}
-        self.movement_metrics={p:self.check_movements(p) for p in ('validation','test')}
+        if validation is None:
+            options=[0,10,50,200,None]
+            candidates=[(self.check('validation',strength)['brier'],strength) for strength in options]
+            self.strength=min(candidates,key=lambda v:(v[0],v[1] is not None))[1]
+            self.metrics={p:self.check(p,self.strength) for p in ('validation','test')}
+            self.movement_metrics={p:self.check_movements(p) for p in ('validation','test')}
+        else:
+            self.strength=validation['strength'];self.metrics=validation['metrics'];self.movement_metrics=validation['movement_metrics']
         families={key[3:] for key in self.counts['fit'] if key[3]}
         self.patterns={pattern(f,l,v):(f,l,v) for f,l,v in families}
         self.arrivals=defaultdict(Counter)
         for (b,s,a,f,l,v),counts in self.counts['fit'].items():self.arrivals[b,s][f,l,v]+=sum(counts.values())
         self.running={p:{tuple(row[:5]):Counter({tuple(v[:4]):v[4] for v in row[5]}) for row in rows} for p,rows in value.get('running',{}).items()}
-        self.running_metrics={p:self.check_running(p) for p in ('validation','test')}
+        self.running_metrics=validation['running_metrics'] if validation is not None else {p:self.check_running(p) for p in ('validation','test')}
 
     def probabilities(self,b,s,action,family=None,location=None,strength=None,*,speed=None):
         base=self.base['fit'].get((b,s,action)) or self.pooled['fit'].get(action,Counter())
@@ -163,7 +166,7 @@ class Cohort:
 
 
 class CorpusWorld:
-    def __init__(self,leagues=None,seasons=None,*,dataset=None,contact_data=None):
+    def __init__(self,leagues=None,seasons=None,*,dataset=None,contact_data=None,validation_data=None):
         raw=dataset or corpus();leagues=leagues or ['MLB','KBO','NPB']
         if set(leagues)-{'MLB','KBO','NPB'}:raise ValueError('학습할 리그를 확인하세요.')
         selected={k:v for k,v in raw['cohorts'].items() if v['league'] in leagues and (not seasons or v['season'] in seasons)}
@@ -172,9 +175,9 @@ class CorpusWorld:
         contact=contact_data or directions()
         asset_sha=raw.get('_asset_sha256',ASSET_SHA256)
         if contact['base_asset_sha256']!=asset_sha:raise ValueError('투구·타구 자료 버전이 맞지 않습니다.')
-        self.contacts={k:ContactModel(contact['cohorts'][k]) for k in selected}
+        self.contacts={k:ContactModel(contact['cohorts'][k],validation=validation_data[k]['contact'] if validation_data else None) for k in selected}
         self.track_strategy=True;self.bat_hand='U';self.last_contact=None
-        self.cohorts={k:Cohort(v) for k,v in selected.items()}
+        self.cohorts={k:Cohort(v,validation=validation_data[k]['pitch'] if validation_data else None) for k,v in selected.items()}
         self.offense_actions=tuple(dict.fromkeys((*OFF,*('swing:'+a for a in ('pull','center','opposite','left','right')),*(key[-1] for c in self.cohorts.values() for key in c.running.get('fit',{})))))
         self.defense_actions=tuple(dict.fromkeys((*DEF,*(a for c in self.cohorts.values() for a in c.patterns))))
         self.evidence={'corpus':True,'model':'multileague-pitch-contact-world-v3','asset_sha256':asset_sha,

@@ -29,13 +29,15 @@ def content_hash(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()).hexdigest()
 
 
-def write_json(path, payload):
+def write_json(path, payload,*,compact=False):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + '.tmp')
     descriptor=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_TRUNC|getattr(os,'O_NOFOLLOW',0),0o600)
     with os.fdopen(descriptor,'w',encoding='utf-8') as file:
-        json.dump(payload,file,ensure_ascii=False,indent=2,allow_nan=False)
+        # dumps uses the C encoder for compact output; retain every field.
+        if compact:file.write(json.dumps(payload,ensure_ascii=False,separators=(',',':'),allow_nan=False))
+        else:json.dump(payload,file,ensure_ascii=False,indent=2,allow_nan=False)
         file.write('\n')
     temporary.replace(path)
     private(path)

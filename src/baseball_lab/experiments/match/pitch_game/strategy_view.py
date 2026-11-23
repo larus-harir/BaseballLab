@@ -1,6 +1,7 @@
 """Read-only, reconciled report projections. Never repairs saved observations."""
 from collections import Counter
 from .strategy import new_stats,merge
+import json
 
 AREAS=tuple(h+'_'+v for v in ('high','middle','low') for h in ('inside','middle','outside'))
 
@@ -74,10 +75,47 @@ def preference_changes(preferences,team,role):
                    for k in before.keys()|after.keys()],key=lambda x:(-abs(x['delta']),x['action']))
 
 
+def choice_groups(values,view):
+    grouped=Counter()
+    for action,p in values.items():
+        if view=='offense':action='swing' if action.startswith('swing:') else 'steal' if action.startswith('steal_') else action
+        elif view=='direction':
+            if not action.startswith('swing:'):continue
+        elif view=='course':
+            if not action.startswith('pitch:') or action.split(':')[2]=='any':continue
+            action='area:'+action.split(':')[2]
+        elif view=='defense':
+            if action.startswith('change_'):continue
+            if action.startswith('pitch:'):action='family:'+action.split(':')[1]
+        grouped[action]+=p
+    return dict(grouped)
+
+
+def recent_stats(result):
+    total=new_stats();games=0
+    def difference(now,old):
+        return {k:difference(v,old.get(k,{})) if isinstance(v,dict) else v-old.get(k,0) for k,v in now.items()}
+    for seed in result['seeds']:
+        history=seed['history']
+        if not history:continue
+        last=history[-1];cut=max((h for h in history if h['games']<=.75*last['games']),key=lambda h:h['games'])
+        games+=last['games']-cut['games']
+        merge(total,[difference(n,o) for n,o in zip(last.get('strategy',new_stats()),cut.get('strategy',new_stats()))])
+    pooled=new_stats()[0]
+    for t in total:merge([pooled],[t])
+    families=Counter()
+    for action,n in pooled['defense'].items():
+        if action.startswith('pitch:'):families[action.split(':')[1]]+=n
+    return {'games':games,'offense':choice_groups(pooled['offense'],'offense'),'targets':pooled['targets'],
+            'families':dict(families),'general_pitches':pooled['defense'].get('pitch',0),
+            'actual_pitches':sum(n for k,n in pooled['defense'].items() if k=='pitch' or k.startswith('pitch:'))}
+
+
 def build(result):
     analysis=result.get('strategy_analysis',{});teams=analysis.get('teams',new_stats())
-    shared=result.get('schema') in ('Match-pitch-decision-game-v5','Match-pitch-decision-game-v6')
-    unified=result.get('schema')=='Match-pitch-decision-game-v6'
+    learned=result.get('schema')=='Match-pitch-decision-game-v7'
+    shared=result.get('schema') in ('Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7')
+    unified=result.get('schema') in ('Match-pitch-decision-game-v6','Match-pitch-decision-game-v7')
     games=sum(s['history'][-1]['games'] for s in result['seeds'] if s['history'])
     areas=tuple(h+'_'+v for v in ('high','middle','low') for h in ('left','middle','right')) if shared else AREAS
     if shared:
@@ -119,6 +157,11 @@ def build(result):
         answer=[]
         for p in values:
             policy={}
+            if learned:
+                for view in ('offense','direction','defense','course'):
+                    source=p['teams'][0]['offense' if view in ('offense','direction') else 'defense']
+                    policy[view]=({stage:choice_groups(v,view) for stage,v in source.items()} if 'before' in source else choice_groups(source,view))
+                answer.append({**p,'teams':[policy]});continue
             for role,probabilities in p['teams'][0].items():
                 if isinstance(probabilities,dict):
                     policy[role]=({stage:grouped_probabilities(v,role) for stage,v in probabilities.items()}
@@ -127,12 +170,30 @@ def build(result):
         return answer
     # This projection omits repetitive raw counters, long hash lists and model
     # internals from the HTML. They remain unchanged in the saved research JSON.
-    return {'schema':'strategy-report-view-v3' if shared else 'strategy-report-view-v2','shared_learning':shared,'unified':unified,'status':result['status'],'teams':rows,'games':games,
-        'contexts':probes(analysis.get('preferences',[])),'heatmaps':maps,'joint_pitch_bins':joint,'leagues':leagues,'families':family_keys,
+    contexts=probes(analysis.get('preferences',[]));comparison={}
+    if learned:
+        for p in contexts:
+            key=json.dumps(p['context'],sort_keys=True);entry=comparison.setdefault(key,{'context':p['context'],'runs':0,'values':{}});entry['runs']+=1
+            for role,stages in p['teams'][0].items():
+                target=entry['values'].setdefault(role,{'before':Counter(),'after':Counter()})
+                for stage,values in stages.items():target[stage].update(values)
+        for e in comparison.values():
+            e['max_change']=0.
+            for role,stages in e['values'].items():
+                for stage in stages:stages[stage]={k:v/e['runs'] for k,v in stages[stage].items()}
+                e['max_change']=max(e['max_change'],max((abs(stages['after'].get(k,0)-stages['before'].get(k,0)) for k in stages['before'].keys()|stages['after'].keys()),default=0.))
+    return {'schema':'strategy-report-view-v3' if shared else 'strategy-report-view-v2','shared_learning':shared,'unified':unified,'learning_review':learned,'status':result['status'],'teams':rows,'games':games,
+        'recent':recent_stats(result) if learned else None,
+        'learning':{'max_change':max((e['max_change'] for e in comparison.values()),default=0.),
+                    'individual_max':max((abs(values['after'].get(k,0)-values['before'].get(k,0)) for p in contexts for values in p['teams'][0].values() for k in values['before'].keys()|values['after'].keys()),default=0.) if learned else 0.,
+                    'contexts':sorted(comparison.values(),key=lambda e:-e['max_change']),
+                    'optimizer_steps':sum(u['optimizer_steps'] for s in result['seeds'] for u in s.get('learning_updates',[]))} if learned else None,
+        'contexts':contexts,'heatmaps':maps,'joint_pitch_bins':joint,'leagues':leagues,'families':family_keys,
         'growth':[{'seed':s['seed'],'history':[{'games':h['games'],'probes':probes(h.get('strategy_probes',[]))} for h in s['history']]} for s in result['seeds']],
         'runs':[{'seed':s['seed'],'replay':{k:v for k,v in (s.get('replay') or {}).items() if k in ('events','environment','management')}} for s in result['seeds']],
         'cohorts':cohorts,'experienced':sorted({k for s in result['seeds'] for k in s.get('training_environments',{})}),
         'evidence':{'quality':result['world'].get('quality',{}),'capabilities':result['world'].get('capabilities',{}),
+                    'supplemental_movement_backoffs':result['world'].get('supplemental_movement_backoffs',[]),
                     'annual_coverage':result['world'].get('annual_coverage',{}),'historical_context':result['world'].get('historical_context',{}),'assumptions':result['world'].get('assumptions',[]),
                     'holdout':result['world']['holdout_prediction']['test'],'asset_sha256':result['world']['asset_sha256'],
                     'contact_asset_sha256':result['world'].get('contact_asset_sha256'),'contact_coverage':result['world'].get('contact_coverage',{})}}

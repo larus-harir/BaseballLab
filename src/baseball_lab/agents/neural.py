@@ -33,6 +33,8 @@ class NeuralPolicy:
             raise ValueError('Unknown policy role')
         self.role = role
         self.actions = tuple(actions) if actions is not None else BAT_PLAYS if role == 'batter' else PITCH_PLAYS
+        self._action_index = {a:i for i,a in enumerate(self.actions)}
+        self._mask_cache = {}
         self.encoder = feature_encoder or features
         self.feature_names = tuple(feature_names)
         self.observation_schema, self.action_schema = observation_schema, action_schema
@@ -58,9 +60,14 @@ class NeuralPolicy:
 
     def _mask(self, legal_actions):
         legal = tuple(legal_actions)
-        if not legal or len(set(legal)) != len(legal) or any(a not in self.actions for a in legal):
+        if legal in self._mask_cache:return self._mask_cache[legal]
+        if not legal or len(set(legal)) != len(legal) or any(a not in self._action_index for a in legal):
             raise ValueError('Incompatible legal-action schema')
-        return np.array([a in legal for a in self.actions], dtype=bool)
+        mask=np.zeros(len(self.actions),dtype=bool)
+        mask[[self._action_index[a] for a in legal]]=True;mask.flags.writeable=False
+        if len(self._mask_cache)>=512:self._mask_cache.clear()
+        self._mask_cache[legal]=mask
+        return mask
 
     def probabilities(self, observation, legal_actions=None):
         probs = self.forward(self.encoder(observation, self.role)[None, :])[0][0]
@@ -72,7 +79,8 @@ class NeuralPolicy:
     def act(self, observation, legal_actions, rng):
         mask = self._mask(legal_actions)
         x = self.encoder(observation, self.role)
-        probs = self.probabilities(observation, legal_actions)
+        probs = self.forward(x[None,:])[0][0]*mask
+        probs /= probs.sum()
         index = rng.choices(range(len(self.actions)), weights=probs, k=1)[0]
         if self.collect:
             self.decisions.append((x, index, mask))
@@ -125,6 +133,7 @@ class NeuralPolicy:
     def state_dict(self):
         return {'role': self.role, 'parameters': [p.tolist() for p in self.params],
                 'adam_m': [p.tolist() for p in self.m], 'adam_v': [p.tolist() for p in self.v], 'steps': self.steps,
+                **({'actions':list(self.actions)} if all(isinstance(a,str) for a in self.actions) else {}),
                 'observation_schema': self.observation_schema, 'action_schema': self.action_schema,
                 'feature_names': list(self.feature_names)}
 
@@ -136,6 +145,7 @@ class NeuralPolicy:
             raise ValueError('Incompatible neural checkpoint schema/features')
         hidden = len(data['parameters'][1])
         policy = cls(data['role'], hidden=hidden, actions=actions, feature_encoder=feature_encoder, feature_names=feature_names, observation_schema=observation_schema, action_schema=action_schema)
+        if 'actions' in data and tuple(data['actions'])!=policy.actions:raise ValueError('Incompatible checkpoint action order')
         for name, source in (('params', 'parameters'), ('m', 'adam_m'), ('v', 'adam_v')):
             values = [np.asarray(value, dtype=np.float64) for value in data[source]]
             if len(values) != len(policy.params) or any(a.shape != b.shape or not np.isfinite(a).all() for a, b in zip(values, policy.params)):

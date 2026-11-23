@@ -99,8 +99,8 @@ class Workbench:
                         from baseball_lab.experiments.match.reporting.summary import build_summary
                         reading=build_summary(data)
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
-                    elif data.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6'):
-                        run['reading']={'headline':('통합 AI의 학습 변화 · ' if data.get('schema') in ('Match-pitch-decision-game-v5','Match-pitch-decision-game-v6') else '투구·타격 선택과 성장 · ' if data.get('schema')=='Match-pitch-decision-game-v4' else '매 공의 행동 학습 · ')+('완료' if data.get('status')=='COMPLETED' else '진행 중')}
+                    elif data.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7'):
+                        run['reading']={'headline':('통합 AI의 학습 변화 · ' if data.get('schema') in ('Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7') else '투구·타격 선택과 성장 · ' if data.get('schema')=='Match-pitch-decision-game-v4' else '매 공의 행동 학습 · ')+('완료' if data.get('status')=='COMPLETED' else '진행 중')}
                     elif data.get('schema')=='Match-whole-game-v1':
                         data_runs=data.get('seeds',[]);completed=[s['test_after']['win_rate'] for s in data_runs if 'test_after' in s]
                         run['reading']={'headline':'전체 경기 전략 학습'+(' · 평가 승률 '+str(round(100*sum(completed)/len(completed),1))+'%' if completed else ' · 진행 중')}
@@ -393,7 +393,7 @@ class Workbench:
                         if progress and self.job['kind'] in ('train','run'):
                             done,total=map(int,progress.groups()[:2]);unit=progress.group(3)
                             display_unit='경기' if 'whole_game' in command or 'pitch_game' in command else '이닝' if 'inning' in command else '득점 기회' if 'scoring' in command else unit
-                            self.job.update(completed_episodes=done,target_episodes=total,message=f'AI 연습 {done:,}/{total:,}{display_unit} · 지금까지의 결과를 볼 수 있습니다.')
+                            self.job.update(completed_episodes=done,target_episodes=total,message=f'학습 {done:,}/{total:,}{display_unit}')
                         if (output/'result/report.html').exists() and not (output/'result/failure.json').exists():
                             self.job['report']=f'/reports/{job_id}/result/report.html'
                         self.job['logs']=self.job['logs'][-120:]
@@ -406,7 +406,7 @@ class Workbench:
                 cancelled=self.job['status']=='cancelling'
                 self._cache=(0,None)
                 status='cancelled' if cancelled else 'failed' if code or invalid_fit else 'completed'
-                message='작업을 중지했습니다.' if cancelled else '검사를 통과하지 못했어요. 아래 이유를 확인하세요.' if invalid_fit else '문제가 생겼어요. 아래 기록과 도움말을 확인하세요.' if code else '완료했어요. 결과 보기를 눌러 주세요.'
+                message='중지됨' if cancelled else '모형 검사 실패' if invalid_fit else '실행 실패 · 로그 확인' if code else '완료'
                 if self.job['kind']=='prepare_catalog' and not cancelled:
                     message=('자료를 내려받지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도하세요. '+(self.job['logs'][-1] if self.job['logs'] else '')) if code else '자료 연결을 마쳤습니다. 선수와 시즌을 선택할 수 있어요.'
                 report=output/'result/report.html'
@@ -554,7 +554,7 @@ def make_handler(workbench):
                             evidence['external_evaluation']=[r for r in external if r.get('run_id')==evidence['run_id']]
                             from baseball_lab.experiments.match.reporting.report import render
                             return self._html(render(evidence))
-                        if evidence.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6'):
+                        if evidence.get('schema') in ('Match-pitch-decision-game-v1','Match-pitch-decision-game-v2','Match-pitch-decision-game-v3','Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7'):
                             from baseball_lab.experiments.match.pitch_game.research import render
                             return self._html(render(evidence))
                         if evidence.get('schema')=='Match-whole-game-v1':
