@@ -309,7 +309,7 @@ class Workbench:
                     plan=Plan(str(options.get('start','')),str(options.get('end','')))
                     start,end=plan.start,plan.end
                 episodes=options.get('episodes',600);seed=options.get('seed',20261104)
-                if type(episodes) is not int or not 20<=episodes<=100000:raise ValueError('학습 타석 수는 20~100,000 사이의 정수입니다.')
+                if type(episodes) is not int or not 20<=episodes<=100000:raise ValueError('학습량은 20~100,000 사이의 정수로 입력하세요.')
                 if type(seed) is not int or not 0<=seed<=2**31-1:raise ValueError('재현 번호 범위를 확인하세요.')
                 extra=['--mode','scoring' if source=='retrosheet' else 'run','--start',start,'--end',end,'--episodes',str(episodes),'--seed',str(seed)]
                 if source=='retrosheet' and collected:extra.append('--collected-window')
@@ -370,6 +370,7 @@ class Workbench:
         write_json(self.outputs/self.job['id']/'task.json',self.job)
 
     def _worker(self,job_id,command,output):
+        from .training_progress import parse as training_progress
         process=None
         try:
             with self.lock:
@@ -387,10 +388,13 @@ class Workbench:
                     line=public_text(line)
                     log.write(line);log.flush()
                     with self.lock:
-                        self.job['logs'].append(line.rstrip())
+                        event=training_progress(line) if 'pitch_game' in command else None
+                        if event:self.job.update(event)
+                        self.job['logs'].append(event['message'] if event else line.rstrip())
                         progress=re.search(r'학습 (\d+)/(\d+)(타석|상황|경기)',line)
-                        if line.startswith('단계 ') or self.job['kind']=='prepare_catalog':self.job['message']=line.strip()
-                        if progress and self.job['kind'] in ('train','run'):
+                        if line.startswith('단계 ') or self.job['kind']=='prepare_catalog':
+                            self.job['message']=('야구 기록을 확인하고 연습 환경을 준비하고 있습니다.' if line.startswith('단계 1') else 'AI의 플레이 연습을 시작합니다.') if '--pitch-corpus' in command else line.strip()
+                        if progress and self.job['kind'] in ('train','run') and self.job.get('progress_scope')!='all_runs':
                             done,total=map(int,progress.groups()[:2]);unit=progress.group(3)
                             display_unit='경기' if 'whole_game' in command or 'pitch_game' in command else '이닝' if 'inning' in command else '득점 기회' if 'scoring' in command else unit
                             self.job.update(completed_episodes=done,target_episodes=total,message=f'학습 {done:,}/{total:,}{display_unit}')
@@ -406,7 +410,8 @@ class Workbench:
                 cancelled=self.job['status']=='cancelling'
                 self._cache=(0,None)
                 status='cancelled' if cancelled else 'failed' if code or invalid_fit else 'completed'
-                message='중지됨' if cancelled else '모형 검사 실패' if invalid_fit else '실행 실패 · 로그 확인' if code else '완료'
+                message='학습을 중지했습니다.' if cancelled else '기록 검사에 실패했습니다. 실행 로그를 확인하세요.' if invalid_fit else '학습을 완료하지 못했습니다. 실행 로그를 확인하거나 다시 시도하세요.' if code else '학습을 마쳤습니다. 결과를 확인하세요.'
+                if not cancelled and not code and not invalid_fit and self.job['kind'] not in ('run','train'):message='작업을 마쳤습니다. 결과를 확인하세요.'
                 if self.job['kind']=='prepare_catalog' and not cancelled:
                     message=('자료를 내려받지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도하세요. '+(self.job['logs'][-1] if self.job['logs'] else '')) if code else '자료 연결을 마쳤습니다. 선수와 시즌을 선택할 수 있어요.'
                 report=output/'result/report.html'

@@ -60,9 +60,12 @@ def build(result):
             row['mean_advantage']=signal['advantage_sum']/n if n else None
             row['winning_game_share']=signal['wins']/n if n else None
     total_pitches=sum(n for a,n in pooled['defense'].items() if a=='pitch' or a.startswith('pitch:'))
-    return {'games':games,'runs':len(result['seeds']),'target_games_per_run':result.get('config',{}).get('episodes',max(growth,default=0)),'offense':choice_groups(pooled['offense'],'offense'),
+    answer={'games':games,'runs':len(result['seeds']),'target_games_per_run':result.get('config',{}).get('episodes',max(growth,default=0)),'offense':choice_groups(pooled['offense'],'offense'),
         'targets':pooled['targets'],'pitching':{k:v for k,v in choice_groups(pooled['defense'],'defense').items() if k!='intentional_walk'},
         'pitches':total_pitches,'preferences':average(pairs),
         'counts':[{'balls':b,'strikes':s,'preferences':average(counts[b,s])} for b in range(4) for s in range(3)],
         'growth':[{'games_per_run':n,'preferences':average(rows)} for n,rows in sorted(growth.items())],
         'feedback':feedback,'basis':'Observed virtual outcomes and pre-update terminal-win advantages; correlated within games, no causal explanation or transcript of thoughts.'}
+    from .explanations import explain
+    answer['explanations']=explain(answer,pooled['defense'],pooled['feedback']['defense'])
+    return answer

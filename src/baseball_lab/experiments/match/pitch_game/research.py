@@ -7,7 +7,7 @@ from collections import Counter,defaultdict
 from dataclasses import dataclass,asdict
 from pathlib import Path
 from random import Random
-import math
+import math,json
 import numpy as np
 from baseball_lab.agents.neural import NeuralPolicy
 from baseball_lab.core.engine import State,transition
@@ -337,7 +337,7 @@ def train(data,start,end,output,config,*,world=None):
     else:write_json(output/'world.json',{'evidence':world.evidence,'weights':world.w.tolist(),'frequency_counts':[{'balls':b,'strikes':s,'action':a,'counts':dict(c)} for (b,s,a),c in world.baseline.items()],'pooled_counts':{a:dict(c) for a,c in world.pooled.items()},'events':EVENTS,'supported_events':{a:sorted(v) for a,v in world.supported.items()},'running_counts':[{'outs':o,'bases':b,'balls':balls,'strikes':strikes,'action':a,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,balls,strikes,a),counter in world.running.items()],'runner_counts':[{'outs':o,'bases':b,'event':e,'bunt':bunt,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,e,bunt),counter in world.runner.items()],'settings':{'optimizer':'minibatch gradient descent','iterations':500,'batch':1024,'learning_rate':.08,'l2':.0001,'random_seed':83,'selected_iterations':world.selected_iterations,'selection':'validation Brier only; frequency candidate included'}})
     shared=getattr(world,'shared_learning',False)
     result['shared_learning']=shared
-    for seed in config.seeds:
+    for run_index,seed in enumerate(config.seeds):
         teams=[world.new_team(seed if shared else seed+i*2) if hasattr(world,'new_team') else (policy('batter',seed+i*2),policy('pitcher',seed+i*2+1)) for i in range(2)];initial=[[a.frozen() for a in t] for t in teams];batches=[[[],[]],[[],[]]];history=[]
         def checkpoint(done):
             if world.evidence.get('corpus'):
@@ -368,6 +368,9 @@ def train(data,start,end,output,config,*,world=None):
                     'seed_bank':bank})
             write_json(output/'checkpoints'/f'{seed}-{done}.json',{'schema':result['schema'],**({'shared_policy':[a.state_dict() for a in teams[0]],'trajectory_roles':2} if shared else {'teams':[[a.state_dict() for a in t] for t in teams]})})
             write_json(output/'research.json',result);report(output,result)
+            if getattr(world,'track_strategy',False):
+                total=config.episodes*len(config.seeds);done=run_index*config.episodes+done
+                print('LEARNING_PROGRESS '+json.dumps({'completed':done,'total':total,'phase':'summarizing' if done==total else 'training'}),flush=True)
         from . import strategy as strategy_metrics
         training_strategy=strategy_metrics.new_stats()
         run={'seed':seed,'history':history,'training_environments':{},'training_choices':[{},{}],'training_outcomes':{'A':0,'B':0}};result['seeds'].append(run);checkpoint(0)

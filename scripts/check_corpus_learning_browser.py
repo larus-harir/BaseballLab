@@ -6,7 +6,9 @@ from playwright.sync_api import sync_playwright,expect
 with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     browser=pw.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
     page=browser.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
-    page.goto(base+'/match/team?study=pitch_game')
+    page.goto(base+'/match')
+    assert page.locator('a[href*=half_inning]').count()==0 and page.locator('a[href="/simulation"]').count()==0
+    page.goto(base+'/match/team?study=half_inning')
     expect(page.locator('#trainingData')).to_have_value('corpus')
     expect(page.locator('#corpusSummary')).to_contain_text('MLB 2010~2026',timeout=30000)
     expect(page.locator('#corpusSummary')).to_contain_text('KBO 2016~2026')
@@ -21,19 +23,24 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     expect(page.locator('#corpusYear option')).to_have_count(9)
     page.locator('#corpusMLB').check();page.locator('#corpusKBO').check()
     expect(page.locator('#corpusYear option')).to_have_count(18)
-    page.locator('#study').select_option('half_inning');expect(page.locator('#trainingDataWrap')).to_be_hidden()
-    page.locator('#study').select_option('pitch_game')
+    expect(page.locator('#study')).to_have_value('pitch_game')
+    assert page.locator('#study option').count()==0
+    assert '실행 로그' in page.locator('#taskPanel').inner_text()
     page.locator('#corpusYear').select_option('all')
     expect(page.locator('#corpusSummary')).to_contain_text('NPB 2019~2026')
     page.locator('#episodes').fill('51');expect(page.locator('#trainBtn')).to_be_enabled(timeout=30000)
     with page.expect_response(lambda r:r.url.endswith('/api/start')) as response:page.locator('#trainBtn').click()
     assert response.value.ok,response.value.text()
-    deadline=time.monotonic()+240
+    deadline=time.monotonic()+240;last_done=0
     while time.monotonic()<deadline:
         job=page.request.get(base+'/api/state?project=match').json()['job']
+        if job.get('progress_scope')=='all_runs':
+            assert job['completed_episodes']>=last_done
+            last_done=job['completed_episodes'];assert job['target_episodes']==153
         if job['status'] not in ('queued','running'):break
         page.wait_for_timeout(1000)
     assert job['status']=='completed',job
+    assert job['completed_episodes']==job['target_episodes']==153
     data=json.loads((ROOT/'outputs/workbench'/job['id']/'result/research.json').read_text(encoding='utf-8'))
     assert data['schema']=='Match-pitch-decision-game-v8' and len(data['seeds'])==3
     assert {c['league'] for c in data['world']['cohorts']}=={'MLB','KBO','NPB'}
@@ -63,7 +70,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     assert '코스 미확인' not in page.locator('main').inner_text()
     assert page.locator('select').count()==0
     assert view['overview']['games']==153 and view['overview']['runs']==3
-    assert page.locator('#countOverview tbody tr').count()==12
+    assert page.locator('#countOverview > .scroll tbody tr').count()==12
     assert all(c['preferences']['course']['states']>0 for c in view['overview']['counts'])
     assert any(row.get('reward_observations',0)>0 for row in view['overview']['feedback']['course'].values())
     assert 'undefined' not in page.locator('#summary').inner_text()
@@ -85,9 +92,9 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     assert page.locator('#growthCharts svg').count()==4
     assert page.locator('#courseComparison svg').count()==2
     assert '학습 신호' in page.locator('#summary').inner_text()
-    page.locator('#replayDetail > summary').click()
-    expect(page.locator('#batChoice')).to_contain_text('공격');assert page.locator('#sceneField').inner_text()
-    position=int(page.locator('#position').input_value());page.locator('#position').focus();page.keyboard.press('ArrowRight');expect(page.locator('#position')).to_have_value(str(position+1))
+    assert page.locator('#replayDetail').count()==0
+    assert page.locator('#reasons .narrative').count()>0
+    assert all(seed.get('replay',{}).get('events') for seed in data['seeds'])
     page.locator('#tab-growth').focus();page.keyboard.press('ArrowRight');expect(page.locator('#evidence')).to_be_visible()
     page.locator('#evidence details').nth(0).locator('summary').click()
     expect(page.locator('#management')).to_contain_text('대조 일치')
@@ -100,7 +107,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     old_shared=next((p for p in (ROOT/'outputs/workbench').glob('*/result/research.json') if json.loads(p.read_text(encoding='utf-8')).get('schema')=='Match-pitch-decision-game-v7'),None)
     if old_shared:
         original=old_shared.read_bytes();page.goto(base+'/reports/'+old_shared.parents[1].name+'/result/report.html')
-        assert page.locator('select').count()==0 and page.locator('#countOverview tbody tr').count()==12
+        assert page.locator('select').count()==0 and page.locator('#countOverview > .scroll tbody tr').count()==12
         assert 'undefined' not in page.locator('main').inner_text() and 'NaN' not in page.locator('main').inner_text()
         assert old_shared.read_bytes()==original
     old=next((p for p in (ROOT/'outputs/workbench').glob('*/result/research.json') if (lambda d:d.get('schema')=='Match-pitch-decision-game-v4' and 'pitch_bins' not in d['strategy_analysis']['teams'][0])(json.loads(p.read_text(encoding='utf-8')))),None)
