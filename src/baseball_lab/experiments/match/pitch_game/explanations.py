@@ -28,9 +28,10 @@ def explain(overview,defense,defense_feedback=None):
         before=values['before'].get(action,0);after=values['after'][action];delta=after-before
         row=overview['feedback'][view].get(action,{})
         signal=row.get('mean_advantage');n=row.get('decisions',0);name=label(action)
-        summary=particle(name,'을','를')+' '+('조금 더 고르는 쪽으로 바뀌었습니다.' if 0<delta<.02 else '더 자주 고르는 쪽으로 바뀌었습니다.' if delta>=.02 else '이전보다 덜 고르지만 여전히 가장 선호합니다.' if delta<0 else '계속 가장 선호하고 있습니다.')
+        ranking='구종 중 가장 선호합니다.' if candidates else '가장 선호합니다.'
+        summary='같은 기준 상황에서 '+particle(name,'을','를')+' '+('조금 더 고르는 쪽으로 바뀌었습니다.' if 0<delta<.02 else '더 자주 고르는 쪽으로 바뀌었습니다.' if delta>=.02 else '이전보다 덜 고르지만 여전히 '+ranking if delta<0 else '계속 '+ranking)
         if signal is None:
-            reason='선택은 달라졌지만 이 실행에는 승패 학습 신호가 남아 있지 않아 이유를 더 좁힐 수 없습니다.'
+            reason='이 실행에는 승패 학습 신호가 남아 있지 않아 선호의 이유를 더 좁힐 수 없습니다.'
         elif signal>0:
             reason='이 선택을 한 경험에서 상대적으로 좋은 승패 신호를 받았습니다. 학습은 이를 유리한 경험으로 반영했습니다.' if delta>=0 else '이 선택의 승패 신호는 유리했지만 최종 선호는 줄었습니다. 다른 선택과 함께 갱신된 영향이 있어 이 신호만으로 변화 이유를 설명하기는 어렵습니다.'
         elif signal<0:
@@ -46,7 +47,7 @@ def explain(overview,defense,defense_feedback=None):
                 if height in HEIGHTS:heights[height]+=count
             if heights:
                 height=heights.most_common(1)[0][0];pattern={'height':height,'count':heights[height],'known':sum(heights.values())}
-                context=particle(name,'은','는')+f' {HEIGHTS[height]}에서 가장 많이 사용했습니다.'
+                context=particle(name,'은','는')+f' 코스 높이가 기록된 선택에서 {HEIGHTS[height]}가 가장 많았습니다.'
                 joint=Counter()
                 for pitch,detail in (defense_feedback or {}).items():
                     parts=pitch.split(':')
@@ -58,11 +59,13 @@ def explain(overview,defense,defense_feedback=None):
         if n and row.get('events'):
             if view in ('offense','direction'):
                 walks=row.get('terminal_results',{}).get('walk',0)
-                observed=f'실제 연습에서는 이 선택 100회당 안타 {100*row.get("hits",0)/n:.1f}회, 볼넷 {100*walks/n:.1f}회가 기록됐습니다.'
+                observed=f'가상 연습에서는 이 선택 100회당 안타 {100*row.get("hits",0)/n:.1f}회, 볼넷 {100*walks/n:.1f}회가 기록됐습니다.'
+            elif action=='intentional_walk':
+                observed=f'가상 연습에서는 고의볼넷 선택 100회당 볼넷 {100*row["events"].get("walk",0)/n:.1f}회가 기록됐습니다.'
             else:
-                observed=f'실제 연습에서는 투구 100구당 피안타 {100*row.get("hits",0)/n:.1f}회, 삼진 {100*row.get("strikeouts",0)/n:.1f}회가 기록됐습니다.'
+                observed=f'가상 연습에서는 투구 100구당 피안타 {100*row.get("hits",0)/n:.1f}회, 삼진 {100*row.get("strikeouts",0)/n:.1f}회가 기록됐습니다.'
                 if pattern and pattern.get('decisions'):
-                    m=pattern['decisions'];observed=f'이 구종·높이 조합에서 100구당 피안타 {100*pattern["hits"]/m:.1f}회, 삼진 {100*pattern["strikeouts"]/m:.1f}회가 기록됐습니다.'
+                    m=pattern['decisions'];observed=f'가상 연습의 이 구종·높이 조합에서 100구당 피안타 {100*pattern["hits"]/m:.1f}회, 삼진 {100*pattern["strikeouts"]/m:.1f}회가 기록됐습니다.'
         rows.append({'view':view,'action':action,'title':name,'summary':summary,'reason':reason,'context':context,'observed':observed,
                      'before':before,'after':after,'delta':delta,'decisions':n,'signal':signal,'pattern':pattern})
     return rows

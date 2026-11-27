@@ -420,11 +420,12 @@ def train(data,start,end,output,config,*,world=None):
 
 def render(result):
     import json
+    from baseball_lab.web.styles import apply_app_styles
     if result.get('schema') in ('Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7','Match-pitch-decision-game-v8'):
         from .strategy_view import build
         result=build(result)
     encoded=json.dumps(result,ensure_ascii=False).replace('<','\\u003c')
-    if result.get('learning_review'):return Path(__file__).with_name('learning_results.html').read_text(encoding='utf-8').replace('__DATA__',encoded)
+    if result.get('learning_review'):return apply_app_styles(Path(__file__).with_name('learning_results.html').read_text(encoding='utf-8').replace('__DATA__',encoded))
     template={'strategy-report-view-v2':'strategy_results.html','strategy-report-view-v3':'shared_strategy_results.html'}.get(result.get('schema'),'results.html')
     return Path(__file__).with_name(template).read_text(encoding='utf-8').replace('__DATA__',encoded)
 def report(output,result):

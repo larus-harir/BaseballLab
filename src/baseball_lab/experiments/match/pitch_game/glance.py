@@ -3,6 +3,7 @@ from collections import Counter,defaultdict
 from html import escape
 from pathlib import Path
 from math import isfinite
+from baseball_lab.web.styles import apply_app_styles
 from .explanations import label
 
 AREAS=tuple(h+'_'+v for v in ('high','middle','low') for h in ('left','middle','right'))
@@ -109,4 +110,4 @@ def render(result):
     if not d['checks_ok']:parts.append('<p class="notice">선택·투구 집계에 확인이 필요한 항목이 있습니다. 상세 근거를 먼저 확인하세요.</p>')
     parts.append('<p class="limit">선택 횟수는 전체 합계, 선호는 같은 상황의 평균입니다. 저장된 실행의 경향이며 최적 전략이나 실제 리그의 우열을 판정한 결과는 아닙니다.</p><a href="report.html#evidence">집계와 학습 근거 확인 ↗</a></article></section><footer><span>실행 기록을 다시 집계한 요약 · 자료와 상세 결과는 동일</span><a href="report.html#growth">학습 변화 자세히 ↗</a><details class="credits"><summary>플랫폼 자료 출처</summary><p>KBO: slothman3878/kbo_playbyplay (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>), ekim56korea·NextPitchh. MLB: 공개 Statcast와 Retrosheet. NPB: This uses data sourced from the <a href="https://github.com/armstjc/Nippon-Baseball-Data-Repository">Nippon Baseball Data Repository</a>; yasumorishima/npb-stats.</p><p>The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at 20 Sunset Rd., Newark, DE 19711.</p><a href="report.html#evidence">이번 실행의 상세 출처와 범위</a></details></footer>')
     template=Path(__file__).with_name('glance.html').read_text(encoding='utf-8')
-    return template.replace('__CONTENT__',''.join(parts))
+    return apply_app_styles(template.replace('__CONTENT__',''.join(parts)))

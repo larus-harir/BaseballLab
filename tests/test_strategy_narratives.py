@@ -32,6 +32,35 @@ def test_missing_neutral_or_negative_signals_never_become_a_success_story(signal
     else:assert '뚜렷한 방향이 없' in r['reason']
 
 
+@pytest.mark.parametrize('before',[.4,.5])
+def test_family_ranking_is_scoped_even_when_intentional_walk_is_more_likely(before):
+    d=sample();d['preferences']['defense']={'before':{'family:cutter':before,'intentional_walk':1-before},
+                                         'after':{'family:cutter':.4,'intentional_walk':.6}}
+    r=explain(d,{})[0]
+    assert r['action']=='family:cutter' and '구종 중 가장 선호' in r['summary']
+    assert r['summary'].startswith('같은 기준 상황에서 ')
+    assert '가상 연습' in r['observed']
+
+
+def test_intentional_walk_uses_decisions_instead_of_pitch_denominator():
+    d=sample();d['preferences']['defense']={'before':{'pitch':.5,'intentional_walk':.5},
+                                         'after':{'pitch':.3,'intentional_walk':.7}}
+    d['feedback']['defense']={'intentional_walk':{'decisions':20,'mean_advantage':None,'events':{'walk':20},
+                                                'terminal_results':{'walk':20}}}
+    r=explain(d,{})[0]
+    assert r['action']=='intentional_walk'
+    assert '선택 100회당 볼넷 100.0회' in r['observed']
+    assert '100구' not in r['observed'] and '가상 연습' in r['observed']
+
+
+def test_unchanged_policy_and_missing_heights_do_not_create_unobserved_changes():
+    d=sample(None);d['preferences']['defense']['before']={'family:cutter':.4}
+    r=explain(d,{'pitch:cutter:left_high:fast':10,'pitch:cutter:any:missing':100})[0]
+    assert r['delta']==0 and '달라졌' not in r['reason']
+    assert '코스 높이가 기록된 선택' in r['context']
+    assert r['pattern']['count']==r['pattern']['known']==10
+
+
 def test_total_progress_crosses_run_boundaries_without_resetting():
     rows=[parse(PREFIX+'{"completed":'+str(n)+',"total":153,"phase":"training"}') for n in (0,51,51,102,102,153)]
     assert [r['completed_episodes'] for r in rows]==[0,51,51,102,102,153]

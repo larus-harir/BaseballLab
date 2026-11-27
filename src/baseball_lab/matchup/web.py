@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from baseball_lab.data.protection import public_view
+from baseball_lab.web.styles import apply_app_styles
 
 
 def render(project,token='',analysis=None):
@@ -19,11 +20,11 @@ def render(project,token='',analysis=None):
         display['validation_warning']='이 저장 결과의 예측 검사는 중단 경기 날짜를 바로잡기 전 기록입니다. 선수 기록의 대결 결과와 분리해서 보며, 최신 검사로 다시 실행하세요.'
         display['model_status']='PERIOD_CHECK_SUPERSEDED'
     initial=json.dumps(display,ensure_ascii=False,allow_nan=False).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
-    return body.replace('__PROJECT__',project).replace('__SESSION_TOKEN__',token).replace('__ANALYSIS__',initial)
+    return apply_app_styles(body.replace('__PROJECT__',project).replace('__SESSION_TOKEN__',token).replace('__ANALYSIS__',initial))
 
 
 def render_common(token='',analysis=None):
     directory=Path(__file__).parents[1]/'web'
-    css=(directory/'matchup.html').read_text(encoding='utf-8').split('<style>',1)[1].split('</style>',1)[0]
+    css=(directory/'matchup.html').read_text(encoding='utf-8').split('<style>',1)[1].split('</style>',1)[0].replace('__APP_STYLES__','')
     initial=json.dumps(public_view(analysis),ensure_ascii=False,allow_nan=False).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
-    return (directory/'common.html').read_text(encoding='utf-8').replace('__STYLE__',css).replace('__SESSION_TOKEN__',token).replace('__ANALYSIS__',initial)
+    return apply_app_styles((directory/'common.html').read_text(encoding='utf-8').replace('__STYLE__',css).replace('__SESSION_TOKEN__',token).replace('__ANALYSIS__',initial))

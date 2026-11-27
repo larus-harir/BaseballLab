@@ -15,8 +15,10 @@
 .brand span{display:none}.brand:before{content:'◇';display:inline-grid;place-items:center;background:#147168;color:#fff;width:29px;height:29px;border-radius:8px;margin-right:9px;font-size:22px;vertical-align:middle}
 .obsbar{display:grid;grid-template-columns:90px 1fr 55px;gap:8px;align-items:center;margin:10px 0;font-size:14px}.obsbar i{background:#e7eee7;border-radius:4px;height:12px}.obsbar b{display:block;height:100%;background:#147168;border-radius:4px}.observation-note{background:#edf4ef;padding:12px 16px;border-radius:9px;font-size:14px}#observations{border-top:1px solid var(--line);padding-top:20px}#observations .row{align-items:start}#observations svg{max-height:350px;width:100%}#observationRole{max-width:320px}
 .pitch-sequences>div{padding:14px 0;border-bottom:1px solid var(--line)}.pitch-chips{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.pitch-chips span{font-size:13px;padding:5px 9px;border-radius:6px}.pitch-token{background:#dfeee4;color:#214b40}.record-token{background:#edf0ed;color:#56646a}
+
+__APP_STYLES__
 </style>
-<main><header><a class="brand" href="/">BaseballLab<span>BASEBALL, EXPLORED.</span></a><nav aria-label="주 메뉴"><a class="active" href="/eramatch">선수 가상 대결</a><a href="/match">AI 전략 연구</a></nav></header><div class="hero"><span class="eyebrow" id="projectTag">ERAMATCH</span><h1 id="title">선수 가상 대결</h1><p id="intro">시즌을 넘어, 기록으로 만나는 승부.</p></div>
+<a class="skip-link" href="#main-content">본문으로 건너뛰기</a><main id="main-content" class="app-page page-matchup"><header><a class="brand" href="/">BaseballLab</a><nav aria-label="주 메뉴"><a href="/eramatch" aria-current="page">선수 가상 대결</a><a href="/match">AI 전략 연구</a><details class="settings"><summary>설정</summary><a href="/lab/data">자료 관리</a></details></nav></header><div class="hero"><span class="eyebrow" id="projectTag">ERAMATCH</span><h1 id="title">선수 가상 대결</h1><p id="intro">시즌을 넘어, 기록으로 만나는 승부.</p></div>
 <div class="page-tabs" role="tablist" aria-label="선수 가상 대결"><button id="tab-duel" role="tab" aria-controls="duel" aria-selected="true">대결</button><button id="tab-principles" role="tab" aria-controls="principles" aria-selected="false">계산 원리</button><button id="tab-developer" role="tab" aria-controls="developer" aria-selected="false">개발자 정보</button></div><div id="duel" role="tabpanel" aria-labelledby="tab-duel"><section id="setup">
 
 <div class="section-heading"><span class="eyebrow">MATCHUP</span><h2>누구와 맞붙일까요?</h2></div>
@@ -27,9 +29,9 @@
 <div id="selectors" class="hidden"><div class="row">
 <div class="player-box"><h3>타자</h3><label>타자 이름 검색<input id="bQuery" type="search" maxlength="80" autocomplete="off" placeholder="선수 이름을 입력하세요"></label><label>타자 선택<select id="bPlayer"></select></label><div id="bInfo" class="muted"></div></div>
 <div class="player-box"><h3>투수</h3><label>투수 이름 검색<input id="pQuery" type="search" maxlength="80" autocomplete="off" placeholder="선수 이름을 입력하세요"></label><label>투수 선택<select id="pPlayer"></select></label><div id="pInfo" class="muted"></div></div></div>
-<label>몇 타석을 붙여볼까요?<input id="n" type="number" min="1" max="10000" value="25"></label>
+<div class="execution-row"><label>대결할 타석 수<input id="n" type="number" min="1" max="10000" value="25"></label>
 
-<button id="calculate" class="primary">대결 시작</button><span id="runHint" class="hidden"></span></div>
+<button id="calculate" class="primary">대결 시작</button><span id="runHint" class="hidden"></span></div></div>
 <p id="formError" class="error" role="alert" tabindex="-1"></p></section><section id="result" class="hidden" role="region" aria-labelledby="resultTitle" tabindex="-1"><span class="tag">타석별 가상 대결</span><h2 id="resultTitle"></h2><p id="headline"></p><div id="facts" class="facts"></div><p id="resultScope" class="muted"></p>
 <div id="resultNotes" class="readingnote"></div><h3 id="distributionTitle">예상과 이번 결과</h3><p class="chartkey"><span><i class="expected"></i>예상 개수</span><span><i class="realized"></i>이번 개수</span></p><div id="eventChart" class="eventchart" aria-label="결과별 예상과 발생 개수"></div><p id="detailScope" class="muted"></p><details id="otherMeaning"><summary id="otherTitle">그 밖의 결과는 무엇인가요?</summary><div id="otherExplanation"></div></details><p id="modelReading" class="muted"></p>
 
@@ -38,7 +40,7 @@
 <label>사용할 기록<select id="dataSource"><option value="collected">최신 수집 기록</option><option value="legacy">이전 과제·검증 모형</option></select></label>
 <label>계산 방식<select id="model"><option value="auto">기록에 맞게 자동 선택</option></select></label><p id="modelHelp" class="muted"></p>
 <label class="check"><input id="reproduceMode" type="checkbox"> 번호를 고정해 재현하기</label><label>같은 결과를 다시 만들 번호<input id="seed" type="number" min="0" max="2147483647" value=""><small>같은 선수·방식·번호로 실행하면 같은 가상 결과가 나옵니다.</small></label>
-<label id="strengthLabel">리그 평균을 반영할 정도<input id="strength" type="number" min="0" max="2000" value="100"></label><label>결과의 흔들림을 확인할 반복 횟수<input id="repetitions" type="number" min="1" max="200" value="200"></label><p class="muted">기록이 적은 선수는 리그 평균을 섞어 극단적인 비율을 줄입니다. 숫자가 클수록 평균에 가까워지며, 실력이 변했다는 뜻은 아닙니다.</p></details><details id="probabilityDetails"><summary>예상 확률·이번 개수·반복 범위 자세히 보기</summary><div id="probabilities" class="tablewrap"></div><p id="uncertainty" class="muted"></p></details><details id="comparisonBlock"><summary>과제 재현과 개선 후보는 얼마나 다른가요?</summary><div id="comparison"></div></details><details><summary>자료·모델·재현 근거</summary><div id="lineage"></div></details><details><summary>모형의 가정</summary><div id="modelAssumptions"></div></details></section></div></main>
+<label id="strengthLabel">리그 평균을 반영할 정도<input id="strength" type="number" min="0" max="2000" value="100"></label><label>결과의 흔들림을 확인할 반복 횟수<input id="repetitions" type="number" min="1" max="200" value="200"></label><p class="muted">기록이 적은 선수는 리그 평균을 섞어 극단적인 비율을 줄입니다. 숫자가 클수록 평균에 가까워지며, 실력이 변했다는 뜻은 아닙니다.</p></details><details id="probabilityDetails"><summary>예상 확률·이번 개수·반복 범위 자세히 보기</summary><div id="probabilities" class="tablewrap"></div><p id="uncertainty" class="muted"></p></details><details id="comparisonBlock"><summary>과제 재현과 개선 후보는 얼마나 다른가요?</summary><div id="comparison"></div></details><details><summary>자료·모델·재현 근거</summary><div id="lineage"></div></details><details><summary>모형의 가정</summary><div id="modelAssumptions"></div></details></section></div><footer class="page-footer">BASEBALL LAB <span aria-hidden="true">/</span> 기록과 전략을 탐구하는 야구 실험실</footer></main>
 <script>__PRINCIPLES_SCRIPT__</script><script>__OBSERVATIONS_SCRIPT__</script>
 <script id="initial" type="application/json">__ANALYSIS__</script>
 <script>

@@ -43,7 +43,7 @@ def test_saved_common_result_uses_existing_storage_and_escapes_html(tmp_path):
     assert result['analysis']['training_executed'] is False
     html=next(wb.outputs.glob('*/result/report.html')).read_text()
     assert '</script><img>' not in html
-    assert '공통 비교' in html
+    assert '다른 리그·시즌 비교' in html
     assert wb.state('eramatch')['runs'][0]['kind']=='matchup'
 
 
