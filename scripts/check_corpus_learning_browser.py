@@ -17,7 +17,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     expect(page.locator('#legacyScope')).to_be_hidden()
     expect(page.locator('#sourcePreview')).to_contain_text('연도별 학습 표본 확인')
     expect(page.locator('#trainingData')).to_be_hidden()
-    expect(page.locator('#sourcePreview')).to_contain_text('코스가 없는 시즌도')
+    expect(page.locator('.research-detail')).to_contain_text('코스가 없는 시즌도')
     page.locator('#trainingOptions > summary').click()
     page.locator('#corpusMLB').uncheck();page.locator('#corpusKBO').uncheck()
     expect(page.locator('#corpusYear option')).to_have_count(9)
