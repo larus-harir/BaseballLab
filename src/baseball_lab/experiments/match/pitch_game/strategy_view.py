@@ -194,6 +194,7 @@ def build(result):
         'runs':[{'seed':s['seed'],'replay':{k:v for k,v in (s.get('replay') or {}).items() if k in ('events','environment','management')}} for s in result['seeds']],
         'cohorts':cohorts,'experienced':sorted({k for s in result['seeds'] for k in s.get('training_environments',{})}),
         'evidence':{'quality':result['world'].get('quality',{}),'capabilities':result['world'].get('capabilities',{}),
+                    'pitch_credit':result['world'].get('pitch_credit'),
                     'supplemental_movement_backoffs':result['world'].get('supplemental_movement_backoffs',[]),
                     'annual_coverage':result['world'].get('annual_coverage',{}),'historical_context':result['world'].get('historical_context',{}),'assumptions':result['world'].get('assumptions',[]),
                     'holdout':result['world']['holdout_prediction']['test'],'asset_sha256':result['world']['asset_sha256'],

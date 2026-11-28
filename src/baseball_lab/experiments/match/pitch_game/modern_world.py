@@ -89,6 +89,7 @@ class ModernWorld(TrackingWorld):
             evaluation_sampling='Equal league opportunities, within-league year cycles and identical-state preference probes; no team ranking tournament.')
         if learner=='ppo':
             self.evidence['policy_head']='Joint pitch logits plus shared family/course/speed residual factors; no fixed preference or auxiliary baseball reward.'
+            self.evidence['pitch_credit']='terminal-win-ppo-shared-pitch-gae-v2'
             self.evidence['feedback_contract']='Executed outcomes and pre-update terminal-win advantages. Contact-kind associations are not identified causal effects of pitch choice.'
             self.evidence['transition_backoff']+=' If native support is empty, use exact base/out/event/bunt observations from completed earlier seasons of the same league, fit splits only. Never use a future season, other league or invented transition.'
             self.evidence['supplemental_movement_backoffs']=[]
@@ -97,8 +98,8 @@ class ModernWorld(TrackingWorld):
         names=(*FEATURES,'MLB','KBO','NPB','season',*('cue_'+f for f in FAMILY_CUES),*('cue_'+v for v in LOCATIONS),
            'cue_slow','cue_middle_speed','cue_fast','bat_left','bat_right','has_family_cue','has_course_cue','has_speed_cue',
            *(n for f in HISTORY_FIELDS for n in ('history_'+f,'has_history_'+f)))
-        from baseball_lab.agents.win_policy import WinPolicy,PitchWinPolicy
-        agents=tuple((WinPolicy if role=='batter' else PitchWinPolicy)(role,seed+i,actions=self.offense_actions if role=='batter' else self.defense_actions,
+        from baseball_lab.agents.win_policy import WinPolicy,PitchCreditPolicy
+        agents=tuple((WinPolicy if role=='batter' else PitchCreditPolicy)(role,seed+i,actions=self.offense_actions if role=='batter' else self.defense_actions,
             feature_encoder=features,feature_names=names,observation_schema='unified-modern-observation-v1',action_schema='unified-modern-actions-v3') if self.learner=='ppo' else NeuralPolicy(role,seed+i,actions=self.offense_actions if role=='batter' else self.defense_actions,
             feature_encoder=features,feature_names=names,observation_schema='unified-modern-observation-v1',action_schema='unified-modern-actions-v1') for i,role in enumerate(('batter','pitcher')))
         for agent in agents:agent.params[-2].fill(0.)

@@ -37,6 +37,9 @@ class WinPolicy(NeuralPolicy):
 
     def output_gradient(self,delta):return delta
 
+    def policy_advantages(self,values,returns,lengths):
+        return returns-values
+
     @staticmethod
     def adam(params,m,v,grads,step,rate):
         norm=np.sqrt(sum(np.sum(g*g) for g in grads));scale=min(1.,.5/max(float(norm),1e-12))
@@ -51,7 +54,7 @@ class WinPolicy(NeuralPolicy):
         returns=np.array([r for d,r in rows],dtype=float)
         old=self.forward(x)[0]*masks;old/=old.sum(axis=1,keepdims=True)
         old_logp=np.log(np.maximum(old[np.arange(len(x)),actions],1e-30));old_values,_=self.values(x)
-        advantages=returns-old_values
+        advantages=self.policy_advantages(old_values,returns,[len(trace) for trace,_ in episodes])
         advantages=(advantages-advantages.mean())/max(float(advantages.std()),1e-8)
         before=[p.copy() for p in self.params];loss=clip_fraction=0.;used=0;kl=0.
         # Reuse the rollout with clipped, bounded on-policy steps. A new rollout
@@ -149,3 +152,27 @@ class PitchWinPolicy(WinPolicy):
         p=super().from_state_dict(data,**kwargs)
         if data.get('pitch_factors')!=list(p.factor_labels) or data.get('joint_residuals') is not True:raise ValueError('Incompatible shared pitch factors')
         return p
+
+
+class PitchCreditPolicy(PitchWinPolicy):
+    """Pitching GAE with undiscounted wins and a Monte Carlo value target."""
+
+    algorithm='terminal-win-ppo-shared-pitch-gae-v2'
+    trace_lambda=.95
+    settings={**PitchWinPolicy.settings,'gae_lambda':trace_lambda,'value_target':'completed-game win/loss'}
+
+    def policy_advantages(self,values,returns,lengths):
+        # A pitch can change the expected final result before the game ends.
+        # Bootstrap only within this team's pitching trace from the same game.
+        # At the end of the trace, use the actual game result as the target.
+        advantages=np.empty_like(values)
+        start=0
+        for length in lengths:
+            end=start+length
+            if length:
+                advantages[end-1]=returns[end-1]-values[end-1]
+                for index in range(end-2,start-1,-1):
+                    change=values[index+1]-values[index]
+                    advantages[index]=change+self.trace_lambda*advantages[index+1]
+            start=end
+        return advantages

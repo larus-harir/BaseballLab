@@ -3,7 +3,7 @@ from copy import deepcopy
 from random import Random
 import numpy as np
 import pytest
-from baseball_lab.agents.win_policy import WinPolicy
+from baseball_lab.agents.win_policy import PitchCreditPolicy, WinPolicy
 
 
 def encode(state,role):return np.array([1.,float(state)])
@@ -76,3 +76,14 @@ def test_no_reward_signal_does_not_force_a_favored_action():
     p.update(episodes)
     assert all(np.array_equal(a,b) for a,b in zip(before,p.params))
     assert p.last_update['parameter_delta']==0 and p.last_update['policy_kl']==0
+
+
+def test_pitch_credit_uses_state_changes_and_stops_at_each_completed_game():
+    p=PitchCreditPolicy('pitcher',actions=('pitch:slider:left_low:middle','pitch:slider:middle_middle:middle'))
+    values=np.array([0.,.6,0.,-.6,.3])
+    outcomes=np.array([1.,1.,1.,1.,-1.])
+    advantages=p.policy_advantages(values,outcomes,[2,0,2,1])
+    assert advantages==pytest.approx([.6+.95*.4,.4,-.6+.95*1.6,1.6,-1.3])
+    assert advantages[0]>advantages[2]  # Same win, opposite change in expected result.
+    p.trace_lambda=1.
+    assert p.policy_advantages(values,outcomes,[2,0,2,1])==pytest.approx(outcomes-values)
