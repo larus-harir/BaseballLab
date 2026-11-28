@@ -121,15 +121,18 @@ def movement_world():
     return world
 
 
-def play(away,home,seed,day,cache,player_stats):
+def play(away,home,seed,day,cache,player_stats,*,max_innings=MAX_INNINGS,innings=None):
     profiles,_,reference,_,_=league()
     world=movement_world()
     rng=Random(seed);scores=[0,0];positions=[0,0]
     teams=(away,home)
-    for inning in range(1,MAX_INNINGS+1):
+    for inning in range(1,max_innings+1):
+        frame=[0,None]
+        if innings is not None:innings.append(frame)
         for offense in (0,1):
             defense=1-offense
             if offense==1 and inning>=9 and scores[1]>scores[0]:return tuple(scores)
+            frame[offense]=0
             batters,pitchers,focuses,tracked=teams[offense]
             _,opponents,op_focus,op_tracked=teams[defense]
             # Five-start rotation and a fixed bullpen handoff in this version.
@@ -155,6 +158,7 @@ def play(away,home,seed,day,cache,player_stats):
                 if offense==1 and inning>=9 and event!='home_run':
                     runs=min(runs,max(0,scores[0]-scores[1]+1))
                 scores[offense]+=runs
+                frame[offense]+=runs
                 if offense==1 and inning>=9 and scores[1]>scores[0]:return tuple(scores)
                 if outs==3:break
             else:raise ValueError('한 이닝의 진행 한도에 도달했습니다. 이번 구간은 저장하지 않았습니다.')

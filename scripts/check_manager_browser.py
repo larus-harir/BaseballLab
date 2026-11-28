@@ -15,7 +15,8 @@ def submit(page, button):
 
 
 def no_overflow(page):
-    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    width,document=page.evaluate('[innerWidth,document.documentElement.scrollWidth]')
+    assert document<=width,(width,document)
 
 
 with TemporaryDirectory(prefix='baseball-manager-') as directory, local_server(Path(directory)) as (base,_), sync_playwright() as pw:
@@ -56,6 +57,13 @@ with TemporaryDirectory(prefix='baseball-manager-') as directory, local_server(P
     expect(page.locator('#advance-season')).to_have_text('다음 30경기 진행')
     state=submit(page,page.locator('#advance-season'))
     assert state['day']==30 and len(state['standings'])==10
+    dialog=page.get_by_role('dialog')
+    expect(dialog).to_be_visible()
+    expect(dialog).to_contain_text('리그 순위')
+    expect(dialog).to_contain_text('마지막 경기')
+    assert '득실' not in dialog.inner_text()
+    page.keyboard.press('Escape')
+    expect(dialog).not_to_be_visible()
     expect(page.locator('#season .club-banner')).to_contain_text('30 / 144경기')
     page.get_by_role('tab',name='시즌',exact=True).focus()
     page.keyboard.press('ArrowRight')
@@ -73,9 +81,28 @@ with TemporaryDirectory(prefix='baseball-manager-') as directory, local_server(P
     page.set_viewport_size({'width':390,'height':844})
     assert submit(page,page.locator('#advance-season'))['day']==60
     expect(page.locator('#season .club-banner')).to_contain_text('60 / 144경기')
+    expect(dialog).to_be_visible()
+    dialog.get_by_role('button',name='확인',exact=True).click()
     for name in ('선수 기록','경기 기록','라인업','시즌'):
         page.get_by_role('tab',name=name,exact=True).click()
         no_overflow(page)
+    for day in (90,120,144):
+        state=submit(page,page.locator('#advance-season'))
+        assert state['day']==day
+        expect(dialog).to_be_visible()
+        if day<144:dialog.get_by_role('button',name='확인',exact=True).click()
+    dialog.get_by_role('button',name='포스트시즌 대진').click()
+    expect(page.get_by_role('tab',name='포스트시즌')).to_have_attribute('aria-selected','true')
+    expect(page.locator('.post-path')).to_contain_text('한국시리즈')
+    state=submit(page,page.locator('#advance-playoff'))
+    assert len(state['postseason']['rounds'][0]['games'])==1
+    expect(dialog).to_contain_text('와일드카드 1차전')
+    expect(dialog.locator('.manager-table')).to_be_visible()
+    no_overflow(page)
+    page.keyboard.press('Escape')
+    page.reload()
+    page.get_by_role('tab',name='포스트시즌').click()
+    expect(page.locator('[data-series="0"][data-playoff-game="0"]')).to_be_visible()
     assert not errors,errors
     browser.close()
-    print('PASS: graded draft, training, 30-game checkpoint, lineup and transfer, resume, keyboard/mobile')
+    print('PASS: draft, event dialogs, lineup and transfer, postseason and saved game, keyboard/mobile')

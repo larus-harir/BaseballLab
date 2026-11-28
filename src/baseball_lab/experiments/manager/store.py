@@ -9,7 +9,7 @@ from threading import RLock
 
 from baseball_lab.data.lineage import write_json
 from baseball_lab.data.protection import private
-from . import presentation,season
+from . import postseason,presentation,season
 
 FOCUS_LIMIT=3
 FORMAT='kbo-manager-season-v1'
@@ -84,11 +84,20 @@ def card(state,key):
     focus=state['focus'].get(key,'')
     abilities,training=presentation.scouting(profile,focus)
     stats=state['stats'].get(key,{})
-    hits=sum(stats.get(e,0) for e in ('single','double','triple','home_run'))
+    playoff_stats=state.get('postseason',{}).get('stats',{}).get(key,{})
     return {'id':key,'name':presentation.names(state['seed'])[key],'role':profile['role'],
             'abilities':abilities,'training':training,'focus':focus,
-            'stats':{'n':stats.get('n',0),'hits':hits,'hr':stats.get('home_run',0),
-                     'bb':stats.get('walk',0),'so':stats.get('strikeout',0)}}
+            'stats':display_stats(stats),'playoff_stats':display_stats(playoff_stats)}
+
+
+def display_stats(stats):
+    hits=sum(stats.get(event,0) for event in ('single','double','triple','home_run'))
+    return {'n':stats.get('n',0),'hits':hits,'hr':stats.get('home_run',0),
+            'bb':stats.get('walk',0),'so':stats.get('strikeout',0)}
+
+
+def bracket(state):
+    return state.get('postseason') or postseason.start(state['standings'],state['seed'])
 
 
 def visible(state):
@@ -105,7 +114,8 @@ def visible(state):
             'roster':{s:card(state,k) for s,k in roster.items()},'draft':slot,
             'choices':[card(state,key) for key in choices(state,slot)] if slot else [],
             'market':{s:[card(state,k) for k in choices(state,s)] for s in season.SLOTS} if can_transfer else {},
-            'standings':standings,'event':state['event'],'results':state['results']}
+            'standings':standings,'event':state['event'],'results':state['results'],
+            'postseason':postseason.view(bracket(state),state['team']) if state['day']==season.GAMES else None}
 
 
 def pick(state,slot,key,focus):
@@ -131,7 +141,14 @@ def set_focus(state,key,focus):
 
 
 def apply(state,action,request):
-    if state['day']==season.GAMES:raise ValueError('시즌이 끝났습니다.')
+    if state['day']==season.GAMES:
+        cup=bracket(state)
+        if action=='playoff':
+            postseason.advance(cup,configured_teams(state),state['seed'])
+            state['postseason']=cup
+            return
+        if action not in ('lineup','focus') or not postseason.view(cup,state['team'])['active'] or cup['champion']:
+            raise ValueError('정규시즌이 끝났습니다.')
     roster=state['roster']
     slot=next((s for s in season.SLOTS if s not in roster),None)
     if action=='draft' and slot:
@@ -158,23 +175,34 @@ def apply(state,action,request):
     else:raise ValueError('현재 할 수 있는 작업을 선택하세요.')
 
 
-def advance(state):
+def configured_teams(state):
     _,teams,_,_,_=season.league()
     rosters={k:(v['batter'],v['pitcher'],{},False) for k,v in teams.items()}
     mine=state['team'];roster=state['roster']
     rosters[mine]=([roster[s] for s in state['batting']],
                    [roster[s] for s in (*state['rotation'],*season.SLOTS[14:])],state['focus'],True)
+    return rosters
+
+
+def my_rank(state):
+    return next(r['rank'] for r in season.table(state['standings']) if r['team']==state['team'])
+
+
+def advance(state):
+    rosters=configured_teams(state);mine=state['team']
     start=state['day'];end=min(start+season.BLOCK,season.GAMES)
     prior_runs=sum(row['rf'] for row in state['standings'].values())
+    before_rank=my_rank(state) if start else None
     fixtures=season.schedule(state['seed']);cache={};recent=[]
     for day in range(start+1,end+1):
         for away,home in fixtures[day-1]:
             seed=f'{state["seed"]}:{day}:{away}:{home}'
-            a,h=season.play(rosters[away],rosters[home],seed,day,cache,state['stats'])
+            innings=[] if mine in (away,home) else None
+            a,h=season.play(rosters[away],rosters[home],seed,day,cache,state['stats'],innings=innings)
             season.record(state['standings'],away,home,a,h)
             if mine in (away,home):
                 entry={'day':day,'opponent':season.TEAMS[away if home==mine else home],
-                       'home':home==mine,'scored':h if home==mine else a,'allowed':a if home==mine else h}
+                       'home':home==mine,'scored':h if home==mine else a,'allowed':a if home==mine else h,'innings':innings}
                 recent.append(entry)
     state['day']=end;state['results'].extend(recent)
     w=sum(g['scored']>g['allowed'] for g in recent);l=sum(g['scored']<g['allowed'] for g in recent)
@@ -185,5 +213,5 @@ def advance(state):
     elif allowed>average:title='투수진 점검'
     else:title='전력 점검'
     state['event']={'from':start+1,'to':end,'w':w,'l':l,'d':len(recent)-w-l,'rf':runs,'ra':allowed,
-                    'league_runs':round(average,1),'title':title}
+                    'league_runs':round(average,1),'title':title,'rank_before':before_rank,'rank':my_rank(state)}
     state['transfer']=False

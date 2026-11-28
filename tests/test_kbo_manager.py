@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from baseball_lab.experiments.manager import presentation, season
+from baseball_lab.experiments.manager import postseason, presentation, season
 from baseball_lab.experiments.manager.store import ManagerStore
 
 
@@ -30,6 +30,25 @@ def test_scouting_uses_stable_fictional_names_and_ordered_grades():
             _,options=presentation.scouting(profile,'')
             for option in options:
                 assert 'SABCD'.index(option['after'])<='SABCD'.index(option['before'])
+
+
+def test_wild_card_advantage_and_korean_series_home_order():
+    ladder={'seeds':list(season.TEAMS)[:5],'rounds':[],'champion':None}
+    wildcard=postseason.next_series(ladder)
+    away,home=postseason.current_teams(wildcard)
+    assert (away,home)==tuple(reversed(ladder['seeds'][3:5]))
+    postseason.finish_game(wildcard,{'away':away,'home':home,'a':3,'h':2})
+    assert wildcard['winner'] is None
+    postseason.finish_game(wildcard,{'away':away,'home':home,'a':1,'h':1})
+    assert wildcard['winner']==home
+    wildcard=postseason.next_series(ladder)
+    for _ in range(2):postseason.finish_game(wildcard,{'away':away,'home':home,'a':3,'h':2})
+    assert wildcard['winner']==away
+    final={'stage':3,'high':home,'low':away,'games':[]}
+    for host in (home,home,away,away,away,home,home):
+        assert postseason.current_teams(final)[1]==host
+        final['games'].append({'home':host,'a':2,'h':2 if len(final['games'])==2 else 1})
+    assert postseason.current_teams(final)[1]==away  # Replay at the drawn game's venue.
 
 
 def test_draft_changes_probabilities_and_real_season_can_finish_after_a_reload(tmp_path):
@@ -80,6 +99,22 @@ def test_draft_changes_probabilities_and_real_season_can_finish_after_a_reload(t
         assert view['day']==expected
     assert len(view['results'])==144 and view['next']==0
     assert sum(r['games'] for r in view['standings'])==1440
+    for game in view['results']:
+        scored,allowed=(1,0) if game['home'] else (0,1)
+        assert sum((inning[scored] or 0) for inning in game['innings'])==game['scored']
+        assert sum((inning[allowed] or 0) for inning in game['innings'])==game['allowed']
     with pytest.raises(ValueError,match='끝났습니다'):
         change('advance')
+    assert view['postseason']['next']['name']=='와일드카드'
+    regular=view['standings']
+    seeds=view['postseason']['seeds']
+    for _ in range(50):
+        if not view['postseason']['next']:break
+        change('playoff')
+    ps=view['postseason']
+    assert ps['champion'] in seeds and not ps['next']
+    assert [round['name'] for round in ps['rounds']]==['와일드카드','준플레이오프','플레이오프','한국시리즈']
+    assert ps['rounds'][-1]['winner']==ps['champion'] and 4 in ps['rounds'][-1]['wins']
+    assert all(new['low']==old['winner'] for old,new in zip(ps['rounds'],ps['rounds'][1:]))
+    assert view['standings']==regular and store.view(key)==view
     assert len(list((tmp_path/'outputs/manager').glob('*.json')))==1
