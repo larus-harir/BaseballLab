@@ -33,6 +33,8 @@ class Workbench:
         private(self.outputs,directory=True)
         private(self.root/'data/local',directory=True)
         self.storage=Storage(self.root)
+        from baseball_lab.experiments.manager.store import ManagerStore
+        self.manager=ManagerStore(self.root)
         from baseball_lab.data.catalog import DatasetCatalog
         self.catalog=DatasetCatalog(self.root)
         self.token=secrets.token_urlsafe(32)
@@ -481,7 +483,7 @@ def make_handler(workbench):
             if not self._host_ok():return self._json({'error':'로컬 주소로 접속하세요.'},403)
             path=urlparse(self.path).path
             pages={'/':'portal.html','/lab':'portal.html','/match':'match.html','/match/team':'workbench.html',
-                   '/match/at-bat':'workbench.html','/simulation':'simulation.html','/lab/data':'data.html'}
+                   '/match/at-bat':'workbench.html','/simulation':'simulation.html','/lab/data':'data.html','/manager':'manager.html'}
             if path in ('/baseball','/eramatch'):
                 from baseball_lab.matchup.web import render
                 if path=='/eramatch' and parse_qs(urlparse(self.path).query).get('mode')==['common']:
@@ -496,6 +498,10 @@ def make_handler(workbench):
                 query=parse_qs(urlparse(self.path).query)
                 try:self._json(workbench.state(query.get('project',[None])[0],compact=query.get('compact')==['1']))
                 except ValueError as exc:self._json({'error':str(exc)},400)
+            elif path=='/api/manager':
+                session=parse_qs(urlparse(self.path).query).get('id',[None])[0]
+                try:self._json(workbench.manager.view(session))
+                except (ValueError,KeyError,TypeError,OSError) as exc:self._json({'error':public_text(exc)},400)
             elif path=='/api/storage':self._json(workbench.storage.inventory())
             elif path=='/api/pitch-corpus':
                 try:
@@ -624,6 +630,8 @@ def make_handler(workbench):
                     payload=json.loads(body)
                     if not isinstance(payload,dict):raise ValueError('대결 설정이 필요합니다.')
                     result=workbench.matchup_analyze(payload.get('project'),payload.get('options'))
+                elif path=='/api/manager':
+                    result=workbench.manager.change(json.loads(body))
                 elif path=='/api/upload':
                     from urllib.parse import unquote
                     result=workbench.upload(unquote(self.headers.get('X-Filename','export.csv')),body,

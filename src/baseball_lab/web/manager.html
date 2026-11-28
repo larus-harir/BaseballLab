@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KBO 감독 모드 · Baseball Lab</title>
+<style>
+.manager-layout,.manager-candidates,.manager-summary{display:grid;gap:16px}
+.manager-layout{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}
+.manager-candidates,.manager-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+.manager-card,.manager-summary>div{background:var(--surface);border:1px solid var(--line);padding:16px;min-width:0}
+.manager-card dl{display:grid;grid-template-columns:1fr auto;gap:4px 10px;margin:12px 0}
+.manager-card dd{margin:0;font-variant-numeric:tabular-nums}
+.manager-card label{font-size:13px}.manager-card select{margin:6px 0 10px}
+.manager-summary strong{font-size:24px;display:block}.manager-summary span{color:var(--muted);font-size:13px}
+.manager-actions,.order-buttons{display:flex;gap:8px;flex-wrap:wrap}.manager-actions{margin:16px 0}
+.order-buttons button{padding:4px 8px;min-height:32px}.manager-table{overflow-x:auto;max-width:100%}
+.manager-table table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.manager-table th,.manager-table td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.manager-table tr.mine{background:var(--soft);font-weight:700}.slot-list{display:flex;gap:8px;flex-wrap:wrap;list-style:none;padding:0}
+.slot-list li{padding:4px 8px;background:var(--soft);font-size:13px}
+#manager-status:empty,#manager-error:empty{display:none}#manager-error{color:#9f3927}
+#manager-screen [hidden]{display:none!important}.page-manager .hero{padding-bottom:12px}
+@media(max-width:820px){.manager-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:650px){.manager-candidates{grid-template-columns:minmax(0,1fr)}.manager-summary{gap:6px}.manager-summary>div{padding:8px}.manager-summary strong{font-size:19px}}
+__APP_STYLES__
+</style></head><body>
+<a class="skip-link" href="#manager-screen">본문으로 건너뛰기</a>
+<main id="manager-screen" class="app-page page-manager">
+  <header><a class="brand" href="/">Baseball Lab</a><nav aria-label="주 메뉴"><a href="/eramatch">선수 가상 대결</a><a href="/match">AI 전략 연구</a></nav></header>
+  <div class="hero"><h1>KBO 감독 모드</h1></div>
+  <p id="manager-status" role="status"></p><p id="manager-error" role="alert" tabindex="-1"></p>
+  <section id="club-setup" hidden>
+    <h2>구단 만들기</h2>
+    <p><a id="resume-save" hidden>저장한 시즌 이어하기</a></p>
+    <form id="club-form"><label>대신할 팀<select id="replace-team" required></select></label>
+    <label>내 팀 이름<input id="club-name" maxlength="18" value="나의 구단" required></label>
+    <button type="submit">선수 선발 시작</button></form>
+    <p class="muted" id="format"></p>
+  </section>
+  <div id="season" hidden></div>
+  <details><summary>경기 모형과 자료</summary>
+  <p>2026 KBO 선수 시즌 집계를 사용합니다. 상대 팀은 소속 기록으로 구성하고, 내 팀의 후보는 기록으로 능력치를 만든 가상 선수입니다. 수비 포지션은 게임에서 배정합니다.</p>
+  <p>타석은 타자·투수의 상대 빈도를 결합하고, 진루는 기존 KBO 관측 전이를 사용합니다. 훈련은 선택한 사건 확률을 같은 역할의 상위 25% 수준 쪽으로 일부 이동시킵니다. 5인 선발, 정해진 불펜 교체, 11회 동점 무승부를 적용합니다.</p>
+  <p>2026 정규시즌 집계 · kaggle-netsong-kbo (게시자 CC BY-NC-SA 4.0). KBO 진루 · 관측 투구 모형에 등록된 공개 플레이 기록. 선수 능력과 경기 결과는 시뮬레이션입니다.</p></details>
+</main>
+<script>
+'use strict';
+const token='__SESSION_TOKEN__',$=id=>document.getElementById(id), esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let current=null,busy=false,marketSlot='';
+const root='/api/manager',query=new URLSearchParams(location.search);
+async function api(url,body){
+ const response=await fetch(url,body?{method:'POST',headers:{'X-Lab-Token':token,'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+ const data=await response.json();if(!response.ok)throw Error(data.error);return data;
+}
+function fail(error){$('manager-error').textContent=error.message;$('manager-error').focus()}
+async function change(action,fields={}){
+ if(busy)return;busy=true;$('manager-error').textContent='';
+ $('manager-status').textContent=action==='advance'?`리그의 다음 ${current.next}경기를 진행 중입니다.`:'시즌을 저장하는 중입니다.';
+ const disabled=[...document.querySelectorAll('button:not(:disabled),select:not(:disabled)')];disabled.forEach(el=>el.disabled=true);
+ try{
+  current=await api(root,{action,...fields,id:current?.id,revision:current?.revision});
+  history.replaceState(null,'','/manager?season='+current.id);
+  remember(current.id);
+  render();
+  if(action==='draft'||action==='advance')$('season-title')?.focus();
+ }catch(error){fail(error)}finally{busy=false;disabled.forEach(el=>el.disabled=false);$('manager-status').textContent=''}
+}
+function table(headers,rows){
+ return '<div class="manager-table" tabindex="0" role="region" aria-label="'+esc(headers[0])+' 표"><table><thead><tr>'+headers.map(h=>'<th scope="col">'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
+}
+function row(cells,highlight=false){return '<tr'+(highlight?' class="mine"':'')+'>'+cells.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>'}
+function focusOptions(card){
+ return '<option value="">기본 능력</option>'+card.training.map(t=>`<option value="${esc(t.id)}" ${card.focus===t.id?'selected':''}>${esc(t.name)} · ${esc(t.metric)} ${t.before}% → ${t.after}%</option>`).join('');
+}
+function candidates(id,cards,transfer=false){
+ return '<div id="'+id+'" class="manager-candidates">'+cards.map((card,i)=>{
+  const limit=current.focus_limit-current.focus_used;
+  return `<article class="manager-card"><h3>후보 ${i+1}</h3><dl>${Object.entries(card.rates).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${v}%</dd>`).join('')}</dl>
+  <small>기준 기록 ${card.sample} ${card.role==='batter'?'타석':'상대 타자'}</small>
+  <label>집중 훈련<select aria-label="후보 ${i+1} 집중 훈련" ${!limit&&!transfer?'disabled':''}>${focusOptions(card)}</select></label>
+  <button type="button" data-pick="${esc(card.id)}">${transfer?'교체':'선발'}</button></article>`;
+ }).join('')+'</div>';
+}
+function lineup(key,order){
+ return '<ol class="lineup">'+order.map((slot,i)=>`<li><strong>${esc(current.roster[slot].name)}</strong> · ${esc(slot)}
+ <span class="order-buttons"><button type="button" class="secondary" data-order="${key}" data-index="${i}" data-delta="-1" aria-label="${esc(slot)} 위로" ${i===0?'disabled':''}>↑</button>
+ <button type="button" class="secondary" data-order="${key}" data-index="${i}" data-delta="1" aria-label="${esc(slot)} 아래로" ${i===order.length-1?'disabled':''}>↓</button></span></li>`).join('')+'</ol>';
+}
+function records(){
+ return table(['경기','상대','장소','득점','실점'],current.results.slice().reverse().map(g=>row([g.day,g.opponent,g.home?'홈':'원정',g.scored,g.allowed])));
+}
+function playerRecords(){
+ return ['batter','pitcher'].map(role=>table(role==='batter'?['타자','타석','안타','홈런','볼넷','삼진']:['투수','상대 타자','피안타','피홈런','볼넷 허용','탈삼진'],
+  Object.entries(current.roster).filter(([,p])=>p.role===role).map(([s,p])=>row([`${p.name} · ${s}`,p.stats.n,p.stats.hits,p.stats.hr,p.stats.bb,p.stats.so])))).join('');
+}
+function render(){
+ $('club-setup').hidden=true;$('season').hidden=false;
+ const s=current,heading=`<h2 id="season-title" tabindex="-1">${esc(s.name)}</h2><p class="muted">${s.year} 기록 기준 · ${esc(s.replaced)} 자리</p>`;
+ if(s.draft){
+  $('season').innerHTML=`${heading}<section><h3>${esc(s.draft)} 선발</h3><p>${Object.keys(s.roster).length} / ${s.slots.length}명 · 남은 집중 훈련 ${s.focus_limit-s.focus_used}명</p>${candidates('draft-cards',s.choices)}
+  <ul class="slot-list" aria-label="선발 명단">${Object.keys(s.roster).map(slot=>'<li>'+esc(slot)+' · '+esc(s.roster[slot].name)+'</li>').join('')}</ul></section>`;
+  return;
+ }
+ const ranked=s.standings.find(x=>x.team===s.team),event=s.event;
+ const standings=table(['순위','팀','경기','승','패','무','승률','득실'],s.standings.map(r=>row([r.games?r.rank:'—',r.name,r.games,r.w,r.l,r.d,r.w+r.l?r.pct.toFixed(3):'—',r.rf-r.ra],r.team===s.team)));
+ const market=Object.keys(s.market);
+ if(!market.includes(marketSlot))marketSlot=market[0];
+ $('season').innerHTML=`${heading}<div class="manager-summary"><div><span>정규시즌</span><strong>${s.day} / ${s.games}</strong></div><div><span>순위</span><strong>${s.day?ranked.rank+'위':'—'}</strong></div><div><span>팀 성적</span><strong>${ranked.w}승 ${ranked.l}패 ${ranked.d}무</strong></div></div>
+ <div class="manager-layout"><div><section><h3>${event?esc(event.title):'개막 준비'}</h3>
+ ${event?`<p>${event.from}~${event.to}경기 · ${event.w}승 ${event.l}패 ${event.d}무 · ${event.rf}득점 ${event.ra}실점</p><p class="muted">같은 구간 리그 팀당 평균 ${event.league_runs}득점</p>`:'<p>타순과 선발 순서를 정하고 시즌을 시작하세요.</p>'}
+ ${s.next?`<div class="manager-actions"><button id="advance-season">다음 ${s.next}경기 진행</button></div>`:''}</section>
+ ${s.next?`<details id="lineup-details"><summary>라인업 · 집중 훈련</summary><h3>타순</h3>${lineup('batting',s.batting)}<h3>선발 순서</h3>${lineup('rotation',s.rotation)}
+ <h3>집중 훈련 ${s.focus_used} / ${s.focus_limit}명</h3>${Object.values(s.roster).map(p=>`<label>${esc(p.name)} <select data-focus="${esc(p.id)}">${focusOptions(p)}</select></label>`).join('')}</details>`:''}
+ ${market.length?`<details id="market-details"><summary>선수 한 명 교체</summary><label>교체 자리<select id="market-slot">${market.map(slot=>`<option ${slot===marketSlot?'selected':''}>${esc(slot)}</option>`).join('')}</select></label>
+ <div id="market-options">${candidates('market-cards',s.market[marketSlot],true)}</div></details>`:''}
+ <details><summary>선수 기록</summary>${playerRecords()}</details>${s.results.length?`<details><summary>경기별 기록</summary>${records()}</details>`:''}
+ </div><section><h3>리그 순위</h3>${standings}</section></div>
+ <p><a href="/manager">새 시즌 만들기</a></p>`;
+}
+$('club-form').onsubmit=event=>{event.preventDefault();change('create',{team:$('replace-team').value,name:$('club-name').value})};
+$('season').onclick=event=>{
+ const button=event.target.closest('button');if(!button||busy)return;
+ if(button.id==='advance-season'){change('advance');return}
+ if(button.dataset.pick){
+  const focus=button.closest('article').querySelector('select').value;
+  const transfer=!!button.closest('#market-cards');
+  change(transfer?'transfer':'draft',{slot:marketSlot,player:button.dataset.pick,focus});return;
+ }
+ if(button.dataset.order){
+  const key=button.dataset.order,index=Number(button.dataset.index),other=index+Number(button.dataset.delta),order=[...current[key]];
+  [order[index],order[other]]=[order[other],order[index]];
+  change('lineup',{batting:current.batting,rotation:current.rotation,[key]:order}).then(()=>$('lineup-details').open=true);
+ }
+};
+$('season').onchange=event=>{
+ const select=event.target;if(select.id==='market-slot'){marketSlot=select.value;$('market-options').innerHTML=candidates('market-cards',current.market[marketSlot],true)}
+ if(select.dataset.focus)change('focus',{player:select.dataset.focus,focus:select.value}).then(()=>{$('lineup-details').open=true;if($('manager-error').textContent)select.value=current.roster[Object.keys(current.roster).find(k=>current.roster[k].id===select.dataset.focus)]?.focus||''});
+};
+async function init(){
+ try{
+  if(query.has('season')){
+   current=await api(root+'?id='+encodeURIComponent(query.get('season')));remember(current.id);render();return;
+  }
+  const info=await api(root);
+  $('replace-team').replaceChildren(...Object.entries(info.teams).map(([id,name])=>new Option(name,id)));
+  $('format').textContent=`10팀 · ${info.games}경기 · ${info.block}경기마다 중간 점검`;
+  $('club-setup').hidden=false;
+  const saved=lastSession();
+  if(saved){$('resume-save').href='/manager?season='+saved;$('resume-save').hidden=false}
+ }catch(error){fail(error);$('manager-status').innerHTML='<a href="/manager">구단 만들기로 돌아가기</a>'}
+}
+function remember(id){try{localStorage.setItem('baseball-manager-season',id)}catch{}}
+function lastSession(){
+ try{const id=localStorage.getItem('baseball-manager-season');return /^[0-9a-f]{24}$/.test(id)?id:null}catch{return null}
+}
+init();
+</script></body></html>
