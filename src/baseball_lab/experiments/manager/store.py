@@ -9,7 +9,7 @@ from threading import RLock
 
 from baseball_lab.data.lineage import write_json
 from baseball_lab.data.protection import private
-from . import season
+from . import presentation,season
 
 FOCUS_LIMIT=3
 FORMAT='kbo-manager-season-v1'
@@ -80,21 +80,13 @@ def choices(state,slot):
 
 
 def card(state,key):
-    profile=season.league()[0][key];role=profile['role'];rates=profile['rates']
-    options=[]
-    for focus,(event,_,label) in season.TRAINING[role].items():
-        before=round(rates[event]*100,1)
-        after=round(season.adjusted(profile,focus)[event]*100,1)
-        if before!=after:
-            options.append({'id':focus,'name':label,'metric':season.LABELS[event],
-                            'before':before,'after':after})
-    measures=(('홈런 외 안타','hit_other'),('볼넷','walk'),('홈런','home_run')) if role=='batter' else (
-              ('피안타','hit_other'),('볼넷 허용','walk'),('탈삼진','strikeout'))
-    display={name:round((rates[k]+(rates['home_run'] if name=='피안타' else 0))*100,1) for name,k in measures}
+    profile=season.league()[0][key]
+    focus=state['focus'].get(key,'')
+    abilities,training=presentation.scouting(profile,focus)
     stats=state['stats'].get(key,{})
     hits=sum(stats.get(e,0) for e in ('single','double','triple','home_run'))
-    return {'id':key,'name':state['names'].get(key),'role':role,'sample':profile['n'],'rates':display,
-            'training':options,'focus':state['focus'].get(key,''),
+    return {'id':key,'name':presentation.names(state['seed'])[key],'role':profile['role'],
+            'abilities':abilities,'training':training,'focus':focus,
             'stats':{'n':stats.get('n',0),'hits':hits,'hr':stats.get('home_run',0),
                      'bb':stats.get('walk',0),'so':stats.get('strikeout',0)}}
 
@@ -123,7 +115,7 @@ def pick(state,slot,key,focus):
     state['focus'].pop(previous,None)
     set_focus(state,key,focus)
     state['roster'][slot]=key
-    state['names'][key]=f'신인 {len(state["names"])+1:02}'
+    state['names'][key]=presentation.names(state['seed'])[key]
 
 
 def set_focus(state,key,focus):

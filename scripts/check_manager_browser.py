@@ -1,4 +1,4 @@
-"""Exercise draft, block play, changes and reload on the bundled KBO data."""
+"""Exercise scouting, draft, lineup, block play, transfer and resume."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -7,11 +7,15 @@ from check_incremental_browser import local_server
 
 
 def submit(page, button):
-    with page.expect_response(lambda r:r.request.method=='POST' and r.url.endswith('/api/manager')) as response:
+    with page.expect_response(lambda response:response.request.method=='POST' and response.url.endswith('/api/manager')) as pending:
         button.click()
-    value=response.value
-    assert value.ok,value.text()
-    return value.json()
+    response=pending.value
+    assert response.ok,response.text()
+    return response.json()
+
+
+def no_overflow(page):
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
 
 
 with TemporaryDirectory(prefix='baseball-manager-') as directory, local_server(Path(directory)) as (base,_), sync_playwright() as pw:
@@ -20,45 +24,58 @@ with TemporaryDirectory(prefix='baseball-manager-') as directory, local_server(P
     errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
     page.goto(base)
     page.get_by_role('link',name='구단 만들기').click()
-    expect(page.locator('#replace-team option')).to_have_count(10)
-    page.locator('#replace-team').select_option('KIA')
+    expect(page.locator('#replace-team input')).to_have_count(10)
+    page.get_by_role('radio',name='타이거즈').check()
     page.locator('#club-name').fill('연습 구단')
     state=submit(page,page.get_by_role('button',name='선수 선발 시작'))
+    # All three cards fit on mobile with names and letter grades only.
+    page.set_viewport_size({'width':390,'height':844})
+    expect(page.locator('#draft-cards .player-card')).to_have_count(3)
+    expect(page.locator('#draft-cards .grade')).to_have_count(9)
+    assert '%' not in page.locator('#draft-cards').inner_text()
+    no_overflow(page)
+    page.set_viewport_size({'width':1280,'height':860})
     for i in range(16):
-        expect(page.locator('#draft-cards article')).to_have_count(3)
+        expect(page.locator('#draft-cards .player-card')).to_have_count(3)
+        selected=0
         if not state['focus_used']:
             for j,card in enumerate(state['choices']):
                 if card['training']:
-                    target=page.locator('#draft-cards article').nth(j)
-                    target.locator('select').select_option(card['training'][0]['id'])
+                    selected=j
+                    page.locator('#draft-cards .player-card').nth(j).click()
+                    page.locator('#pick-focus').select_option(card['training'][0]['id'])
                     break
-            else:target=page.locator('#draft-cards article').first
-        else:target=page.locator('#draft-cards article').first
-        state=submit(page,target.get_by_role('button',name='선발',exact=True))
-        if i<15:expect(page.locator('.slot-list li')).to_have_count(i+1)
-    assert state['focus_used']==1
-    assert len(state['roster'])==16
+        card=state['choices'][selected]
+        assert card['name'] and not any(c.isdigit() for c in card['name'])
+        expect(page.locator('#draft-cards .player-card[aria-pressed="true"]')).to_contain_text(card['name'])
+        slot=state['draft']
+        state=submit(page,page.get_by_role('button',name=card['name']+' 선발',exact=True))
+        assert card['name']==state['roster'][slot]['name']
+        if i<15:expect(page.locator('.club-banner strong')).to_contain_text(f'{i+1} / 16명')
+    assert state['focus_used']==1 and len(state['roster'])==16
     expect(page.locator('#advance-season')).to_have_text('다음 30경기 진행')
     state=submit(page,page.locator('#advance-season'))
     assert state['day']==30 and len(state['standings'])==10
-    expect(page.locator('.manager-summary')).to_contain_text('30 / 144')
-    page.get_by_text('라인업 · 집중 훈련',exact=True).click()
+    expect(page.locator('#season .club-banner')).to_contain_text('30 / 144경기')
+    page.get_by_role('tab',name='시즌',exact=True).focus()
+    page.keyboard.press('ArrowRight')
+    expect(page.get_by_role('tab',name='라인업')).to_be_focused()
     state=submit(page,page.locator('[data-order=batting][data-index="0"][data-delta="1"]'))
     assert state['batting'][:2]==['1루수','포수']
-    page.get_by_text('선수 한 명 교체',exact=True).click()
     slot=page.locator('#market-slot').input_value()
     previous=state['roster'][slot]['id']
-    state=submit(page,page.locator('#market-cards button').first)
+    state=submit(page,page.locator('#market-cards button[data-pick]'))
     assert state['roster'][slot]['id']!=previous
     page.goto(base+'/manager')
-    page.get_by_role('link',name='저장한 시즌 이어하기').click()
-    expect(page.locator('.manager-summary')).to_contain_text('30 / 144')
+    page.get_by_role('link',name='이어하기').click()
+    expect(page.locator('#season .club-banner')).to_contain_text('30 / 144경기')
     expect(page.locator('#market-details')).to_have_count(0)
     page.set_viewport_size({'width':390,'height':844})
-    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     assert submit(page,page.locator('#advance-season'))['day']==60
-    expect(page.locator('.manager-summary')).to_contain_text('60 / 144')
-    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    expect(page.locator('#season .club-banner')).to_contain_text('60 / 144경기')
+    for name in ('선수 기록','경기 기록','라인업','시즌'):
+        page.get_by_role('tab',name=name,exact=True).click()
+        no_overflow(page)
     assert not errors,errors
     browser.close()
-    print('PASS: draft and training, 30-game checkpoint, lineup and transfer, saved season resume, mobile layout')
+    print('PASS: graded draft, training, 30-game checkpoint, lineup and transfer, resume, keyboard/mobile')

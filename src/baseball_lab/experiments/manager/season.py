@@ -18,10 +18,9 @@ TEAMS = {
 }
 POSITIONS = ('포수', '1루수', '2루수', '3루수', '유격수', '좌익수', '중견수', '우익수', '지명타자')
 SLOTS = (*POSITIONS, *(f'선발 {i}' for i in range(1,6)), '중간계투', '마무리')
-TRAINING = {'batter':{'contact':('hit_other',1,'컨택'), 'eye':('walk',1,'선구안'), 'power':('home_run',1,'장타')},
+TRAINING = {'batter':{'contact':('hit_other',1,'컨택'), 'eye':('walk',1,'선구안'), 'power':('home_run',1,'장타력')},
             'pitcher':{'control':('walk',-1,'제구'), 'stuff':('strikeout',1,'탈삼진'), 'limit':('home_run',-1,'피홈런 억제')}}
 FIELDS = ('HBP', 'HR')
-LABELS = {'hit_other':'홈런 외 안타','walk':'볼넷','home_run':'홈런','strikeout':'삼진'}
 
 
 def schedule(seed):

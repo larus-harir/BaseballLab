@@ -1,8 +1,9 @@
 from collections import Counter
+import json
 
 import pytest
 
-from baseball_lab.experiments.manager import season
+from baseball_lab.experiments.manager import presentation, season
 from baseball_lab.experiments.manager.store import ManagerStore
 
 
@@ -12,6 +13,23 @@ def test_kbo_schedule_has_144_games_and_balanced_venues():
     venues=Counter(fixture for day in dates for fixture in day)
     assert len(venues)==90 and set(venues.values())=={8}
     assert all(len(day)==5 and {t for fixture in day for t in fixture}==set(season.TEAMS) for day in dates)
+
+
+def test_scouting_uses_stable_fictional_names_and_ordered_grades():
+    profiles,_,_,pools,_=season.league()
+    names=presentation.names(41)
+    assert len(set(names.values()))==len(profiles)
+    assert not set(names.values()) & {p['name'] for p in profiles.values()}
+    assert presentation.names(42)!=names
+    for role,trait in (('pitcher','control'),('batter','power')):
+        candidates=[profiles[key] for key in pools[role]]
+        candidates.sort(key=lambda p:presentation.trait_score(trait,p,p['rates']))
+        assert presentation.grade(trait,candidates[0],candidates[0]['rates'])=='D'
+        assert presentation.grade(trait,candidates[-1],candidates[-1]['rates'])=='S'
+        for profile in candidates:
+            _,options=presentation.scouting(profile,'')
+            for option in options:
+                assert 'SABCD'.index(option['after'])<='SABCD'.index(option['before'])
 
 
 def test_draft_changes_probabilities_and_real_season_can_finish_after_a_reload(tmp_path):
@@ -25,8 +43,11 @@ def test_draft_changes_probabilities_and_real_season_can_finish_after_a_reload(t
 
     while view['draft']:
         candidate=view['choices'][0]
+        slot=view['draft']
         training=next(iter(candidate['training']),None) if view['focus_used']==0 else None
         change('draft',player=candidate['id'],focus=training['id'] if training else '')
+        assert view['roster'][slot]['name']==candidate['name']
+        assert 'rates' not in candidate and all(a['grade'] in 'SABCD' for a in candidate['abilities'])
     assert len(view['roster'])==16 and len({p['id'] for p in view['roster'].values()})==16
     assert view['focus_used']==1
     p=next(p for p in view['roster'].values() if p['focus'])
@@ -47,6 +68,11 @@ def test_draft_changes_probabilities_and_real_season_can_finish_after_a_reload(t
     slot=order[0];new=view['market'][slot][0]['id']
     change('transfer',slot=slot,player=new)
     assert view['roster'][slot]['id']==new and view['batting']==order and not view['market']
+    # Existing season files used serial numbers as display names.
+    file=tmp_path/'outputs'/'manager'/f'{key}.json'
+    archived=json.loads(file.read_text(encoding='utf-8'))
+    archived['names']={key:f'신인 {i:02d}' for i,key in enumerate(archived['names'],1)}
+    file.write_text(json.dumps(archived),encoding='utf-8')
     store=ManagerStore(tmp_path)
     assert store.view(key)==view
     for expected in (60,90,120,144):
