@@ -103,6 +103,10 @@ def league_results_validation_saved(page, base, root):
         assert analysis['simulation']['n'] == 37
         expect(page.locator('#headline')).to_contain_text('37타석')
         expect(page.locator('#result')).to_be_focused()
+        expect(page.locator('#otherMeaning')).not_to_be_visible()
+        assert '원천' not in page.locator('#detailScope').inner_text()
+        chart_text=page.locator('#eventChart').inner_text()
+        assert '그 밖의 결과' not in chart_text, chart_text
         no_overflow(page)
         page.locator('#eventChart button').first.click()
         expect(page.locator('#plateDetails')).to_have_attribute('open', '')

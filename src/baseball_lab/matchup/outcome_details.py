@@ -21,7 +21,7 @@ DETAIL_LABELS={'ground_out':'땅볼 아웃','fly_out':'뜬공 아웃','line_out'
  'grounded_double_play':'병살타','double_play':'병살 플레이','triple_play':'삼중살 플레이',
  'runner_out':'선행주자 아웃','sacrifice_bunt':'희생번트','sacrifice_fly':'희생플라이',
  'reached_error':'실책 출루','fielders_choice':'야수선택','interference':'방해로 출루',
- 'recorded_out':'아웃 플레이','unresolved':'그 밖의 결과'}
+ 'recorded_out':'아웃 플레이','unresolved':'세부 미분류'}
 _CACHE={};_LOCK=threading.RLock()
 
 

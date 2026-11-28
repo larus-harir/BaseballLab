@@ -23,7 +23,9 @@ def build(result):
     for p in result.get('contexts',[]):
         if 'seed' in p:per_run[p['seed']].append(p['teams'][0])
     shifts=[]
-    if headline:
+    if headline and headline.get('situation_specific'):
+        shifts=headline['run_deltas']
+    elif headline:
         view=headline['view'];action=headline['action']
         for pairs in per_run.values():
             differences=[]
@@ -44,13 +46,14 @@ def build(result):
         scope.append(league+' '+', '.join(str(g[0]) if len(g)==1 else f'{g[0]}~{g[-1]}' for g in groups))
     cards=[]
     for role,view,title in (('offense','offense','공격에서 배운 선택'),('pitching','defense','투구에서 배운 선택')):
-        counts=o[role];top=max(counts,key=counts.get,default=None);v=o['preferences'][view]
+        story=stories.get(view)
+        counts=o[role];top=max(counts,key=counts.get,default=None);v=story['preferences'] if story and story.get('situation_specific') else o['preferences'][view]
         keys=sorted(v['after'].keys()|v['before'].keys(),key=lambda k:-max(v['before'].get(k,0),v['after'].get(k,0)))
         rows=[{'action':k,'before':v['before'].get(k,0),'after':v['after'].get(k,0)} for k in keys[:3]]
         if len(keys)>3:rows.append({'action':'other','before':sum(v['before'].get(k,0) for k in keys[3:]),'after':sum(v['after'].get(k,0) for k in keys[3:])})
         cards.append({'role':view,'title':title,'top':label(top) if top else None,'count':counts.get(top,0) if top else 0,'total':sum(counts.values()),
-                      'story':stories.get(view) if o['games'] else None,
-                      'detail':(stories.get('direction',{}).get('summary','') if view=='offense' else stories.get('defense',{}).get('context','')) if o['games'] else '',
+                      'story':story if o['games'] else None,
+                      'detail':(stories.get('direction',{}).get('summary','') if view=='offense' else '') if o['games'] else '',
                       'rows':rows,'states':v['states'] if o['games'] else 0})
     return {'schema':'learning-glance-v1','headline':headline['summary'] if headline and o['games'] else '학습 경험이 쌓이면 달라진 플레이를 보여줍니다.',
         'games':o['games'],'pitches':o['pitches'],'completed':result['status']=='COMPLETED','scope':scope,'cards':cards,
@@ -83,12 +86,11 @@ def render(result):
     state='학습 결과' if d['completed'] else '중간 저장 기록'
     parts.append(f'<section class="lead"><div><p class="eyebrow">한눈에 보기 · {state}</p><h1>{text(d["headline"])}</h1><p class="scope">{text(" · ".join(d["scope"]))}</p></div><dl><div><dt>저장된 연습</dt><dd>{d["games"]:,}<small> 경기</small></dd></div><div><dt>선택한 투구</dt><dd>{d["pitches"]:,}<small> 구</small></dd></div></dl></section>')
     if not d['completed']:parts.append('<p class="notice">학습 도중 저장된 내용입니다. 최종 결과와 다를 수 있습니다.</p>')
-    parts.append('<div class="legend"><span><i class="before"></i>학습 전 선호</span><span><i class="after"></i>학습 후 선호</span><span>같은 기준 상황의 평균</span></div><section class="roles" aria-label="공격과 투구 요약">')
+    parts.append('<div class="legend"><span><i class="before"></i>학습 전 선호</span><span><i class="after"></i>학습 후 선호</span><span>같은 상황에서 달라진 판단</span></div><section class="roles" aria-label="공격과 투구 요약">')
     for c in d['cards']:
         parts.append(f'<article class="card"><div class="card-heading"><h2>{text(c["title"])}</h2><a href="report.html#{"pitch" if c["role"]=="defense" else "summary"}">자세히 ↗</a></div>')
-        if c['top']:parts.append(f'<p class="played">자주 실행한 선택 <strong>{text(c["top"])}</strong><span>{c["count"]:,}회 / {c["total"]:,}회</span></p>')
-        else:parts.append('<p class="empty">아직 실행된 선택이 없습니다.</p>')
         if c['story']:parts.append('<p class="story">'+text(c['story']['summary'])+'</p><p class="reason">'+text(c['story']['reason'])+'</p>')
+        if c['story'] and c['story'].get('situation_specific'):parts.append('<p class="secondary">'+text(c['story']['context'])+' · 같은 상황의 실행 평균</p>')
         if c['detail']:parts.append('<p class="secondary">'+text(c['detail'])+'</p>')
         if c['states']:
             parts.append('<ul class="comparisons">')
@@ -98,6 +100,7 @@ def render(result):
                 parts.append(f'<li aria-label="{text(aria)}"><div class="bar-label"><span>{text(name)}</span><span>{pct(row["before"])} → <b>{pct(row["after"])}</b></span></div><div class="track"><i class="before" style="width:{100*row["before"]:.5f}%"></i></div><div class="track"><i class="after" style="width:{100*row["after"]:.5f}%"></i></div></li>')
             parts.append('</ul>')
         else:parts.append('<p class="empty">전후 비교 기록이 없습니다.</p>')
+        if c['top']:parts.append(f'<p class="played">전체 연습에서 가장 많이 실행 <strong>{text(c["top"])}</strong><span>{c["count"]:,}회 / {c["total"]:,}회</span></p>')
         parts.append('</article>')
     parts.append('</section><section class="bottom"><article class="card course"><div class="card-heading"><h2>코스 선호의 전후 비교</h2><a href="report.html#pitch">투구 상세 ↗</a></div>')
     course=d['course']

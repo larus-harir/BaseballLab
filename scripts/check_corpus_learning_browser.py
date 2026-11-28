@@ -72,6 +72,20 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     page.goto(base+job['report']);expect(page.locator('#teamCards')).to_contain_text('공격')
     view=page.locator('#data').text_content();view=json.loads(view)
     assert view['schema']=='strategy-report-view-v3'
+    choices=page.locator('[data-choice-record]')
+    expect(choices).to_have_count(2)
+    choices.nth(0).locator('summary').focus();page.keyboard.press('Enter')
+    expect(choices.nth(0)).to_have_attribute('open','')
+    expect(choices.nth(1)).to_have_attribute('open','')
+    choices.nth(1).locator('summary').click()
+    expect(choices.nth(0)).not_to_have_attribute('open','')
+    expect(choices.nth(1)).not_to_have_attribute('open','')
+    assert all(s['situation_specific'] and s['probe_id'] for s in view['overview']['explanations'])
+    assert '여전히' not in page.locator('#reasons').inner_text()
+    page.locator('#reasons details summary').first.click()
+    expect(page.locator('#reasons table').first).to_be_visible()
+    expect(page.locator('#reasons details[open]')).to_have_count(len(view['overview']['explanations']))
+    assert page.locator('#reasons table').first.locator('tbody tr').count()>=1
     original=(ROOT/'outputs/workbench'/job['id']/'result/research.json').read_bytes()
     page.locator('#glanceLink').click();expect(page).to_have_url(base+job['report'].replace('report.html','overview.html'))
     expect(page.locator('h1')).to_be_visible();assert page.locator('.grids svg').count()==2
@@ -108,7 +122,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     page.locator('#tab-growth').focus();page.keyboard.press('Enter');expect(page.locator('#growth')).to_be_visible()
     assert page.locator('#growthCharts svg').count()==4
     assert page.locator('#courseComparison svg').count()==2
-    assert '학습 신호' in page.locator('#summary').inner_text()
+    assert '같은 경기 상황' in page.locator('#summary').inner_text()
     assert page.locator('#replayDetail').count()==0
     assert page.locator('#reasons .narrative').count()>0
     assert all(seed.get('replay',{}).get('events') for seed in data['seeds'])

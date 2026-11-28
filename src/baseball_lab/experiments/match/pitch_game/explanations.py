@@ -2,7 +2,7 @@
 from collections import Counter
 
 FAMILIES={'fastball':'직구','sinker':'싱커·투심','cutter':'커터','slider':'슬라이더','curve':'커브','changeup':'체인지업','splitter':'포크·스플리터','knuckle':'너클볼'}
-NAMES={'swing':'스윙','take':'지켜보기','bunt':'번트','steal':'도루','pitch':'구종 지정 없는 투구','intentional_walk':'고의볼넷','pull':'당겨치기','center':'가운데 타격','opposite':'밀어치기','left':'좌측 타격','right':'우측 타격'}
+NAMES={'swing':'스윙','take':'지켜보기','bunt':'번트','steal':'도루','pitch':'투구','intentional_walk':'고의볼넷','pull':'당겨치기','center':'가운데 타격','opposite':'밀어치기','left':'좌측 타격','right':'우측 타격'}
 HEIGHTS={'high':'높은 코스','middle':'중간 높이 코스','low':'낮은 코스'}
 
 

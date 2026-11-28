@@ -6,13 +6,14 @@ from .models import EVENTS,LABELS
 def interpret(result):
     if result['model']['model']=='common':
         q=result['model']['probabilities'];s=result['simulation']
+        labels={**result['labels'],'other':'아웃·실책 등'}
         return {'headline':'리그 평균 대비 공통 기록 비교 · 절대 실력 검증 전',
-            'rows':[{'key':k,'label':result['labels'][k],'count':s['counts'][k],'expected':s['expected'][k],'probability':q[k]} for k in q],
+            'rows':[{'key':k,'label':labels[k],'count':s['counts'][k],'expected':s['expected'][k],'probability':q[k]} for k in q],
             'notes':([('홈런은 따로 계산하고, 구분할 수 없는 안타 종류는 '+result['labels']['hit_other']+'로 묶었습니다.') ] if 'hit_other' in q and 'home_run' in q else [])+[result['scope']],'hits':sum(s['counts'].get(k,0) for k in ('hit','hit_other','single','double','triple','home_run')),'extra_base_hits':sum(s['counts'].get(k,0) for k in ('double','triple','home_run')) if all(k in q for k in ('double','triple','home_run')) else None,
-            'events':s['events'],'labels':result['labels'],'denominator':s['n']}
+            'events':s['events'],'labels':labels,'denominator':s['n']}
     simulation=result['simulation'];q=result['model']['probabilities'];n=simulation['n'];counts=simulation['counts']
     detail=result.get('event_display',{});display=detail.get('events',simulation['events']);labels={**LABELS,**detail.get('labels',{})}
-    labels['other']='기타 결과 (세부 기록 없음)'
+    labels['other']='아웃·실책 등'
     actual=Counter(display);rows=[]
     rates=detail.get('other',{}).get('conditional_rates',{})
     for key in EVENTS:

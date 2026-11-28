@@ -67,5 +67,6 @@ def build(result):
         'growth':[{'games_per_run':n,'preferences':average(rows)} for n,rows in sorted(growth.items())],
         'feedback':feedback,'basis':'Observed virtual outcomes and pre-update terminal-win advantages; correlated within games, no causal explanation or transcript of thoughts.'}
     from .explanations import explain
-    answer['explanations']=explain(answer,pooled['defense'],pooled['feedback']['defense'])
+    from .decision_insights import build as insights
+    answer['explanations']=insights(result) or explain(answer,pooled['defense'],pooled['feedback']['defense'])
     return answer
