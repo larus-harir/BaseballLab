@@ -63,6 +63,8 @@ def league():
             if singles<0:
                 continue
             profile['hit_mix']=(singles,counts['2B'],counts['3B'])
+            sb,cs=counts['SB'],counts['CS']
+            profile['steal_attempt_rate']=(sb+cs)/n if n and sb is not None and cs is not None else None
         profiles[key]=profile
         teams[team][role].append(key)
     total=Counter()
@@ -70,10 +72,14 @@ def league():
         if p['role']=='batter':total.update(p['events'])
     reference={event:n/sum(total.values()) for event,n in total.items()}
     hit_mix=tuple(sum(p['hit_mix'][i] for p in profiles.values() if p['role']=='batter') for i in range(3))
+    runners=[p for p in profiles.values() if p.get('steal_attempt_rate') is not None]
+    attempt_prior=sum(p['steal_attempt_rate']*p['n'] for p in runners)/sum(p['n'] for p in runners) if runners else 0.
     for p in profiles.values():
         # Same relative-rate inputs and 100 PA shrinkage as the matchup screen.
         p['rates']={k:(p['events'][k]+100*prior)/(p['n']+100) for k,prior in reference.items()}
         if p['role']=='batter' and not sum(p['hit_mix']):p['hit_mix']=hit_mix
+        if p.get('steal_attempt_rate') is not None:
+            p['steal_attempt_rate']=(p['steal_attempt_rate']*p['n']+100*attempt_prior)/(p['n']+100)
     pools={role:sorted(p['id'] for p in profiles.values() if p['role']==role and p['n']>=100) for role in TRAINING}
     benchmarks={}
     for role,choices in TRAINING.items():
@@ -121,11 +127,16 @@ def movement_world():
     return world
 
 
-def play(away,home,seed,day,cache,player_stats,*,max_innings=MAX_INNINGS,innings=None):
+def play(away,home,seed,day,cache,player_stats,*,max_innings=MAX_INNINGS,innings=None,fielding=None,accounts=None):
+    from . import skills
+
     profiles,_,reference,_,_=league()
     world=movement_world()
     rng=Random(seed);scores=[0,0];positions=[0,0]
     teams=(away,home)
+    if accounts is None:accounts=tuple(player_stats if roster[3] else None for roster in teams)
+    speed=skills.running_ratings() if fielding is not None else {}
+    expectancy=skills.run_expectancy() if fielding is not None else None
     for inning in range(1,max_innings+1):
         frame=[0,None]
         if innings is not None:innings.append(frame)
@@ -133,30 +144,42 @@ def play(away,home,seed,day,cache,player_stats,*,max_innings=MAX_INNINGS,innings
             defense=1-offense
             if offense==1 and inning>=9 and scores[1]>scores[0]:return tuple(scores)
             frame[offense]=0
-            batters,pitchers,focuses,tracked=teams[offense]
-            _,opponents,op_focus,op_tracked=teams[defense]
+            batters,_,focuses,_,_=teams[offense]
+            _,opponents,op_focus,_,fielders=teams[defense]
+            hit_account,pitch_account=accounts[offense],accounts[defense]
             # Five-start rotation and a fixed bullpen handoff in this version.
             pitcher=opponents[(day-1)%5 if inning<=5 else 5 if inning<=7 else 6]
-            outs=bases=0
+            outs=bases=0;runner=None
             for _ in range(100):
                 hitter=batters[positions[offense]]
                 positions[offense]=(positions[offense]+1)%9
                 pair=(hitter,pitcher,focuses.get(hitter),op_focus.get(pitcher))
                 if pair not in cache:
                     q,_,_=generalized_log5(adjusted(profiles[hitter],pair[2]),adjusted(profiles[pitcher],pair[3]),reference)
-                    cache[pair]=(tuple(q),tuple(q.values()))
-                events,weights=cache[pair]
+                    mix=profiles[hitter]['hit_mix']
+                    single_to_out=q['hit_other']*mix[0]/sum(mix)/q['other']
+                    cache[pair]=(tuple(q),tuple(q.values()),single_to_out)
+                events,weights,single_to_out=cache[pair]
                 event=rng.choices(events,weights=weights,k=1)[0]
                 if event=='hit_other':
                     event=rng.choices(('single','double','triple'),weights=profiles[hitter]['hit_mix'],k=1)[0]
-                for account,player in ((tracked,hitter),(op_tracked,pitcher)):
-                    if account:
-                        stats=player_stats.setdefault(player,{})
-                        stats['n']=stats.get('n',0)+1
-                        stats[event]=stats.get(event,0)+1
-                outs,bases,runs=world.advance(outs,bases,'out' if event=='other' else event,rng)
+                if fielding is not None and event in ('single','other'):
+                    fielder=rng.choice(fielders)
+                    event,saved=skills.field_contact(event,fielding[fielder],single_to_out,rng)
+                    if pitch_account is not None:
+                        record_fielding(pitch_account,fielder,saved)
+                start=outs*8+bases
+                terminal='out' if event=='other' else event
+                if fielding is None:
+                    outs,bases,runs=world.advance(outs,bases,terminal,rng)
+                else:
+                    outs,bases,runs=skills.advance(world,outs,bases,terminal,speed.get(runner),rng)
+                    runner=first_base_runner(event,outs,bases,hitter,runner,start % 8)
                 if offense==1 and inning>=9 and event!='home_run':
                     runs=min(runs,max(0,scores[0]-scores[1]+1))
+                value=runs+expectancy[min(24,outs*8+bases)]-expectancy[start] if expectancy is not None else None
+                if hit_account is not None:record_pa(hit_account,hitter,event,value)
+                if pitch_account is not None:record_pa(pitch_account,pitcher,event,-value if value is not None else None)
                 scores[offense]+=runs
                 frame[offense]+=runs
                 if offense==1 and inning>=9 and scores[1]>scores[0]:return tuple(scores)
@@ -164,6 +187,25 @@ def play(away,home,seed,day,cache,player_stats,*,max_innings=MAX_INNINGS,innings
             else:raise ValueError('한 이닝의 진행 한도에 도달했습니다. 이번 구간은 저장하지 않았습니다.')
         if inning>=9 and scores[0]!=scores[1]:break
     return tuple(scores)
+
+
+def first_base_runner(event,outs,bases,hitter,runner,previous_bases):
+    if outs==3 or not bases&1:return None
+    if event in ('single','walk','hbp'):return hitter
+    return runner if event=='strikeout' and bases==previous_bases else None
+
+
+def record_fielding(records,player,saved):
+    stats=records.setdefault(player,{})
+    stats['field_chances']=stats.get('field_chances',0)+1
+    stats['field_net']=stats.get('field_net',0)+saved
+
+
+def record_pa(records,player,event,value):
+    stats=records.setdefault(player,{})
+    stats['n']=stats.get('n',0)+1
+    stats[event]=stats.get(event,0)+1
+    if value is not None:stats['value']=stats.get('value',0.)+value
 
 
 def record(standings,away,home,a,h):

@@ -63,7 +63,7 @@ def finish_game(series,game):
         series['winner']=winner
 
 
-def advance(bracket,rosters,seed):
+def advance(bracket,rosters,seed,fielding=None,cache=None):
     series=next_series(bracket)
     if series is None:raise ValueError('포스트시즌이 끝났습니다.')
     if not bracket['rounds'] or bracket['rounds'][-1] is not series:
@@ -73,10 +73,24 @@ def advance(bracket,rosters,seed):
     game_seed=f'{seed}:postseason:{series["stage"]}:{number}'
     day=1+sum(len(r['games']) for r in bracket['rounds'])
     innings=[]
-    a,h=season.play(rosters[away],rosters[home],game_seed,day,{},bracket['stats'],max_innings=MAX_INNINGS,innings=innings)
+    a,h=season.play(rosters[away],rosters[home],game_seed,day,cache if cache is not None else {},bracket['stats'],
+                    max_innings=MAX_INNINGS,innings=innings,fielding=fielding)
     finish_game(series,{'number':number,'away':away,'home':home,'a':a,'h':h,'innings':innings})
     if series['stage']==len(ROUNDS)-1 and series['winner']:
         bracket['champion']=series['winner']
+
+
+def play_to_next_user_game(bracket,rosters,seed,team,fielding,*,play_user=False):
+    cache={}
+    first=next_series(bracket)
+    play_user=play_user and first is not None and team in current_teams(first)
+    while series:=next_series(bracket):
+        involves_user=team in current_teams(series)
+        if involves_user and not play_user:
+            break
+        advance(bracket,rosters,seed,fielding,cache)
+        if involves_user:
+            play_user=False
 
 
 def view(bracket,team):

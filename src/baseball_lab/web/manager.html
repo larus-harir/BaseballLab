@@ -70,11 +70,22 @@ main.page-manager.app-page{max-width:1330px;padding-bottom:44px}
 .manager-summary strong{display:block;font-size:clamp(16px,3vw,26px);font-variant-numeric:tabular-nums}.manager-summary span{color:var(--muted);font-size:12px}
 .manager-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.page-manager button[aria-selected=true]{background:var(--green);color:#0d241b;border-color:var(--green)}
 .game-tab{min-width:0}.game-tab>div+div{margin-top:12px}
-.order-list{display:grid;gap:7px;padding:0;margin:0;list-style:none}
-.order-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;background:#101d27;border-radius:8px;padding:8px 10px}
-.order-item small{color:var(--muted)}.order-item strong{display:block}.order-buttons{display:flex;gap:4px}.order-buttons button{padding:4px 8px;min-width:34px;min-height:36px}
-.roster-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0 0}.roster-card{background:#10202b;padding:10px;border-radius:8px;min-width:0}
-.roster-card h3{font-size:15px;margin-bottom:6px}.roster-card select{font-size:13px;margin-top:8px}
+.order-list{display:grid;gap:5px;padding:0;margin:0;list-style:none}
+.order-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;border:1px solid var(--line);background:#101d27;border-radius:8px}
+.order-item:has([aria-pressed=true]){border-color:var(--green);background:#19382f}
+.page-manager .line-player{display:grid;grid-template-columns:auto minmax(75px,1fr) auto;align-items:center;gap:7px;text-align:left;
+ background:transparent;color:var(--ink);padding:6px 8px;font-weight:650;min-width:0;width:100%}
+.line-player small{display:block;color:var(--muted);font-size:11px;font-weight:500}.line-name{overflow-wrap:anywhere}
+.line-number{font-variant-numeric:tabular-nums;color:var(--green);min-width:19px;text-align:center}
+.line-player .grade-list{display:flex;flex-wrap:wrap;gap:4px 7px}.line-player .grade-trait{font-size:11px;gap:3px}
+.line-player .grade{min-width:16px;min-height:17px;font-size:11px}.lineup-role,.order-item [data-profile]{align-self:center}
+.lineup-role{display:none}.page-manager .lineup-role [aria-pressed=true]{border-color:var(--green);color:var(--green);background:#19382f}
+.lineup-help{margin:0 0 9px!important;min-height:20px}.pitcher-label{margin:10px 0 6px!important}
+.club-actions{display:grid;gap:5px;justify-items:end;text-align:right;flex-shrink:0}.club-actions button{padding:3px 7px}
+.season-recap{border-color:#456f66;background:linear-gradient(135deg,#18352e,var(--surface) 65%)}
+.season-recap h2{font-size:clamp(22px,4vw,34px);margin-bottom:8px}.season-recap .event-actions a{align-self:center;padding:8px}
+.awards{display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin:10px 0 0}
+.awards>div{background:#10202c;padding:9px;border-radius:8px}.awards b,.awards span{display:block}.award-mvp{color:#ffdc8c}
 .manager-table{overflow-x:auto;min-width:0;max-width:100%}.manager-table table{width:100%;margin:0;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .manager-table td,.manager-table th{background:transparent;border-color:var(--line);color:var(--ink);text-align:left;white-space:nowrap;padding:8px 6px;font-size:13px}
 .manager-table th{color:var(--muted)}.manager-table tr.mine{background:#1b3b31;font-weight:800}
@@ -101,7 +112,8 @@ main.page-manager.app-page{max-width:1330px;padding-bottom:44px}
 .report-metrics span{display:block;font-size:12px;color:var(--muted)}.report-metrics b{font-size:17px}
 .report-content h3{margin:6px 0}.report-actions{padding:0 20px 17px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 #report-body .manager-table th,#report-body .manager-table td{padding:6px 5px}
-.game-help{font-size:13px;color:var(--muted)}.game-help summary{color:var(--ink)}.new-season-link{font-size:13px}
+#report-error{padding:8px 20px;color:#ffc3ca}
+.game-help{font-size:13px;color:var(--muted)}.game-help summary{color:var(--ink)}
 #manager-status:not(:empty),#manager-error:not(:empty){padding:10px 14px;background:var(--soft);border-radius:8px;margin-top:10px}
 #manager-error{color:#ffc3ca}#manager-screen [hidden]{display:none!important}
 @media(max-width:900px){.draft-layout,.season-layout,.club-form-layout{grid-template-columns:minmax(0,1fr)}}
@@ -112,6 +124,10 @@ main.page-manager.app-page{max-width:1330px;padding-bottom:44px}
  .page-manager .manager-tabs button{padding:8px 10px}.club-banner strong{font-size:13px}
  .manager-summary .result-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px}.manager-summary .result-strip li{padding:2px 0;text-align:center;font-size:11px}
  .post-path li{padding:6px 4px;font-size:11px;text-align:center}.report-content,.report-head{padding:12px}.report-actions{padding:0 12px 12px}
+ .lineup-role{display:flex;gap:5px;margin-bottom:9px}.lineup-layout[data-role=batter] #pitcher-list,.lineup-layout[data-role=pitcher] #batter-list{display:none}
+ .page-manager .line-player{grid-template-columns:auto minmax(62px,1fr) auto;font-size:13px;padding:5px;gap:4px}
+ .line-player .grade-list{gap:2px 4px;max-width:126px}.line-player .grade-trait{font-size:10px}.line-player .grade{min-height:16px}
+ .order-item [data-profile]{padding:3px;font-size:11px}.line-player small{font-size:10px}
 }
 </style>
 </head>
@@ -135,12 +151,14 @@ main.page-manager.app-page{max-width:1330px;padding-bottom:44px}
   <dialog id="game-report" aria-labelledby="game-report-title">
     <div class="report-head"><div><p id="report-eyebrow"></p><h2 id="game-report-title"></h2></div>
       <form method="dialog"><button class="secondary" aria-label="결과 닫기" autofocus>닫기</button></form></div>
+    <p id="report-error" class="quiet" role="alert" tabindex="-1" hidden></p>
     <div id="report-body" class="report-content"></div>
     <div id="report-actions" class="report-actions"></div>
   </dialog>
   <details class="game-help"><summary>등급과 자료</summary>
     <p>등급은 2026 KBO 같은 역할 선수와 비교한 가상 능력입니다. S가 가장 높고 D가 가장 낮습니다. 집중 훈련 효과가 같은 등급 안에서 반영될 수 있습니다.</p>
-    <p>선수 이름과 수비 포지션은 가상입니다. 진루는 기존 KBO 관측 전이를 사용합니다.</p>
+    <p>주력은 도루 시도 기록으로 매깁니다. 1루 주자가 단타에 3루까지 가는 빈도에 반영합니다. 수비력은 가상 능력이며, 홈런이나 삼진에는 영향을 주지 않습니다.</p>
+    <p>시상은 가상 정규시즌 기준입니다. MVP는 주자·아웃 상황별 득점 기대값으로 계산합니다. 수비 골드글러브는 포지션별 순 안타 저지로 정합니다.</p>
     <p>상위 다섯 팀이 포스트시즌에 진출합니다. 승률이 같으면 이 게임에서는 득실차, 다득점, 추첨 순으로 시드를 정합니다.</p>
     <p>2026 정규시즌 집계 · kaggle-netsong-kbo (게시자 CC BY-NC-SA 4.0).</p>
   </details>
@@ -155,9 +173,10 @@ const query=new URLSearchParams(location.search);
 const mainTabs=[['overview','시즌'],['lineup','라인업'],['stats','선수 기록'],['games','경기 기록']];
 const stages=['와일드카드','준플레이오프','플레이오프','한국시리즈'];
 let current=null,busy=false,activeTab='overview',marketSlot='',selectedCandidate=0;
-let reportReturn=null;
+let reportReturn=null,orderPick=null,lineupRole='batter';
 
-function availableTabs(){return current.postseason?[...mainTabs,['postseason','포스트시즌']]:mainTabs}
+function availableTabs(){return [...mainTabs,...(current.postseason?[['postseason','포스트시즌']]:[]),
+ ...(current.season_report?[['report','시즌 성적표']]:[])]}
 function canEdit(state){return state.next>0||!!(state.postseason?.next&&state.postseason.active)}
 
 async function api(url,body){
@@ -166,39 +185,52 @@ async function api(url,body){
  if(!response.ok)throw Error(data.error);
  return data;
 }
-function fail(error){$('manager-error').textContent=error.message;$('manager-error').focus()}
+function fail(error){
+ const alert=$($('game-report').open?'report-error':'manager-error');
+ alert.hidden=false;alert.textContent=error.message;alert.focus();
+}
 async function change(action,fields={}){
  if(busy)return;
  busy=true;$('manager-error').textContent='';
- $('manager-status').textContent=action==='advance'?`다음 ${current.next}경기 진행 중`:action==='playoff'?`${current.postseason.next.name} 진행 중`:'저장 중';
+ $('report-error').hidden=true;
+ $('manager-status').textContent=action==='advance'?`다음 ${current.next}경기 진행 중`:action==='playoff'?'포스트시즌 진행 중':'저장 중';
  const source=document.activeElement;
+ const next=current?.postseason?.next;
+ const personalGame=action==='playoff'&&next?.teams.includes(current.team)?next:null;
  const controls=[...document.querySelectorAll('button:enabled,select:enabled,input:enabled')];
  controls.forEach(el=>el.disabled=true);
  try{
+  const restart=action==='create'&&current;
   current=await api(root,{action,...fields,id:current?.id,revision:current?.revision});
-  history.replaceState(null,'','/manager?season='+current.id);
+  if(restart)history.pushState(null,'','/manager?season='+current.id);
+  else history.replaceState(null,'','/manager?season='+current.id);
   remember(current.id);
-  selectedCandidate=0;
-  if(action==='advance')activeTab='overview';
-  if(action==='playoff')activeTab='postseason';
+  selectedCandidate=0;orderPick=null;
+  if(action==='create'){
+   activeTab='overview';marketSlot='';lineupRole='batter';
+   if($('game-report').open){reportReturn=null;$('game-report').close()}
+  }
+  if(action==='advance'||action==='playoff')activeTab=current.season_report?'report':action==='playoff'?'postseason':'overview';
   render();
   if(action==='lineup'&&source?.dataset.order){
-   const index=Number(source.dataset.index)+Number(source.dataset.delta);
-   $('season').querySelector(`[data-order="${source.dataset.order}"][data-index="${index}"]:enabled`)?.focus();
+   $('season').querySelector(`[data-order="${source.dataset.order}"][data-index="${source.dataset.index}"]:enabled`)?.focus();
   }else if(action==='focus'){
-   $('season').querySelector(`[data-focus="${fields.player}"]`)?.focus();
+   showPlayer(fields.player);$('player-focus')?.focus();
   }else $('season-title')?.focus();
-  if(action==='advance')showBlock();
-  if(action==='playoff'){
-   const series=current.postseason.rounds.filter(round=>round.games.length).at(-1);
-   showPlayoffGame(series,series.games.at(-1));
+  if(action==='advance'&&!current.season_report)showBlock();
+  if(personalGame){
+   const series=current.postseason.rounds.find(round=>round.stage===personalGame.stage);
+   showPlayoffGame(series,series.games[personalGame.number-1]);
   }
  }catch(error){fail(error)}finally{
   busy=false;controls.forEach(el=>el.disabled=false);$('manager-status').textContent='';
  }
 }
 function grade(letter){return `<span class="grade grade-${esc(letter.toLowerCase())}">${esc(letter)}</span>`}
-function grades(card){return `<span class="grade-list">${card.abilities.map(a=>`<span class="grade-trait">${esc(a.name)} ${grade(a.grade)}</span>`).join('')}</span>`}
+function grades(card,compact=false){
+ const labels={contact:'컨택',eye:'선구',power:'장타',running:'주력',fielding:'수비',limit:'피홈런'};
+ return `<span class="grade-list">${card.abilities.map(a=>`<span class="grade-trait" title="${esc(a.name)}">${esc(compact?(labels[a.id]??a.name):a.name)} ${grade(a.grade)}</span>`).join('')}</span>`;
+}
 function focusOptions(card){
  return '<option value="">기본</option>'+card.training.map(t=>{
   const change=t.before===t.after?`${t.before} 등급 내 향상`:`${t.before} → ${t.after}`;
@@ -230,33 +262,37 @@ function field(state){
  }).join('')}</div><ul class="arm-board" aria-label="투수 명단">${state.slots.slice(9).map(slot=>
    `<li>${esc(slot)}<b>${esc(state.roster[slot]?.name||'—')}</b></li>`).join('')}</ul>`;
 }
-function lineup(key,slots){
+function statLine(player){
+ const {n,hits,hr,so}=player.stats;
+ return !n?'기록 없음':player.role==='batter'?`안타 ${hits} · 홈런 ${hr}`:`탈삼진 ${so} · 피홈런 ${hr}`;
+}
+function lineup(key,slots,editable){
  return `<ol class="order-list">${slots.map((slot,i)=>{
   const player=current.roster[slot];
-  const buttons=[[-1,'위로','↑',i===0],[1,'아래로','↓',i===slots.length-1]].map(([delta,label,icon,disabled])=>
-   `<button type="button" class="secondary" data-order="${key}" data-index="${i}" data-delta="${delta}" aria-label="${esc(player.name)} ${label}" ${disabled?'disabled':''}>${icon}</button>`).join('');
-  return `<li class="order-item"><span><small>${i+1} · ${esc(slot)}</small><strong>${esc(player.name)}</strong></span><span class="order-buttons">${buttons}</span></li>`;
+  const content=`<span class="line-number">${key==='relief'?'·':i+1}</span><span class="line-name"><small>${esc(slot)}</small>${esc(player.name)}<small>${statLine(player)}</small></span>${grades(player,true)}`;
+  const control=editable?`<button type="button" class="line-player" data-order="${key}" data-index="${i}" aria-pressed="false">${content}</button>`:`<span class="line-player">${content}</span>`;
+  return `<li class="order-item">${control}<button type="button" class="text-button" data-profile="${esc(player.id)}" aria-label="${esc(player.name)} 상세">상세</button></li>`;
  }).join('')}</ol>`;
 }
 function records(){
  return table(['경기','상대','장소','결과'],current.results.slice().reverse().map(g=>
   `<tr><td>${g.day}</td><td>${esc(g.opponent)}</td><td>${g.home?'홈':'원정'}</td><td><button type="button" class="text-button" data-game="${g.day}">${g.scored} : ${g.allowed} · ${resultOf(g.scored,g.allowed)}</button></td></tr>`));
 }
-function playerRecords(field='stats'){
+function playerRecords(field='stats',players=Object.entries(current.roster)){
  return ['batter','pitcher'].map(role=>table(role==='batter'?['타자','타석','안타','홈런','볼넷','삼진']:['투수','상대 타자','피안타','피홈런','볼넷 허용','탈삼진'],
-  Object.entries(current.roster).filter(([,p])=>p.role===role).map(([s,p])=>{
+  players.filter(([,p])=>p.role===role).map(([s,p])=>{
    const stats=p[field];
    return row([`${p.name} · ${s}`,stats.n,stats.hits,stats.hr,stats.bb,stats.so]);
   }))).join('');
 }
 function banner(state){
  return `<div class="club-banner"><div><p>${state.year} 시즌 · ${esc(state.replaced)} 자리</p><h1 id="season-title" tabindex="-1">${esc(state.name)}</h1></div>
-  <strong>${state.draft?`${Object.keys(state.roster).length} / ${state.slots.length}명`:`${state.day} / ${state.games}경기`}</strong></div>`;
+  <div class="club-actions"><strong>${state.draft?`${Object.keys(state.roster).length} / ${state.slots.length}명`:`${state.day} / ${state.games}경기`}</strong><button type="button" class="secondary" data-restart>새 시즌</button></div></div>`;
 }
 function renderDraft(state){
  return `${banner(state)}<div class="draft-layout">
    <div class="game-panel"><div class="panel-title"><h2>${esc(state.draft)} 영입</h2><small>남은 집중 훈련 ${state.focus_limit-state.focus_used}명</small></div>
-   <div id="draft-cards">${candidateGroup(state.draft,state.choices,false)}</div></div>
+   <div id="draft-cards">${candidateGroup(state.draft,state.choices,false)}</div><div class="event-actions"><button type="button" class="secondary" id="quick-draft">남은 선수 빠르게 선발</button></div></div>
    <aside class="game-panel"><div class="panel-title"><h2>편성 현황</h2></div>${field(state)}</aside></div>`;
 }
 function standings(state,summary=false){
@@ -278,24 +314,25 @@ function fixturePanel(state){
  return `<div class="game-panel"><div class="panel-title"><h2>${event?esc(event.title):'개막 준비'}</h2><small>${event?`${event.from}–${event.to}경기`:'정규시즌'}</small></div>
  ${event?`<p class="event-score">${event.w}승 ${event.l}패 ${event.d}무</p>`:''}
  <div class="event-actions">${state.next?`<button type="button" id="advance-season">다음 ${state.next}경기 진행</button><button type="button" class="secondary" data-show-tab="lineup">라인업 확인</button>`:
-  '<button type="button" data-show-tab="postseason">포스트시즌 대진</button>'}
+  state.season_report?'<button type="button" data-show-tab="report">시즌 성적표</button>':'<button type="button" data-show-tab="postseason">포스트시즌 대진</button>'}
  ${event?'<button type="button" class="secondary" id="block-report">구간 결과</button>':''}</div></div>`;
 }
 function marketPanel(state){
  const slots=Object.keys(state.market);
  if(!slots.length)return '';
  if(!slots.includes(marketSlot))marketSlot=slots[0];
- return `<div class="game-panel" id="market-details"><div class="panel-title"><h2>선수 교체</h2><small>이번 점검에 1명</small></div>
+ return `<details class="game-panel" id="market-details"><summary>선수 교체 · 이번 점검에 1명</summary>
  <label>교체 자리<select id="market-slot">${slots.map(slot=>`<option ${slot===marketSlot?'selected':''}>${esc(slot)}</option>`).join('')}</select></label>
- <div id="market-cards">${candidateGroup(marketSlot,state.market[marketSlot],true)}</div></div>`;
+ <div id="market-cards">${candidateGroup(marketSlot,state.market[marketSlot],true)}</div></details>`;
 }
 function lineupPanel(state){
  const editable=canEdit(state);
- const roster=Object.entries(state.roster).map(([slot,p])=>`<div class="roster-card"><h3>${esc(p.name)} <small class="quiet">${esc(slot)}</small></h3>${grades(p)}
-  ${editable?`<select data-focus="${esc(p.id)}" aria-label="${esc(p.name)} 집중 훈련">${focusOptions(p)}</select>`:''}</div>`).join('');
- const slots=editable?`<div class="lineup-layout"><div class="game-panel"><div class="panel-title"><h2>타순</h2></div>${lineup('batting',state.batting)}</div>
- <div class="game-panel"><div class="panel-title"><h2>선발 로테이션</h2></div>${lineup('rotation',state.rotation)}</div></div>`:'';
- return `${slots}${marketPanel(state)}<div class="game-panel"><div class="panel-title"><h2>선수단</h2><small>집중 훈련 ${state.focus_used} / ${state.focus_limit}명</small></div><div class="roster-list">${roster}</div></div>`;
+ return `<div class="lineup-role" role="group" aria-label="선수 유형">${[['batter','타자 9'],['pitcher','투수 7']].map(([key,label])=>
+  `<button type="button" class="secondary" data-lineup-role="${key}" aria-pressed="${lineupRole===key}">${label}</button>`).join('')}</div>
+ ${editable?'<p class="quiet lineup-help" id="lineup-help" aria-live="polite">두 선수를 누르면 순서가 바뀝니다.</p>':''}
+ <div class="lineup-layout" data-role="${lineupRole}"><div class="game-panel" id="batter-list"><div class="panel-title"><h2>타순</h2></div>${lineup('batting',state.batting,editable)}</div>
+ <div class="game-panel" id="pitcher-list"><div class="panel-title"><h2>선발 로테이션</h2></div>${lineup('rotation',state.rotation,editable)}
+ <h3 class="pitcher-label">불펜</h3>${lineup('relief',state.slots.slice(14),false)}</div></div>${marketPanel(state)}`;
 }
 function teamName(team){return current.standings.find(row=>row.team===team)?.name??'—'}
 function standingsSeed(team){return current.postseason.seeds.indexOf(team)+1}
@@ -311,14 +348,35 @@ function postseasonPanel(state){
  let next='';
  if(ps.next){
   const [away,home]=ps.next.teams;
+  const buttonLabel=ps.next.teams.includes(state.team)?`${ps.next.number}차전 진행`:ps.active?'내 팀 경기까지 진행':'포스트시즌 마치기';
   next=`<h3>${ps.next.name} ${ps.next.number}차전</h3><div class="post-match"><span>${esc(teamName(away))} 원정</span><span>·</span><span>${esc(teamName(home))} 홈</span></div>
-  <div class="event-actions"><button type="button" id="advance-playoff">${ps.next.number}차전 진행</button>${canEdit(state)?'<button type="button" class="secondary" data-show-tab="lineup">라인업 확인</button>':''}</div>`;
- }else next=`<h3>${esc(teamName(ps.champion))} 우승</h3>`;
+  <div class="event-actions"><button type="button" id="advance-playoff">${buttonLabel}</button>${canEdit(state)?'<button type="button" class="secondary" data-show-tab="lineup">라인업 확인</button>':''}</div>`;
+ }else next=`<h3>${esc(teamName(ps.champion))} 우승</h3><div class="event-actions"><button type="button" data-show-tab="report">시즌 성적표</button></div>`;
  const history=ps.rounds.map(series=>`<div class="series-card"><h3>${series.name}</h3><p>${esc(seriesScore(series))}</p>
   ${series.stage===0?'<p>4위는 1승 또는 무승부, 5위는 2승 시 진출</p>':''}
   <div class="event-actions">${series.games.map((g,i)=>`<button type="button" class="secondary" data-series="${series.stage}" data-playoff-game="${i}">${g.number}차전 · ${g.a} : ${g.h}</button>`).join('')}</div></div>`).join('');
  return `<div class="game-panel"><div class="panel-title"><h2>포스트시즌</h2><small>${note}</small></div><ol class="post-path">${path}</ol>${next}</div>
  <div class="game-panel"><div class="panel-title"><h2>시리즈 기록</h2></div>${history}</div>`;
+}
+function seasonRecap(state){
+ const {players,playoff_w:w,playoff_l:l,playoff_d:d,awards}=state.season_report;
+ const mine=state.standings.find(row=>row.team===state.team);
+ const count=(role,field)=>players.filter(p=>p.role===role).reduce((sum,p)=>sum+p.stats[field],0);
+ const champion=state.postseason.champion;
+ const stage=state.postseason.rounds.filter(round=>[round.high,round.low].includes(state.team)).at(-1);
+ const outcome=champion===state.team?'한국시리즈 우승':stage?`${stage.name} 탈락`:'포스트시즌 미진출';
+ const mvp=awards?.mvp;
+ const playerCard=(p,label,detail)=>`<div><span class="quiet">${esc(label)}</span><b>${esc(p.name)}</b><span class="quiet">${esc(teamName(p.team))} · ${esc(detail)}</span></div>`;
+ return `<div class="game-panel season-recap"><h2>시즌 성적표</h2><div class="report-metrics">
+  <div><span>정규시즌 · ${mine.rank}위</span><b>${mine.w}승 ${mine.l}패 ${mine.d}무</b></div>
+  <div><span>${outcome}</span><b>${stage?`${w}승 ${l}패 ${d}무`:`${esc(teamName(champion))} 우승`}</b>${stage&&champion!==state.team?`<span>우승 ${esc(teamName(champion))}</span>`:''}</div>
+  <div><span>타선</span><b>안타 ${count('batter','hits')} · 홈런 ${count('batter','hr')}</b></div>
+  <div><span>투수진</span><b>탈삼진 ${count('pitcher','so')} · 피홈런 ${count('pitcher','hr')}</b></div></div>
+  <div class="event-actions"><button type="button" data-restart>같은 구단으로 새 시즌</button><a class="secondary" href="/manager">다른 구단 선택</a></div></div>
+  ${awards?`<div class="game-panel"><div class="panel-title"><h2>정규시즌 시상</h2></div>
+   ${mvp?`<div class="awards award-mvp">${playerCard(mvp,'MVP',`${mvp.role==='batter'?'득점 기여':'실점 억제'} ${mvp.value.toFixed(1)}점`)}</div>`:''}
+   ${awards.gloves.length?`<details><summary>수비 골드글러브 · ${awards.gloves.length}명</summary><div class="awards">${awards.gloves.map(p=>playerCard(p,p.slot,`순 안타 저지 ${p.value}개`)).join('')}</div></details>`:''}</div>`:''}
+  <details class="game-panel"><summary>시즌 전체 선수 기록</summary><div class="record-layout">${playerRecords('stats',players.map(p=>[p.slot,p]))}</div></details>`;
 }
 function tabPanel(key,html){return `<section id="manager-panel-${key}" class="game-tab" role="tabpanel" aria-labelledby="manager-tab-${key}" ${activeTab!==key?'hidden':''}>${html}</section>`}
 function renderSeason(state){
@@ -331,8 +389,7 @@ function renderSeason(state){
   ${tabPanel('lineup',lineupPanel(state))}
   ${tabPanel('stats',`<div class="record-layout">${state.day?playerRecords():'<p class="quiet">아직 선수 기록이 없습니다.</p>'}</div>${Object.values(state.roster).some(p=>p.playoff_stats.n)?`<div class="game-panel"><h2>포스트시즌 선수 기록</h2><div class="record-layout">${playerRecords('playoff_stats')}</div></div>`:''}`)}
   ${tabPanel('games',`<div class="game-panel">${state.day?records():'<p class="quiet">아직 경기 기록이 없습니다.</p>'}</div>`)}
-  ${state.postseason?tabPanel('postseason',postseasonPanel(state)):''}</div>
-  <a class="new-season-link" href="/manager">시즌 시작 화면</a>`;
+  ${state.postseason?tabPanel('postseason',postseasonPanel(state)):''}${state.season_report?tabPanel('report',seasonRecap(state)):''}</div>`;
 }
 function render(){
  $('club-setup').hidden=true;$('season').hidden=false;
@@ -349,6 +406,7 @@ function inningScore(innings,away,home,a,h){
 function report(title,round,content,links=[]){
  const dialog=$('game-report');
  reportReturn=document.activeElement;
+ $('report-error').hidden=true;
  $('game-report-title').textContent=title;$('report-eyebrow').textContent=round;
  $('report-body').innerHTML=content;
  $('report-actions').innerHTML=links.map(([key,label])=>`<button type="button" data-report-tab="${key}">${label}</button>`).join('')+
@@ -388,9 +446,20 @@ function showPlayoffGame(series,game){
  const games=series.games.slice(0,game.number);
  const wins=[series.high,series.low].map(team=>games.filter(g=>g.a!==g.h&&(g.a>g.h?g.away:g.home)===team).length);
  const score=seriesScore({...series,wins});
- const actions=canEdit(current)?[['lineup','라인업 조정']]:[];
+ const actions=current.season_report?[['report','시즌 성적표']]:canEdit(current)?[['lineup','라인업 조정']]:[];
  report(label,`${series.name} ${game.number}차전`,
   matchScore(away,home,game.a,game.h)+inningScore(game.innings,away,home,game.a,game.h)+`<p class="quiet">${esc(score)}</p>`,actions);
+}
+function showPlayer(id){
+ const player=Object.values(current.roster).find(p=>p.id===id);
+ const {n,hits,hr,bb,so,field_net}=player.stats;
+ const batting=player.role==='batter';
+ const statistics=row([n,hits,hr,bb,so]);
+ const training=canEdit(current)?`<label>집중 훈련 · ${current.focus_used} / ${current.focus_limit}명
+  <select id="player-focus" data-player="${esc(id)}" ${!player.focus&&current.focus_used>=current.focus_limit?'disabled':''}>${focusOptions(player)}</select></label>`:'';
+ const fielding=field_net?`<p class="quiet">${field_net>0?`순 안타 저지 ${field_net}개`:`순 추가 허용 안타 ${-field_net}개`}</p>`:'';
+ report(player.name,'선수 상세',grades(player)+table(batting?['타석','안타','홈런','볼넷','삼진']:['상대 타자','피안타','피홈런','볼넷 허용','탈삼진'],[statistics])+fielding+training);
+ reportReturn=$('season').querySelector(`[data-profile="${CSS.escape(id)}"]`);
 }
 $('game-report').onclick=event=>{
  const button=event.target.closest('button');if(!button)return;
@@ -398,8 +467,16 @@ $('game-report').onclick=event=>{
   reportReturn=null;$('game-report').close();setTab(button.dataset.reportTab);
  }else if(button.hasAttribute('data-report-dismiss'))$('game-report').close();
 };
+$('game-report').onchange=event=>{
+ const select=event.target;
+ if(select.id==='player-focus'){
+  const player=Object.values(current.roster).find(p=>p.id===select.dataset.player);
+  change('focus',{player:player.id,focus:select.value}).then(()=>{if(!$('report-error').hidden)select.value=player.focus});
+ }
+};
 $('game-report').onclose=()=>{reportReturn?.focus();reportReturn=null};
 function setTab(key){
+ clearOrderPick();
  activeTab=key;
  for(const [name] of availableTabs()){
   const button=$('manager-tab-'+name),selected=name===key;
@@ -407,6 +484,12 @@ function setTab(key){
   $('manager-panel-'+name).hidden=!selected;
  }
  $('manager-tab-'+key).focus();
+}
+function clearOrderPick(){
+ orderPick=null;
+ $('season').querySelector('[data-order][aria-pressed=true]')?.setAttribute('aria-pressed','false');
+ const hint=$('lineup-help');
+ if(hint)hint.textContent='두 선수를 누르면 순서가 바뀝니다.';
 }
 $('club-form').onsubmit=event=>{
  event.preventDefault();
@@ -417,9 +500,17 @@ $('season').onclick=event=>{
  const button=event.target.closest('button');if(!button||busy)return;
  const data=button.dataset;
  if(data.tab||data.showTab){setTab(data.tab||data.showTab);return}
+ if(button.hasAttribute('data-restart')){change('create',{team:current.team,name:current.name});return}
+ if(button.id==='quick-draft'){change('quick_draft');return}
  if(button.id==='advance-season'){change('advance');return}
  if(button.id==='advance-playoff'){change('playoff');return}
  if(button.id==='block-report'){showBlock();return}
+ if(data.profile){showPlayer(data.profile);return}
+ if(data.lineupRole){
+  lineupRole=data.lineupRole;clearOrderPick();
+  button.parentElement.querySelectorAll('button').forEach(el=>el.setAttribute('aria-pressed',String(el===button)));
+  $('season').querySelector('.lineup-layout').dataset.role=lineupRole;return;
+ }
  if(data.game){showRegularGame(current.results.find(g=>g.day===Number(data.game)));return}
  if(data.series!==undefined){
   const series=current.postseason.rounds.find(r=>r.stage===Number(data.series));
@@ -439,9 +530,17 @@ $('season').onclick=event=>{
   change(data.transfer==='true'?'transfer':'draft',{slot:marketSlot,player:data.pick,focus:$('pick-focus').value});return;
  }
  if(data.order){
-  const key=data.order,index=Number(data.index),other=index+Number(data.delta),order=[...current[key]];
+  const key=data.order,index=Number(data.index),other=orderPick?.index;
+  const reselected=orderPick?.key===key&&other===index;
+  if(orderPick?.key!==key||reselected){
+   clearOrderPick();
+   if(reselected)return;
+   orderPick={key,index};button.setAttribute('aria-pressed','true');
+   $('lineup-help').textContent=`${current.roster[current[key][index]].name} 선택 · 바꿀 선수를 누르세요.`;return;
+  }
+  const order=[...current[key]];
   [order[index],order[other]]=[order[other],order[index]];
-  change('lineup',{batting:current.batting,rotation:current.rotation,[key]:order});
+  clearOrderPick();change('lineup',{batting:current.batting,rotation:current.rotation,[key]:order});
  }
 };
 $('season').onkeydown=event=>{
@@ -458,16 +557,14 @@ $('season').onchange=event=>{
  if(select.id==='market-slot'){
   marketSlot=select.value;selectedCandidate=0;
   $('market-cards').innerHTML=candidateGroup(marketSlot,current.market[marketSlot],true);
- }else if(select.dataset.focus){
-  const player=Object.values(current.roster).find(p=>p.id===select.dataset.focus);
-  change('focus',{player:player.id,focus:select.value}).then(()=>{if($('manager-error').textContent)select.value=player.focus});
  }
 };
 function remember(id){try{localStorage.setItem('baseball-manager-season',id)}catch{}}
 function lastSession(){try{const id=localStorage.getItem('baseball-manager-season');return /^[0-9a-f]{24}$/.test(id)?id:null}catch{return null}}
+window.addEventListener('popstate',()=>location.reload());
 async function init(){
  try{
-  if(query.has('season')){current=await api(root+'?id='+encodeURIComponent(query.get('season')));remember(current.id);render();return}
+  if(query.has('season')){current=await api(root+'?id='+encodeURIComponent(query.get('season')));remember(current.id);if(current.season_report)activeTab='report';render();return}
   const info=await api(root);
   $('replace-team').innerHTML=Object.entries(info.teams).map(([id,name],i)=>`<label><input type="radio" name="team" value="${esc(id)}" ${i===0?'checked':''} required><span>${esc(name)}</span></label>`).join('');
   $('format').textContent=`${info.year} · 10팀 정규시즌 · ${info.games}경기`;

@@ -1,9 +1,10 @@
 from collections import Counter
 import json
+from random import Random
 
 import pytest
 
-from baseball_lab.experiments.manager import postseason, presentation, season
+from baseball_lab.experiments.manager import postseason, presentation, season, skills
 from baseball_lab.experiments.manager.store import ManagerStore
 
 
@@ -51,6 +52,36 @@ def test_wild_card_advantage_and_korean_series_home_order():
     assert postseason.current_teams(final)[1]==away  # Replay at the drawn game's venue.
 
 
+def test_postseason_skips_cpu_rounds_and_stops_after_one_user_game(monkeypatch):
+    teams=list(season.TEAMS)[:5]
+    bracket={'seeds':teams,'rounds':[],'champion':None,'stats':{}}
+    monkeypatch.setattr(season,'play',lambda *args,**kwargs:(1,3))
+    rosters={team:None for team in teams}
+    mine=teams[1]
+    postseason.play_to_next_user_game(bracket,rosters,41,mine,None)
+    assert [r['winner'] for r in bracket['rounds']]==[teams[3],teams[2]]
+    assert postseason.next_series(bracket)['high']==mine
+    postseason.play_to_next_user_game(bracket,rosters,41,mine,None,play_user=True)
+    assert len(bracket['rounds'][-1]['games'])==1
+    assert bracket['champion'] is None
+    postseason.play_to_next_user_game(bracket,rosters,41,'no-user-team',None)
+    assert bracket['champion']==teams[0]
+
+
+def test_fielding_and_speed_change_only_eligible_plays():
+    event,net=skills.field_contact('single',1.,.5,Random(31))
+    assert (event,net)==('other',1)
+    assert skills.field_contact('other',0.,.5,Random(31))==('single',-1)
+    for event in ('home_run','strikeout','walk','double','triple','hbp'):
+        assert skills.field_contact(event,1.,.5,Random(31))==(event,0)
+    world=season.movement_world()
+    slow=Random(42);fast=Random(42)
+    count=lambda rating,rng:sum(skills.advance(world,0,1,'single',rating,rng)==(0,5,0) for _ in range(1000))
+    assert count(1.,fast)>count(0.,slow)
+    assert skills.advance(world,0,0,'single',1.,Random(41))==world.advance(0,0,'single',Random(41))
+    assert skills.run_expectancy()[0]>skills.run_expectancy()[8]>skills.run_expectancy()[16]>0
+
+
 def test_draft_changes_probabilities_and_real_season_can_finish_after_a_reload(tmp_path):
     store=ManagerStore(tmp_path)
     view=store.change({'action':'create','team':'KIA','name':'연습 구단'})
@@ -84,7 +115,7 @@ def test_draft_changes_probabilities_and_real_season_can_finish_after_a_reload(t
         store.change({'action':'advance','id':key,'revision':revision})
     order=list(reversed(view['batting']))
     change('lineup',batting=order,rotation=view['rotation'])
-    slot=order[0];new=view['market'][slot][0]['id']
+    slot=order[0];new=view['market'][slot][0]['id'];released=view['roster'][slot]['id']
     change('transfer',slot=slot,player=new)
     assert view['roster'][slot]['id']==new and view['batting']==order and not view['market']
     # Existing season files used serial numbers as display names.
@@ -105,16 +136,38 @@ def test_draft_changes_probabilities_and_real_season_can_finish_after_a_reload(t
         assert sum((inning[allowed] or 0) for inning in game['innings'])==game['allowed']
     with pytest.raises(ValueError,match='끝났습니다'):
         change('advance')
-    assert view['postseason']['next']['name']=='와일드카드'
     regular=view['standings']
     seeds=view['postseason']['seeds']
     for _ in range(50):
-        if not view['postseason']['next']:break
+        upcoming=view['postseason']['next']
+        if not upcoming:break
+        assert view['team'] in upcoming['teams']
+        previous=sum(len(series['games']) for series in view['postseason']['rounds']
+                     if view['team'] in (series['high'],series['low']))
         change('playoff')
+        played=sum(len(series['games']) for series in view['postseason']['rounds']
+                   if view['team'] in (series['high'],series['low']))
+        assert played==previous+1
     ps=view['postseason']
     assert ps['champion'] in seeds and not ps['next']
     assert [round['name'] for round in ps['rounds']]==['와일드카드','준플레이오프','플레이오프','한국시리즈']
     assert ps['rounds'][-1]['winner']==ps['champion'] and 4 in ps['rounds'][-1]['wins']
     assert all(new['low']==old['winner'] for old,new in zip(ps['rounds'],ps['rounds'][1:]))
+    recap=view['season_report']
+    assert released in {player['id'] for player in recap['players']}
+    assert sum(player['stats']['n'] for player in recap['players'])>0
+    assert recap['awards']['mvp']['team'] in season.TEAMS
+    gloves=recap['awards']['gloves']
+    assert gloves and len({g['slot'] for g in gloves})==len(gloves) and all(g['value']>0 for g in gloves)
     assert view['standings']==regular and store.view(key)==view
     assert len(list((tmp_path/'outputs/manager').glob('*.json')))==1
+
+    fresh=store.change({'action':'create','team':view['team'],'name':view['name']})
+    other=store.change({'action':'quick_draft','id':fresh['id'],'revision':fresh['revision']})
+    assert other['id']!=key and other['day']==0 and len(other['roster'])==16 and other['draft'] is None
+    assert store.view(key)==view
+    # Old saves can open a recap without introducing awards for unrecorded rivals.
+    archived=json.loads(file.read_text(encoding='utf-8'))
+    del archived['league_stats'],archived['player_slots']
+    file.write_text(json.dumps(archived),encoding='utf-8')
+    assert store.view(key)['season_report']['awards'] is None

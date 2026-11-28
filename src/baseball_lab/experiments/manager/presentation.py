@@ -42,11 +42,17 @@ def grade(focus,profile,rates):
     score=trait_score(focus,profile,rates)
     # Midrank keeps tied abilities at the same grade.
     percentile=(bisect_left(values,score)+bisect_right(values,score))/(2*len(values))
+    return grade_letter(percentile)
+
+
+def grade_letter(percentile):
+    if percentile is None:
+        return '—'
     return next(letter for threshold,letter in ((.93,'S'),(.75,'A'),(.45,'B'),(.20,'C'),(0,'D'))
                 if percentile>=threshold)
 
 
-def scouting(profile,focus):
+def scouting(profile,focus,fielding=None,running=None):
     current=season.adjusted(profile,focus)
     ratings=[];training=[]
     for key,(event,_,label) in season.TRAINING[profile['role']].items():
@@ -56,4 +62,7 @@ def scouting(profile,focus):
         if round(preview[event]*100,1)!=round(profile['rates'][event]*100,1):
             training.append({'id':key,'name':label,'before':grade(key,profile,profile['rates']),
                              'after':grade(key,profile,preview)})
+    if fielding is not None:
+        ratings.extend(({'id':'running','name':'주력','grade':grade_letter(running)},
+                        {'id':'fielding','name':'수비력','grade':grade_letter(fielding)}))
     return ratings,training
