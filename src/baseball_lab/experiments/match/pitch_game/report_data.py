@@ -7,7 +7,7 @@ from baseball_lab.data.lineage import write_json
 from .strategy_view import build as strategy_view
 
 LEARNING_SCHEMAS=('Match-pitch-decision-game-v7','Match-pitch-decision-game-v8')
-FORMAT='learning-page-data-v1'
+FORMAT='learning-page-data-v2'
 PAGE_KEYS=('schema','learning_review','overview','status','teams','leagues','cohorts','heatmaps','evidence')
 _cache=OrderedDict()
 _lock=Lock()
@@ -19,13 +19,7 @@ def page_data(view):
 
 
 def build(result):
-    view=strategy_view(result)
-    compact=page_data(view)
-    # Earlier runs may have only pooled explanations, which use the context
-    # table to calculate consistency. The detailed page never needs that table.
-    if any(not row.get('situation_specific') for row in view['overview']['explanations']):
-        compact['contexts']=view['contexts']
-    return compact
+    return page_data(strategy_view(result))
 
 
 def revision(source):
@@ -46,7 +40,7 @@ def _read(source,source_revision):
             if saved['format']==FORMAT and saved['source_revision']==list(source_revision):
                 view=saved['view']
                 if view['learning_review'] and view['status']=='COMPLETED':
-                    return page_data(view) | ({'contexts':view['contexts']} if 'contexts' in view else {})
+                    return page_data(view)
         except (OSError,ValueError,TypeError,KeyError):
             pass
     raw=json.loads(source.read_text(encoding='utf-8'))

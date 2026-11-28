@@ -54,6 +54,8 @@ def run(page, selector='#calculate'):
 
 def navigation_mobile_keyboard(page, base, root):
     page.goto(base + '/')
+    expect(page.locator('h1')).to_have_text('Baseball Lab')
+    expect(page.locator('.experiences a[href="/match/team"]')).to_be_visible()
     keyboard_to(page, 'a.button[href="/eramatch"]')
     page.keyboard.press('Enter')
     expect(page.locator('#calculate')).to_be_enabled(timeout=TIMEOUT)

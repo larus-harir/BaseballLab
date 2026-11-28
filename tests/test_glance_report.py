@@ -33,27 +33,27 @@ def test_glance_uses_exact_detailed_aggregates_without_mutation():
     d=sample();original=deepcopy(d);v=detailed(d);g=build(d)
     assert d==original and g['games']==v['overview']['games']==40
     assert g['pitches']==v['overview']['pitches']==20
-    assert g['course']==v['overview']['preferences']['course']
     assert g['cards'][0]['count']==16 and g['cards'][0]['total']==20
-    assert '같은 방향' in g['interpretation']
-    for c in g['cards']:
+    for c,role in zip(g['cards'],('offense','defense')):
+        assert c['rows']==v['overview']['overall'][role][:2]
+        assert c['rows'][0]['runs']==2
         assert sum(r['before'] for r in c['rows'])==pytest.approx(1.)
         assert sum(r['after'] for r in c['rows'])==pytest.approx(1.)
-    assert '자료와 상세 결과는 동일' in render(d)
+    assert '전체 기준 상황의 평균' in render(d)
 
 
 def test_mixed_runs_empty_course_and_partial_status_are_honest():
-    d=sample((.8,.2));assert '변화 방향이 달랐' in build(d)['interpretation']
+    d=sample((.8,.2));assert '변화는 실행마다 방향이 달랐' in render(d)
     d=mock_result();d['schema']='Match-pitch-decision-game-v7';d['status']='RUNNING'
     html=render(d)
-    assert '중간 저장 기록' in html and '코스 선택의 전후 비교가 없습니다' in html
+    assert '중간 저장 기록' in html and '전후 비교 기록 없음' in html
     assert '<svg' not in html and '0.0%' not in html
     v=detailed(sample());v['overview']['preferences']['course']['after']['area:left_high']=float('nan')
     with pytest.raises(ValueError,match='수치가 올바르지'):render(v)
 
 
 def test_summary_escapes_strings_and_new_runs_save_both_pages(tmp_path):
-    v=detailed(sample());v['overview']['explanations'][0]['summary']='<script>alert("MOCK_TEST_ONLY")</script>'
+    v=detailed(sample());v['overview']['overall']['offense'][0]['action']='<script>alert("MOCK_TEST_ONLY")</script>'
     html=render(v);assert '<script>' not in html and '&lt;script&gt;' in html
     report(tmp_path,sample())
     assert 'overview.html' in (tmp_path/'report.html').read_text()

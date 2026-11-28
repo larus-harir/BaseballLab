@@ -24,25 +24,44 @@ def average(pairs):
     return answer
 
 
+def compare_overall(preferences, run_preferences):
+    """Rank changes in the paired averages, independently of executed counts."""
+    result={}
+    for view,values in preferences.items():
+        rows=[]
+        for action in values['before'].keys()|values['after'].keys():
+            before=values['before'].get(action,0)
+            after=values['after'].get(action,0)
+            shifts=[run[view]['after'].get(action,0)-run[view]['before'].get(action,0)
+                    for run in run_preferences if run[view]['states']]
+            rows.append({'action':action,'before':before,'after':after,'delta':after-before,
+                         'up':sum(d>1e-9 for d in shifts),'down':sum(d<-1e-9 for d in shifts),
+                         'runs':len(shifts)})
+        result[view]=sorted(rows,key=lambda row:(-abs(row['delta']),-row['after'],row['action']))
+    return result
+
+
 def build(result):
-    pairs=[];counts=defaultdict(list);growth=defaultdict(list);games=0;pooled=new_stats()[0];signals=defaultdict(Counter)
+    pairs=[];runs=[];counts=defaultdict(list);games=0;pooled=new_stats()[0];signals=defaultdict(Counter)
     for seed in result['seeds']:
         history=seed['history']
         if not history:continue
         games+=history[-1]['games']
         for team in history[-1].get('strategy',new_stats()):merge([pooled],[team])
         initial={p['id']:p for p in history[0].get('strategy_probes',[])}
-        for p in history[-1].get('strategy_probes',[]):
-            if p['id'] not in initial:continue
-            pair=(initial[p['id']]['teams'][0],p['teams'][0]);pairs.append(pair)
-            if p['context'].get('name','').startswith('count_'):
-                counts[p['context']['balls'],p['context']['strikes']].append(pair)
-        # Older reports have first-pitch probes only; do not invent other counts.
-        if not any(p['context'].get('name','').startswith('count_') for p in history[-1].get('strategy_probes',[])):
-            for p in history[-1].get('strategy_probes',[]):
-                if p['id'] in initial and not p['context'].get('name'):counts[p['context']['balls'],p['context']['strikes']].append((initial[p['id']]['teams'][0],p['teams'][0]))
-        for h in history:
-            for p in h.get('strategy_probes',[]):growth[h['games']].append((p['teams'][0],p['teams'][0]))
+        probes=history[-1].get('strategy_probes',[])
+        count_probes=any(p['context'].get('name','').startswith('count_') for p in probes)
+        run=[]
+        if history[-1]['games']>history[0]['games']:
+            for p in probes:
+                old=initial.get(p['id']);context=p['context']
+                if old is None or old['context']!=context:continue
+                pair=(old['teams'][0],p['teams'][0]);run.append(pair)
+                name=context.get('name','')
+                # Older reports have first-pitch probes only.
+                if name.startswith('count_') or (not name and not count_probes):
+                    counts[context['balls'],context['strikes']].append(pair)
+        if run:pairs.extend(run);runs.append(average(run))
         for update in seed.get('learning_updates',[]):
             for key,row in update.get('choice_signals',{}).items():signals[key].update(row)
     feedback={v:{} for v in VIEWS}
@@ -60,14 +79,13 @@ def build(result):
             row['mean_advantage']=signal['advantage_sum']/n if n else None
             row['winning_game_share']=signal['wins']/n if n else None
     total_pitches=sum(n for a,n in pooled['defense'].items() if a=='pitch' or a.startswith('pitch:'))
-    answer={'games':games,'runs':len(result['seeds']),'target_games_per_run':result.get('config',{}).get('episodes',max(growth,default=0)),'offense':choice_groups(pooled['offense'],'offense'),
+    preferences=average(pairs)
+    answer={'games':games,'runs':len(result['seeds']),'offense':choice_groups(pooled['offense'],'offense'),
         'targets':pooled['targets'],'pitching':{k:v for k,v in choice_groups(pooled['defense'],'defense').items() if k!='intentional_walk'},
-        'pitches':total_pitches,'preferences':average(pairs),
+        'pitches':total_pitches,'preferences':preferences,'overall':compare_overall(preferences,runs),
         'counts':[{'balls':b,'strikes':s,'preferences':average(counts[b,s])} for b in range(4) for s in range(3)],
-        'growth':[{'games_per_run':n,'preferences':average(rows)} for n,rows in sorted(growth.items())],
         'feedback':feedback,'basis':'Observed virtual outcomes and pre-update terminal-win advantages; correlated within games, no causal explanation or transcript of thoughts.'}
-    from .explanations import explain,compact
+    from .explanations import explain
     from .decision_insights import build as insights
     answer['explanations']=insights(result) or explain(answer,pooled['defense'],pooled['feedback']['defense'])
-    for row in answer['explanations']:row['brief']=compact(row)
     return answer

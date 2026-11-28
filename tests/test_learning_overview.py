@@ -24,6 +24,25 @@ def test_pooled_runs_sum_choices_and_average_matched_policies_without_mutation()
     assert v['counts'][0]['preferences']['course']['states']==0
 
 
+def test_local_change_does_not_replace_the_paired_overall_average():
+    from test_glance_report import sample
+    data=sample((.9,.9))
+    for seed in data['seeds']:
+        old,new=seed['history']
+        for h,value in ((old,.5),(new,.1)):
+            other=deepcopy(h['strategy_probes'][0])
+            other['id']='MOCK_TEST_ONLY_SECOND';other['context']['balls']=1
+            other['teams'][0]['offense']={'take':1-value,'swing':value}
+            h['strategy_probes'].append(other)
+    view=build(data)['overview']
+    assert view['preferences']['offense']['states']==4
+    assert all(abs(row['delta'])<1e-12 for row in view['overall']['offense'])
+    assert abs(next(row['delta'] for row in view['explanations'] if row['view']=='offense'))==pytest.approx(.4)
+    data['seeds'][0]['history'][-1]['strategy_probes'][1]['context']['strikes']=1
+    view=build(data)['overview']
+    assert view['preferences']['offense']['states']==3
+
+
 def test_contact_kind_and_terminal_outcomes_use_observed_denominators_only():
     stats=new_stats();o=Observation(1,0,0,0,0,0,0,0,0,'MLB',2024)
     action='pitch:cutter:left_low:fast'

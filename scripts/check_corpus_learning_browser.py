@@ -85,6 +85,11 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     expect(choices.nth(0)).not_to_have_attribute('open','')
     expect(choices.nth(1)).not_to_have_attribute('open','')
     assert all(s['situation_specific'] and s['probe_id'] for s in view['overview']['explanations'])
+    expect(page.locator('#summary #teamCards table')).to_have_count(2)
+    assert page.locator('#summary #reasons').count()==0
+    expect(page.locator('#tab-growth')).to_have_text('상황별')
+    page.locator('#tab-growth').click()
+    page.get_by_text('개별 상황의 변화',exact=True).click()
     assert '여전히' not in page.locator('#reasons').inner_text()
     assert all(len(t)<70 for t in page.locator('#reasons .narrative').all_inner_texts())
     expect(page.locator('#reasons details p').first).not_to_be_visible()
@@ -94,18 +99,15 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     assert page.locator('#reasons table').first.locator('tbody tr').count()>=1
     original=(ROOT/'outputs/workbench'/job['id']/'result/research.json').read_bytes()
     page.locator('#glanceLink').click();expect(page).to_have_url(base+job['report'].replace('report.html','overview.html'))
-    expect(page.locator('h1')).to_be_visible();assert page.locator('.grids svg').count()==2
-    assert len(page.locator('h1').inner_text())<70
-    expect(page.locator('.story-evidence p').first).not_to_be_visible()
+    expect(page.locator('h1')).to_have_text('학습 결과 요약')
+    expect(page.locator('.roles .card')).to_have_count(2)
+    expect(page.locator('.comparisons li')).to_have_count(4)
     page.set_viewport_size({'width':390,'height':844})
-    page.locator('.story-evidence > summary').focus();page.keyboard.press('Enter')
-    expect(page.locator('.story-evidence h3')).to_have_count(2)
-    expect(page.locator('.story-evidence p').first).to_be_visible()
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.set_viewport_size({'width':1280,'height':720})
     assert '한눈에 보기' in page.title() and not page.locator('select').count()
     page.locator('a[href="report.html#pitch"]').first.click();expect(page.locator('#pitch')).to_be_visible()
-    page.locator('#glanceLink').click();page.locator('.interpretation a[href="report.html#evidence"]').click();expect(page.locator('#evidence')).to_be_visible()
+    page.locator('#glanceLink').click();page.locator('footer > a[href="report.html#evidence"]').click();expect(page.locator('#evidence')).to_be_visible()
     page.locator('#tab-summary').click()
     assert (ROOT/'outputs/workbench'/job['id']/'result/research.json').read_bytes()==original
     assert (ROOT/'outputs/workbench'/job['id']/'result/overview.html').is_file()
@@ -134,9 +136,9 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
         assert ratio>=4.5
     assert view['heatmaps']['generated|KBO|all'][0]['known']>0
     page.locator('#tab-growth').focus();page.keyboard.press('Enter');expect(page.locator('#growth')).to_be_visible()
-    assert page.locator('#growthCharts svg').count()==4
+    assert page.locator('#growth svg').count()==0
     assert page.locator('#courseComparison svg').count()==2
-    assert '같은 경기 상황' in page.locator('#summary').inner_text()
+    assert '같은 기준 상황' in page.locator('#summary').inner_text()
     assert page.locator('#replayDetail').count()==0
     assert page.locator('#reasons .narrative').count()>0
     assert all(seed.get('replay',{}).get('events') for seed in data['seeds'])

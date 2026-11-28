@@ -154,19 +154,15 @@ svg { max-width: 100%; }
 .skip-link:focus { transform: translateY(0); }
 :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid #a15b31; outline-offset: 4px; }
 
-/* Two clear entrances, treated as a publication spread rather than a dashboard. */
+.page-portal > header { justify-content: flex-end; }
 .page-portal .hero { padding: 54px 0 35px; }
 .page-portal .hero h1 { max-width: 760px; font-size: clamp(38px, 5.8vw, 67px); line-height: 1.2; margin-bottom: 0; }
 .experiences { display: grid; grid-template-columns: 1.15fr 1fr; gap: 0; margin-top: 10px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
-.experience { position: relative; display: flex; flex-direction: column; margin: 0; padding: 37px 38px 34px 0; border: 0; background: transparent; min-height: 310px; border-radius: 0; }
-.experience h2 { font-size: clamp(27px, 3vw, 37px); margin: 53px 0 10px; }
-.experience p { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
-.experience .button { align-self: flex-start; margin-top: auto; }
-.experience .mark { position: absolute; width: 52px; height: 52px; right: 38px; top: 32px; color: var(--green); }
+.experience { display: flex; flex-direction: column; margin: 0; padding: 32px 38px 34px 0; border: 0; background: transparent; border-radius: 0; }
+.experience h2 { font-size: clamp(25px, 3vw, 33px); margin: 0 0 18px; }
+.experience .button { align-self: flex-start; margin: 0; }
+.experience-links { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
 .experience.research { border-left: 1px solid var(--line); padding-left: 38px; background: #e7ebe2; color: var(--ink); }
-.experience.research .eyebrow { color: var(--gold); }
-.experience.research .mark { color: var(--ink); }
-.experience.research p { color: var(--muted); }
 .experience.research .button { background: var(--ink); color: #fff; }
 
 /* Research: a field illustration and a compact record index. */
@@ -313,10 +309,9 @@ dialog::backdrop { background: #172e3570; }
   .page-portal .hero { padding: 34px 0 26px; }
   .page-portal .hero h1 { font-size: 40px; }
   .experiences { grid-template-columns: 1fr; }
-  .experience, .experience.research { min-height: 260px; padding: 25px 20px; }
+  .experience, .experience.research { padding: 24px 20px; }
   .experience.research { border-left: 0; border-top: 1px solid var(--line); }
-  .experience h2 { margin-top: 44px; font-size: 29px; }
-  .experience .mark { width: 43px; height: 43px; top: 22px; right: 21px; }
+  .experience h2 { font-size: 24px; }
   .page-match .hero-panel { grid-template-columns: 1fr 110px; gap: 12px; padding: 30px 0; margin-bottom: 24px; }
   .page-match .hero-panel h1 { font-size: 38px; }
   .page-match .hero-panel p { font-size: 13px; }

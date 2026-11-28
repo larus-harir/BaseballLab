@@ -12,39 +12,40 @@
 .page-learning-report .roles .card:first-child,.page-learning-detail #teamCards .card:first-child{border-top:4px solid var(--green)}
 .page-learning-report .roles .card:last-child,.page-learning-detail #teamCards .card:last-child{border-top:4px solid var(--gold)}
 .page-learning-report .card h2,.page-learning-detail h2{font-size:20px;letter-spacing:-.5px}
-.page-learning-report .story{font-size:18px;font-weight:650}.page-learning-report .reason{font-size:13px;line-height:1.8}
 .page-learning-report .played{border-bottom:1px solid var(--line);padding-bottom:12px}
 .page-learning-report .track{height:5px;border-radius:0}.page-learning-report .track i{border-radius:0}
 .page-learning-report .before{background:#778487}.page-learning-report .after{background:var(--green)}
-.page-learning-report .secondary{color:var(--green);background:transparent;border-left:2px solid var(--green);padding:0 0 0 10px}
-.page-learning-report .interpretation{background:var(--soft);border-top:4px solid var(--ink)}
-.page-learning-report .legend{gap:9px 20px}.page-learning-report .caption{font-size:12px}.page-learning-report .scope{font-size:12px}
+.page-learning-report .scope{font-size:12px}
 .page-learning-report footer{border-top:1px solid var(--line);margin-top:20px;padding-top:16px}
 .page-learning-detail .hero{padding:30px 0 24px}.page-learning-detail .scope{font-size:13px}
 .page-learning-detail nav[role=tablist]{border-bottom:2px solid var(--ink);gap:4px;margin-bottom:24px}
 .page-learning-detail nav[role=tablist] button{border-radius:0;padding:13px 18px;font-weight:650;background:transparent;box-shadow:none}
 .page-learning-detail nav[role=tablist] button[aria-selected=true]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
-.page-learning-detail #teamCards .card{padding:22px 24px}.page-learning-detail #teamCards h2{margin-top:8px}
+.page-learning-detail #teamCards .card{padding:22px 24px}.page-learning-detail #teamCards h3{margin-top:0}
+.page-learning-detail #teamCards,.page-learning-detail #overallTable{grid-template-columns:repeat(2,minmax(0,1fr))}
+.page-learning-detail .recorded-choice{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
+.page-learning-detail .recorded-choice span{color:var(--muted);font-size:13px;margin-right:5px}
+.page-learning-detail #overallTable h3{margin:14px 0 8px}
+@media(max-width:700px){.page-learning-detail #teamCards,.page-learning-detail #overallTable{grid-template-columns:minmax(0,1fr)}}
 .page-learning-detail #reasons{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
 .page-learning-detail .reason{border-bottom:1px solid var(--line);padding:20px 0}
 .page-learning-detail .reason h3{font-size:12px;letter-spacing:.08em;color:var(--green);margin-bottom:10px}
 .page-learning-detail .narrative{font-size:18px;line-height:1.65;font-weight:650}
 .page-learning-report .scenario,.page-learning-detail .reason>p.scenario{font-size:13px;color:var(--muted);line-height:1.5}
 .page-learning-detail .narrative{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.page-learning-report .story-evidence{margin-top:18px}
 .page-learning-detail .reason>p:not(.narrative){font-size:14px;color:var(--muted);line-height:1.8}
 .page-learning-detail .reason details{font-size:13px}.page-learning-detail .reason summary{font-weight:600}
 .page-learning-detail .surface>h2{padding-bottom:12px;border-bottom:1px solid var(--line)}
 .page-learning-detail .report-actions .action{border-radius:3px;background:var(--green);border-color:var(--green);color:white;padding:9px 16px}
 .page-learning-detail .badge{border-radius:3px;font-weight:600}
 .page-learning-detail th{font-size:12px;color:var(--muted);background:var(--soft)}
-.page-learning-detail td{font-size:13px}.page-learning-detail .plot{min-height:190px}
-.page-learning-detail #growthCharts .card{padding:20px}.page-learning-detail .footnote{font-size:12px;line-height:1.75}
-@media(max-width:760px){.page-learning-report main,.page-learning-detail main{padding:22px 18px 36px}.page-learning-report .lead{grid-template-columns:1fr;gap:14px}.page-learning-report .lead dl{padding-left:0;border-left:0}.page-learning-report .bottom,.page-learning-report .roles,.page-learning-detail #reasons{grid-template-columns:1fr}.page-learning-detail .card,.page-learning-detail .surface{padding:20px}.page-learning-detail .hero{padding:25px 0 18px}.page-learning-detail header{align-items:flex-start;flex-wrap:wrap}.page-learning-detail nav[role=tablist] button{padding:12px 10px;font-size:13px}.page-learning-report .grids{grid-template-columns:1fr;max-width:270px}.page-learning-report .lead dd{font-size:25px}}
+.page-learning-detail td{font-size:13px}
+.page-learning-detail .footnote{font-size:12px;line-height:1.75}
+@media(max-width:760px){.page-learning-report main,.page-learning-detail main{padding:22px 18px 36px}.page-learning-report .lead{grid-template-columns:1fr;gap:14px}.page-learning-report .lead dl{padding-left:0;border-left:0}.page-learning-report .roles,.page-learning-detail #reasons{grid-template-columns:1fr}.page-learning-detail .card,.page-learning-detail .surface{padding:20px}.page-learning-detail .hero{padding:25px 0 18px}.page-learning-detail header{align-items:flex-start;flex-wrap:wrap}.page-learning-detail nav[role=tablist] button{padding:12px 10px;font-size:13px}.page-learning-report .lead dd{font-size:25px}}
 /* Common-league comparisons use the same outcome hierarchy as player duels. */
 .page-common #commonFacts{grid-template-columns:repeat(3,minmax(0,1fr))}.page-common #commonFacts strong{display:block;font-size:12px;color:var(--muted);line-height:1.5}.page-common #commonFacts b{display:block;font-size:32px;line-height:1.4;font-variant-numeric:tabular-nums}.page-common #commonFacts span{font-size:12px;color:var(--muted)}
 .page-common .common-chart{display:grid;gap:12px;margin:18px 0 24px}.page-common .common-event{display:grid;grid-template-columns:110px minmax(0,1fr) 94px;gap:14px;align-items:center;font-size:13px}.page-common .common-track{min-width:0}.page-common .common-track span{display:block;height:6px;max-width:100%;margin:4px 0}.page-common .common-track .expected{background:#b4bdb1}.page-common .common-track .realized{background:var(--green)}.page-common .common-event small{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.page-common #sequence .replay-controls{display:flex;align-items:center;gap:12px}.page-common #commonPosition{flex:1;min-width:50px}.page-common #commonEvent{font-weight:650}
 @media(max-width:650px){.page-common #commonFacts{grid-template-columns:1fr 1fr}.page-common .common-event{grid-template-columns:75px minmax(0,1fr) 70px;gap:8px;font-size:12px}.page-common #sequence button{padding:10px 12px}}
 /* Isolate report composition from the application's border-led section layout. */
-.page-learning-report section{padding:0;margin:0;border:0}.page-learning-report section.lead{padding:30px 0 22px;border-bottom:1px solid var(--line);margin-bottom:16px}.page-learning-report section.roles{padding:0;margin:0 0 18px;gap:18px}.page-learning-report section.bottom{padding:0;margin:0;gap:18px}.page-learning-report .card{padding:22px 24px;margin:0;min-width:0}.page-learning-detail section.panel{padding:0;margin:0;border:0}.page-learning-detail .card,.page-learning-detail .surface{padding:22px 24px;margin-bottom:20px}
+.page-learning-report section{padding:0;margin:0;border:0}.page-learning-report section.lead{padding:30px 0 22px;border-bottom:1px solid var(--line);margin-bottom:16px}.page-learning-report section.roles{padding:0;margin:0 0 18px;gap:18px}.page-learning-report .card{padding:22px 24px;margin:0;min-width:0}.page-learning-detail section.panel{padding:0;margin:0;border:0}.page-learning-detail .card,.page-learning-detail .surface{padding:22px 24px;margin-bottom:20px}
 @media(max-width:760px){.page-learning-report .card,.page-learning-detail .card,.page-learning-detail .surface{padding:20px}.page-learning-report section.lead{padding:24px 0 18px}}

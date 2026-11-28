@@ -2,7 +2,7 @@
 from collections import Counter
 
 FAMILIES={'fastball':'직구','sinker':'싱커·투심','cutter':'커터','slider':'슬라이더','curve':'커브','changeup':'체인지업','splitter':'포크·스플리터','knuckle':'너클볼'}
-NAMES={'swing':'스윙','take':'지켜보기','bunt':'번트','steal':'도루','pitch':'투구','intentional_walk':'고의볼넷','pull':'당겨치기','center':'가운데 타격','opposite':'밀어치기','left':'좌측 타격','right':'우측 타격'}
+NAMES={'swing':'스윙','take':'지켜보기','bunt':'번트','steal':'도루','pitch':'구종 지정 없이 투구','intentional_walk':'고의볼넷','pull':'당겨치기','center':'가운데 타격','opposite':'밀어치기','left':'좌측 타격','right':'우측 타격'}
 HEIGHTS={'high':'높은 코스','middle':'중간 높이 코스','low':'낮은 코스'}
 
 
@@ -16,15 +16,6 @@ def label(action):
         side,height=action.split(':')[1].split('_')
         return {'left':'왼쪽','middle':'가운데','right':'오른쪽'}[side]+' '+HEIGHTS[height]
     return NAMES.get(action.split(':')[-1],action)
-
-
-def compact(row):
-    if abs(row['delta'])<.02:return '뚜렷한 변화 없음'
-    choices=row.get('comparison',[])
-    if len(choices)>1:
-        ordered=sorted(choices,key=lambda v:v['after']-v['before'])
-        return label(ordered[-1]['action'])+' ↑ · '+label(ordered[0]['action'])+' ↓'
-    return label(row['action'])+(' ↑' if row['delta']>0 else ' ↓')
 
 
 def explain(overview,defense,defense_feedback=None):
