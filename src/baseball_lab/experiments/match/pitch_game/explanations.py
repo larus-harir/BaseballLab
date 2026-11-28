@@ -18,6 +18,15 @@ def label(action):
     return NAMES.get(action.split(':')[-1],action)
 
 
+def compact(row):
+    if abs(row['delta'])<.02:return '뚜렷한 변화 없음'
+    choices=row.get('comparison',[])
+    if len(choices)>1:
+        ordered=sorted(choices,key=lambda v:v['after']-v['before'])
+        return label(ordered[-1]['action'])+' ↑ · '+label(ordered[0]['action'])+' ↓'
+    return label(row['action'])+(' ↑' if row['delta']>0 else ' ↓')
+
+
 def explain(overview,defense,defense_feedback=None):
     rows=[]
     for view in ('offense','direction','defense','course'):

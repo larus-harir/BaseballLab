@@ -82,6 +82,8 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     expect(choices.nth(1)).not_to_have_attribute('open','')
     assert all(s['situation_specific'] and s['probe_id'] for s in view['overview']['explanations'])
     assert '여전히' not in page.locator('#reasons').inner_text()
+    assert all(len(t)<70 for t in page.locator('#reasons .narrative').all_inner_texts())
+    expect(page.locator('#reasons details p').first).not_to_be_visible()
     page.locator('#reasons details summary').first.click()
     expect(page.locator('#reasons table').first).to_be_visible()
     expect(page.locator('#reasons details[open]')).to_have_count(len(view['overview']['explanations']))
@@ -89,6 +91,11 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     original=(ROOT/'outputs/workbench'/job['id']/'result/research.json').read_bytes()
     page.locator('#glanceLink').click();expect(page).to_have_url(base+job['report'].replace('report.html','overview.html'))
     expect(page.locator('h1')).to_be_visible();assert page.locator('.grids svg').count()==2
+    assert len(page.locator('h1').inner_text())<70
+    expect(page.locator('.story-evidence p').first).not_to_be_visible()
+    page.locator('.story-evidence > summary').click()
+    expect(page.locator('.story-evidence h3')).to_have_count(2)
+    expect(page.locator('.story-evidence p').first).to_be_visible()
     assert '한눈에 보기' in page.title() and not page.locator('select').count()
     page.locator('a[href="report.html#pitch"]').first.click();expect(page.locator('#pitch')).to_be_visible()
     page.locator('#glanceLink').click();page.locator('.interpretation a[href="report.html#evidence"]').click();expect(page.locator('#evidence')).to_be_visible()
