@@ -29,6 +29,9 @@
 .page-learning-detail .reason{border-bottom:1px solid var(--line);padding:20px 0}
 .page-learning-detail .reason h3{font-size:12px;letter-spacing:.08em;color:var(--green);margin-bottom:10px}
 .page-learning-detail .narrative{font-size:18px;line-height:1.65;font-weight:650}
+.page-learning-report .scenario,.page-learning-detail .reason>p.scenario{font-size:13px;color:var(--muted);line-height:1.5}
+.page-learning-detail .narrative{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.page-learning-report .story-evidence{margin-top:18px}
 .page-learning-detail .reason>p:not(.narrative){font-size:14px;color:var(--muted);line-height:1.8}
 .page-learning-detail .reason details{font-size:13px}.page-learning-detail .reason summary{font-weight:600}
 .page-learning-detail .surface>h2{padding-bottom:12px;border-bottom:1px solid var(--line)}

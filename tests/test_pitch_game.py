@@ -5,6 +5,48 @@ import pytest
 from baseball_lab.experiments.match.pitch_game.research import sequence,policy,Observation,OFF,PITCH_OFF,DEF,play,finish,World
 
 
+def test_report_interval_does_not_change_v8_learning(monkeypatch,tmp_path):
+    from baseball_lab.agents.win_policy import WinPolicy
+    from baseball_lab.experiments.match.pitch_game import research
+    from baseball_lab.experiments.match.team_win.training import Config
+
+    class MockWorld:
+        result_schema='Match-pitch-decision-game-v8'
+        evidence={}
+        track_strategy=True
+        shared_learning=True
+
+        def new_team(self,seed):
+            return [WinPolicy(role,seed+i,hidden=4,actions=actions,
+                              feature_names=('MOCK_TEST_ONLY_bias',),feature_encoder=lambda obs,role:np.ones(1))
+                    for i,(role,actions) in enumerate((('batter',OFF),('pitcher',DEF)))]
+
+        def strategy_probes(self,teams):return []
+        def state_dict(self):return {'mock':'MOCK_TEST_ONLY'}
+
+    def play_mock(world,teams,seed,**kwargs):
+        rng=Random(seed)
+        choices=[]
+        for team in teams:
+            choices.append([agent.act(Observation(1,0,0,0,0,0,0,0,0),agent.actions,rng)
+                            for agent in team])
+        return {'winner':int(choices[0][0]!='take'),'choices':[{},{}]}
+
+    monkeypatch.setattr(research,'play',play_mock)
+    monkeypatch.setattr(research,'report',lambda *args:None)
+    results=[];checkpoints=[]
+    for interval in (3,8):
+        path=tmp_path/f'MOCK_TEST_ONLY_{interval}'
+        result=research.train({'manifest':{'source_status':'REAL_OBSERVED','dataset_id':'MOCK_TEST_ONLY'}},
+                              '', '',path,Config(20,(41,),interval,20,7),world=MockWorld())
+        results.append(result['seeds'][0])
+        checkpoints.append((path/'checkpoints/41-20.json').read_bytes())
+    assert checkpoints[0]==checkpoints[1]
+    assert results[0]['learning_updates']==results[1]['learning_updates']
+    assert [u['games'] for u in results[0]['learning_updates']]==[7,7,14,14,20,20]
+    assert [(h['games'],h['updated_through_games']) for h in results[0]['history']][:4]==[(0,0),(3,0),(6,0),(9,7)]
+
+
 def turn(pitches,event):return {'pitches':pitches,'event':event,'intentional_walk':False}
 
 

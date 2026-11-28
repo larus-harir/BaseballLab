@@ -4,17 +4,18 @@ import json
 from .explanations import FAMILIES, label, particle
 
 
-def situation(context, view):
-    parts=[f'{context.get("balls",0)}볼 {context.get("strikes",0)}스트라이크']
-    if 'outs' in context:parts.append(f'{context["outs"]}아웃')
-    if 'bases' in context:
+def situation(context, view, *, brief=False):
+    balls, strikes=context.get('balls',0),context.get('strikes',0)
+    parts=[f'{balls}볼 {strikes}스트라이크' if not brief else f'{balls}B {strikes}S']
+    if not brief and 'outs' in context:parts.append(f'{context["outs"]}아웃')
+    if not brief and 'bases' in context:
         bases=context['bases']
         parts.append('주자 '+('·'.join(str(i+1)+'루' for i in range(3) if bases & (1<<i)) if bases else '없음'))
     # Pitching policies do not observe the incoming pitch cue used by batters.
     cue=(context.get('cue') or '').split(':')
     if view in ('offense','direction') and len(cue)>=3 and cue[1] in FAMILIES:
         height={'high':'높은','middle':'중간 높이의','low':'낮은'}.get(cue[2].split('_')[-1],'')
-        parts.append((height+' ' if height else '')+FAMILIES[cue[1]]+' 상대')
+        parts.append((height+' ' if height else '')+FAMILIES[cue[1]]+('' if brief else ' 상대'))
     return ' · '.join(parts)
 
 
@@ -74,7 +75,8 @@ def build(result):
         if 'difference' in context:
             diff=context['difference'];scope.append('공격 팀 '+(f'{diff}점 앞섬' if diff>0 else f'{-diff}점 뒤짐' if diff<0 else '동점'))
         stories.append({'view':view,'action':action,'title':name,'summary':summary,'reason':reason,
-            'context':' · '.join(scope),'state':where,'before':values['before'].get(action,0),'after':values['after'].get(action,0),
+            'context':' · '.join(scope),'state':where,'brief_state':situation(context,view,brief=True),
+            'before':values['before'].get(action,0),'after':values['after'].get(action,0),
             'delta':delta,'decisions':0,'signal':None,'pattern':None,'observed':'',
             'comparison':rows,'preferences':values,'matched_runs':len(shifts),'run_deltas':shifts,'probe_id':key[0],'situation_specific':True})
     return stories

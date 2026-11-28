@@ -337,8 +337,12 @@ def train(data,start,end,output,config,*,world=None):
     else:write_json(output/'world.json',{'evidence':world.evidence,'weights':world.w.tolist(),'frequency_counts':[{'balls':b,'strikes':s,'action':a,'counts':dict(c)} for (b,s,a),c in world.baseline.items()],'pooled_counts':{a:dict(c) for a,c in world.pooled.items()},'events':EVENTS,'supported_events':{a:sorted(v) for a,v in world.supported.items()},'running_counts':[{'outs':o,'bases':b,'balls':balls,'strikes':strikes,'action':a,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,balls,strikes,a),counter in world.running.items()],'runner_counts':[{'outs':o,'bases':b,'event':e,'bunt':bunt,'outcomes':[[*v,n] for v,n in counter.items()]} for (o,b,e,bunt),counter in world.runner.items()],'settings':{'optimizer':'minibatch gradient descent','iterations':500,'batch':1024,'learning_rate':.08,'l2':.0001,'random_seed':83,'selected_iterations':world.selected_iterations,'selection':'validation Brier only; frequency candidate included'}})
     shared=getattr(world,'shared_learning',False)
     result['shared_learning']=shared
+    fixed_update_schedule=result['schema']=='Match-pitch-decision-game-v8'
+    if fixed_update_schedule:
+        result['update_schedule']='completed batches and final remainder'
     for run_index,seed in enumerate(config.seeds):
         teams=[world.new_team(seed if shared else seed+i*2) if hasattr(world,'new_team') else (policy('batter',seed+i*2),policy('pitcher',seed+i*2+1)) for i in range(2)];initial=[[a.frozen() for a in t] for t in teams];batches=[[[],[]],[[],[]]];history=[]
+        updated_through=0
         def checkpoint(done):
             if world.evidence.get('corpus'):
                 stage='학습 전' if done==0 else str(done)+'경기 학습 후'
@@ -351,6 +355,7 @@ def train(data,start,end,output,config,*,world=None):
                     'strategy_probes':world.strategy_probes(teams),
                     'training_outcomes':dict(run['training_outcomes']),
                     'evaluation_scope':'choice-focused study: identical-state policy probes and executed training behavior; no opponent-ranking tournament'})
+                if fixed_update_schedule:history[-1]['updated_through_games']=updated_through
                 result['strategy_analysis']=strategy_metrics.analyze(result)
             else:
                 # Final games use a different seed bank from progress monitoring.
@@ -388,7 +393,9 @@ def train(data,start,end,output,config,*,world=None):
                 for action,n in counts.items():run['training_choices'][i][action]=run['training_choices'][i].get(action,0)+n
             for i,t in enumerate(teams):
                 for j,a in enumerate(t):batches[i][j].append((list(a.decisions),1 if game['winner']==i else -1))
-            if episode%config.batch_size==0 or episode==config.episodes or episode%config.evaluate_every==0:
+            checkpoint_due=episode%config.evaluate_every==0 or episode==config.episodes
+            batch_due=episode%config.batch_size==0 or episode==config.episodes
+            if batch_due or (checkpoint_due and not fixed_update_schedule):
                 if shared:
                     for role,learner in enumerate(teams[0]):
                         learner.update([*batches[0][role],*batches[1][role]])
@@ -402,7 +409,8 @@ def train(data,start,end,output,config,*,world=None):
                 else:
                     for i,t in enumerate(teams):
                         for j,a in enumerate(t):a.update(batches[i][j]);batches[i][j]=[]
-            if episode%config.evaluate_every==0 or episode==config.episodes:
+                updated_through=episode
+            if checkpoint_due:
                 print(f'학습 {episode}/{config.episodes}경기 · '+('공동 AI가 양쪽 역할의 경험을 함께 학습합니다.' if shared else 'A팀과 B팀이 매 공의 행동을 학습합니다.'),flush=True);checkpoint(episode)
         run['replay']=play(world,[[a.frozen() for a in t] for t in teams],seed+900000,record=True)
         if shared:

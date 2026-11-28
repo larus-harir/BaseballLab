@@ -58,6 +58,9 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     assert all(any(k.startswith('pitch:') for counts in s['training_choices'] for k in counts) for s in data['seeds'])
     for seed in data['seeds']:
         assert len(seed['history'])==6
+        if data.get('update_schedule'):
+            assert [h['updated_through_games'] for h in seed['history']]==[0,0,0,32,32,51]
+            assert [u['games'] for u in seed['learning_updates']]==[32,32,51,51]
         assert 'A_wins' not in seed['history'][-1]
         assert seed['training_outcomes']['A']+seed['training_outcomes']['B']==51
         for i,t in enumerate(seed['history'][-1]['strategy']):
@@ -93,9 +96,12 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     expect(page.locator('h1')).to_be_visible();assert page.locator('.grids svg').count()==2
     assert len(page.locator('h1').inner_text())<70
     expect(page.locator('.story-evidence p').first).not_to_be_visible()
-    page.locator('.story-evidence > summary').click()
+    page.set_viewport_size({'width':390,'height':844})
+    page.locator('.story-evidence > summary').focus();page.keyboard.press('Enter')
     expect(page.locator('.story-evidence h3')).to_have_count(2)
     expect(page.locator('.story-evidence p').first).to_be_visible()
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    page.set_viewport_size({'width':1280,'height':720})
     assert '한눈에 보기' in page.title() and not page.locator('select').count()
     page.locator('a[href="report.html#pitch"]').first.click();expect(page.locator('#pitch')).to_be_visible()
     page.locator('#glanceLink').click();page.locator('.interpretation a[href="report.html#evidence"]').click();expect(page.locator('#evidence')).to_be_visible()

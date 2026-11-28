@@ -5,11 +5,11 @@
 .report-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.report-actions a{text-decoration:none}header{flex-wrap:wrap;gap:12px}__APP_STYLES__
 </style>
 <body class="page-learning-detail"><a class="skip-link" href="#report-main">본문으로 건너뛰기</a><main id="report-main" class="learning-detail"><header><a class="brand" href="/match/team">BaseballLab <span class="micro">/ Match</span></a><div class="report-actions"><a class="action" id="glanceLink" href="overview.html">한눈에 보기</a><span id="auditBadge" class="badge"></span></div></header>
-<div class="hero"><div class="eyebrow">AI 학습 결과</div><h1>학습한 플레이와 변화</h1><p id="scope" class="muted"></p></div>
+<div class="hero"><h1>AI 학습 결과</h1><p id="scope" class="muted"></p></div>
 <nav role="tablist" aria-label="학습 결과"><button id="tab-summary" role="tab" aria-controls="summary" aria-selected="true">요약</button><button id="tab-pitch" role="tab" aria-controls="pitch" aria-selected="false" tabindex="-1">구종·코스</button><button id="tab-growth" role="tab" aria-controls="growth" aria-selected="false" tabindex="-1">학습 변화</button><button id="tab-evidence" role="tab" aria-controls="evidence" aria-selected="false" tabindex="-1">기록·근거</button></nav>
-<section id="summary" class="panel" role="tabpanel" aria-labelledby="tab-summary"><div class="two" id="teamCards"></div><div class="surface"><h2>상황별 선택 변화</h2><p class="micro">같은 경기 상황 · 학습 전 → 후</p><div id="reasons"></div><details><summary>해석 기준</summary><p class="footnote">변화가 큰 기준 상황을 비교합니다. 선택 확률의 변화이며 실제 경기의 유리함을 검증한 결과는 아닙니다.</p></details></div></section>
-<section id="pitch" class="panel" role="tabpanel" aria-labelledby="tab-pitch" hidden><div class="surface"><h2>코스 선호의 변화</h2><p class="micro">같은 기준 상황 · 코스 지정 투구 안에서의 확률</p><div class="course-grid" id="courseComparison"></div><h3>전체 학습에서 실제 선택한 코스</h3><div id="heatmaps" class="map"></div><p id="courseDenominator" class="map-caption"></p><p class="footnote">기록 기준 왼쪽·오른쪽과 높이이며 존 밖을 포함합니다. 구종·구속대별 가능한 선택 범위는 유지합니다.</p></div><details class="surface"><summary>구종별 상세 기록</summary><div id="pitchOutcomes"></div></details></section>
-<section id="growth" class="panel" role="tabpanel" aria-labelledby="tab-growth" hidden><div class="surface"><h2>학습이 진행되며 바뀐 선호</h2><p class="micro">동일한 기준 상황의 통합 평균 · 방향·코스는 해당 선택 안에서의 비율</p><div id="growthCharts" class="two"></div></div><div class="surface"><h2>카운트별 선택</h2><div id="countOverview"></div></div></section>
+<section id="summary" class="panel" role="tabpanel" aria-labelledby="tab-summary"><div class="surface"><h2>상황별 선택 변화</h2><p class="micro">같은 경기 상황 · 학습 전 → 후</p><div id="reasons"></div><details><summary>해석 기준</summary><p class="footnote">변화가 큰 기준 상황을 비교합니다. 승률 향상은 별도 평가가 필요합니다.</p></details></div><div class="two" id="teamCards"></div></section>
+<section id="pitch" class="panel" role="tabpanel" aria-labelledby="tab-pitch" hidden><div class="surface"><h2>코스 선호의 변화</h2><p class="micro">같은 상황에서 코스를 정한 투구의 선택 확률</p><div class="course-grid" id="courseComparison"></div><h3>연습 경기에서 던진 코스</h3><div id="heatmaps" class="map"></div><p id="courseDenominator" class="map-caption"></p><p class="footnote">기록 기준 왼쪽·오른쪽과 높이이며 존 밖을 포함합니다. 구종·구속대별 가능한 선택 범위는 유지합니다.</p></div><details class="surface"><summary>구종별 상세 기록</summary><div id="pitchOutcomes"></div></details></section>
+<section id="growth" class="panel" role="tabpanel" aria-labelledby="tab-growth" hidden><div class="surface"><h2>학습 중 선택 변화</h2><p class="micro">동일한 기준 상황의 통합 평균 · 방향·코스는 해당 선택 안에서의 비율</p><div id="growthCharts" class="two"></div></div><div class="surface"><h2>카운트별 선택</h2><div id="countOverview"></div></div></section>
 <section id="evidence" class="panel" role="tabpanel" aria-labelledby="tab-evidence" hidden><div class="surface"><h2>학습 기록</h2><div id="updateRecords"></div><details><summary>집계 검사·투수 교체</summary><div id="checks"></div><p id="management" class="micro"></p></details></div><div class="surface"><h2>자료 범위</h2><div id="experience"></div><details><summary>관측 항목별 표본 수</summary><div id="quality"></div></details><details><summary>모형·검증</summary><p>공통 9이닝·연장 2루 주자와 최소 상대 타자 규칙을 적용합니다. 투수 명단도 관측 기록의 세 명으로 제한하며, 각 시대·리그의 실제 규칙·명단 전체를 복원한 경기는 아닙니다.</p><p>경기 승패만 보상으로 사용합니다. 구종·코스·구속대의 공유 출력과 개별 조합 출력을 함께 갱신하며, 목표 행동 비율은 주지 않습니다.</p><p>같은 기준 상황의 확률을 평균하고 실제 행동은 모든 학습 실행에서 합산합니다. 여러 정책을 하나의 가중치로 합치거나 연속 학습한 결과로 바꾸지 않습니다. 그래프 가로축은 각 실행의 학습 진행률입니다.</p><p>구종별 땅볼·안타·실점은 현재 모형 안에서 함께 발생한 결과입니다. 타구 종류는 구종·코스의 직접 인과 효과를 추정한 모델이 아니므로 땅볼이 늘어서 특정 구종을 골랐다고 단정하지 않습니다.</p><p id="prediction"></p><p id="movementSupplement" hidden></p><p class="micro">자료 지문 <code id="fingerprint"></code></p></details><details><summary>출처</summary><p class="micro">KBO: slothman3878/kbo_playbyplay, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>; ekim56korea·NextPitchh 공개 기록. NPB: This uses data sourced from the <a href="https://github.com/armstjc/Nippon-Baseball-Data-Repository" target="_blank" rel="noopener">Nippon Baseball Data Repository</a>; yasumorishima/npb-stats. MLB: 공개 Statcast 배포본과 Retrosheet.</p><p class="micro">The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at 20 Sunset Rd., Newark, DE 19711.</p></details></div></section>
 </main><script id="data" type="application/json">__DATA__</script><script>
 'use strict';
@@ -23,9 +23,35 @@ function increasedChoice(v){return [...new Set([...Object.keys(v.before),...Obje
 function topPair(v){const key=increasedChoice(v);return key?label(key)+' '+pct(v.before[key]||0)+' → '+pct(v.after[key]||0):'—'}
 $('scope').textContent='전체 '+num(o.games)+'경기 · 공격 '+num(sum(o.offense))+'회 · 투구 '+num(o.pitches)+'구';
 const t=r.teams[0];$('auditBadge').textContent=Object.values(t.checks).every(Boolean)?'집계 일치':'기록 확인 필요';
-$('teamCards').innerHTML=[['공격',o.offense,'방향을 정한 스윙',Object.fromEntries(Object.entries(o.targets).map(([k,n])=>['swing:'+k,n]))],['투구',o.pitching,'',{}]].map(([title,values,sub,extra])=>'<div class="card"><div class="eyebrow">전체 학습 · '+title+'</div><h2>'+(title==='공격'?'타격 판단과 방향':'구종과 코스')+'</h2><details data-choice-record data-disclosure-group="choices"><summary>실행한 선택 보기</summary>'+bars(values)+(sum(extra)?'<div class="direction-bars"><h3>'+sub+'</h3>'+bars(extra)+'</div>':'')+'</details></div>').join('');
+const recordedChoices=[
+ ['공격 기록',o.offense,Object.fromEntries(Object.entries(o.targets).map(([k,n])=>['swing:'+k,n]))],
+ ['투구 기록',o.pitching,{}],
+];
+$('teamCards').innerHTML=recordedChoices.map(([title,values,targets])=>{
+ const top=sorted(values)[0];
+ const leading=top?label(top[0])+' '+num(top[1])+' / '+num(sum(values))+'회':'실행 기록 없음';
+ return '<div class="card"><h2>'+title+'</h2><p class="muted">'+esc(leading)+'</p>'
+  +'<details data-choice-record data-disclosure-group="choices"><summary>전체 비중</summary>'+bars(values)
+  +(sum(targets)?'<div class="direction-bars"><h3>방향을 정한 스윙</h3>'+bars(targets)+'</div>':'')+'</details></div>';
+}).join('');
 function outcome(row,view){if(!row)return '결과 연결 기록 없음';const n=row.decisions||0,parts=['실제 '+num(n)+'회'];parts.push((view==='defense'||view==='course'?'100구당 피안타 ':'선택 100회당 안타 ')+(n?100*row.hits/n:0).toFixed(1));if(row.events){parts.push('볼넷 '+(n?100*(row.terminal_results?.walk||0)/n:0).toFixed(1)+' / 삼진 '+(n?100*(row.strikeouts||0)/n:0).toFixed(1)+' (100회당)');}if(sum(row.kinds))parts.push('땅볼 '+pct(row.kinds.ground||0,sum(row.kinds))+' (형태 확인 '+num(sum(row.kinds))+'타구)');if(row.runs!==undefined)parts.push((view==='defense'||view==='course'?'100구당 실점 ':'선택 100회당 득점 ')+(n?100*row.runs/n:0).toFixed(1));return parts.join(' · ')}
-$('reasons').innerHTML=(o.explanations||[]).map(c=>'<article class="reason"><h3>'+({offense:'타격 판단',direction:'타격 방향',defense:'구종·승부',course:'코스 선택'}[c.view])+'</h3><p class="narrative">'+esc(c.brief||c.title+' '+(Math.abs(c.delta)<.02?'변화 없음':c.delta>0?'↑':'↓'))+'</p><p class="micro">'+esc(c.title)+' '+pct(c.before)+' → '+pct(c.after)+(c.run_deltas?.some(d=>d>0)&&c.run_deltas?.some(d=>d<0)?' · 실행별 차이 있음':'')+'</p><details data-disclosure-group="decisions"><summary>상황·근거</summary><p>'+esc(c.summary)+'</p><p>'+esc(c.reason)+'</p>'+(c.context?'<p class="micro">'+esc(c.context)+'</p>':'')+(c.situation_specific?table(['선택','학습 전','학습 후'],c.comparison.map(v=>[label(v.action),pct(v.before),pct(v.after)]))+'<p class="micro">'+c.matched_runs+'개 실행 · 같은 상황의 평균</p>':'<p>'+esc(c.observed||outcome(o.feedback[c.view][c.action],c.view))+'</p>')+'</details></article>').join('')||'<p class="muted">비교할 학습 기록이 없습니다.</p>';
+const decisionTitles={offense:'타격 판단',direction:'타격 방향',defense:'구종·승부',course:'코스 선택'};
+$('reasons').innerHTML=(o.explanations||[]).map(c=>{
+ const comparison=c.comparison||[{action:c.action,before:c.before,after:c.after}];
+ const mainChoices=comparison.map(v=>label(v.action)+' '+pct(v.before)+' → '+pct(v.after)).join(' · ');
+ const changed=Math.abs(c.delta)>=.02;
+ const mixed=c.run_deltas?.some(d=>d>1e-9)&&c.run_deltas?.some(d=>d<-1e-9);
+ const details=c.situation_specific
+  ? table(['선택','학습 전','학습 후'],comparison.map(v=>[label(v.action),pct(v.before),pct(v.after)]))
+    +'<p class="micro">'+c.matched_runs+'개 실행 · 같은 상황의 평균</p>'
+  : '<p>'+esc(c.observed||outcome(o.feedback[c.view][c.action],c.view))+'</p>';
+ return '<article class="reason"><h3>'+decisionTitles[c.view]+'</h3>'
+  +(c.brief_state?'<p class="scenario">'+esc(c.brief_state)+'</p>':'')
+  +'<p class="narrative">'+esc(changed?mainChoices:'뚜렷한 변화 없음')+'</p>'
+  +(mixed?'<p class="scenario">실행마다 방향이 달랐습니다.</p>':'')
+  +'<details data-disclosure-group="decisions"><summary>상황·근거</summary><p>'+esc(c.summary)+'</p><p>'+esc(c.reason)+'</p>'
+  +(c.context?'<p class="micro">'+esc(c.context)+'</p>':'')+details+'</details></article>';
+}).join('')||'<p class="muted">비교할 학습 기록이 없습니다.</p>';
 const pairedRecords=[...document.querySelectorAll('[data-disclosure-group]')];
 for(const item of pairedRecords)item.addEventListener('toggle',()=>{for(const other of pairedRecords)if(other.dataset.disclosureGroup===item.dataset.disclosureGroup&&other.open!==item.open)other.open=item.open});
 function ink(rgb){const l=rgb.reduce((s,c,i)=>{const x=c/255;return s+[.2126,.7152,.0722][i]*(x<=.04045?x/12.92:((x+.055)/1.055)**2.4)},0);return 1.05/(l+.05)>=4.5?'#fff':'#000'}
