@@ -34,11 +34,15 @@ def build(result):
             seen.add(key)
             identity=(key,json.dumps(probe['context'],sort_keys=True))
             groups[identity].append((probe['context'],old['teams'][0],probe['teams'][0]))
+    comparisons=[]
+    for key,records in groups.items():
+        pairs=[(old,new) for _,old,new in records]
+        comparisons.append((key,records[0][0],average(pairs),[average([pair]) for pair in pairs]))
     stories=[]
     for view in ('offense','direction','defense','course'):
         candidates=[]
-        for key,records in groups.items():
-            values=average([(old,new) for _,old,new in records])[view]
+        for key,context,pooled,individual in comparisons:
+            values=pooled[view]
             if not values['states']:continue
             before,after=values['before'],values['after']
             keys=before.keys()|after.keys()
@@ -50,10 +54,10 @@ def build(result):
             action=max(sorted(choices),key=lambda a:(abs(deltas[a]),deltas[a]))
             replaced=(min if deltas[action]>=0 else max)(sorted(keys),key=lambda a:deltas[a])
             shifts=[]
-            for _,old,new in records:
-                v=average([(old,new)])[view]
+            for run in individual:
+                v=run[view]
                 if v['states']:shifts.append(v['after'].get(action,0)-v['before'].get(action,0))
-            candidates.append((deltas[action],key,records[0][0],values,action,replaced,shifts))
+            candidates.append((deltas[action],key,context,values,action,replaced,shifts))
         if not candidates:continue
         delta,key,context,values,action,replaced,shifts=max(candidates,key=lambda row:(abs(row[0]),row[0],row[1]))
         name=label(action);where=situation(context,view)

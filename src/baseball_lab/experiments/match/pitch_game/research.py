@@ -372,7 +372,8 @@ def train(data,start,end,output,config,*,world=None):
                     'evaluation_scope':'new simulated games in fit-only world; initial neural opponents are frozen, not human strategies',
                     'seed_bank':bank})
             write_json(output/'checkpoints'/f'{seed}-{done}.json',{'schema':result['schema'],**({'shared_policy':[a.state_dict() for a in teams[0]],'trajectory_roles':2} if shared else {'teams':[[a.state_dict() for a in t] for t in teams]})})
-            write_json(output/'research.json',result);report(output,result)
+            write_json(output/'research.json',result)
+            if not fixed_update_schedule:report(output,result)
             if getattr(world,'track_strategy',False):
                 total=config.episodes*len(config.seeds);done=run_index*config.episodes+done
                 print('LEARNING_PROGRESS '+json.dumps({'completed':done,'total':total,'phase':'summarizing' if done==total else 'training'}),flush=True)
@@ -432,15 +433,20 @@ def render(result):
     if result.get('schema') in ('Match-pitch-decision-game-v4','Match-pitch-decision-game-v5','Match-pitch-decision-game-v6','Match-pitch-decision-game-v7','Match-pitch-decision-game-v8'):
         from .strategy_view import build
         result=build(result)
-    encoded=json.dumps(result,ensure_ascii=False).replace('<','\\u003c')
+    if result.get('learning_review'):
+        from .report_data import page_data
+        result=page_data(result)
+    encoded=json.dumps(result,ensure_ascii=False,separators=(',',':')).replace('<','\\u003c')
     if result.get('learning_review'):return apply_app_styles(Path(__file__).with_name('learning_results.html').read_text(encoding='utf-8').replace('__DATA__',encoded))
     template={'strategy-report-view-v2':'strategy_results.html','strategy-report-view-v3':'shared_strategy_results.html'}.get(result.get('schema'),'results.html')
     return Path(__file__).with_name(template).read_text(encoding='utf-8').replace('__DATA__',encoded)
 def report(output,result):
     if result.get('schema') in ('Match-pitch-decision-game-v7','Match-pitch-decision-game-v8'):
-        from .strategy_view import build
         from .glance import render as glance
+        from .report_data import build,save
         view=build(result)
         Path(output/'report.html').write_text(render(view),encoding='utf-8')
         Path(output/'overview.html').write_text(glance(view),encoding='utf-8')
+        source=Path(output)/'research.json'
+        if result['status']=='COMPLETED' and source.is_file():save(source,view)
     else:Path(output/'report.html').write_text(render(result),encoding='utf-8')

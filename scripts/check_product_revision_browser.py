@@ -5,6 +5,7 @@ Requires Playwright and Chromium. Never starts training or opens the real
 workbench root. Only MOCK_TEST_ONLY, created below, is deleted through the UI.
 """
 from pathlib import Path
+import json
 import re
 import tempfile
 from unittest.mock import patch
@@ -120,6 +121,12 @@ def league_results_validation_saved(page, base, root):
         expect(page.locator('#resultTitle')).to_contain_text(analysis['batter']['name'])
         expect(page.locator('#headline')).to_contain_text('37타석')
         expect(page.locator('#setup')).to_be_hidden()
+        if league=='MLB':
+            page.route('**/api/matchup/analyze',lambda route:route.fulfill(status=400,json={'error':'MOCK_TEST_ONLY 재현 실패'}))
+            page.locator('#reproduce').click()
+            expect(page.locator('#resultError')).to_have_text('MOCK_TEST_ONLY 재현 실패')
+            expect(page.locator('#resultError')).to_be_focused()
+            page.unroute('**/api/matchup/analyze')
         page.set_viewport_size({'width': 390, 'height': 844})
         no_overflow(page)
         page.set_viewport_size({'width': 1440, 'height': 1000})
@@ -170,6 +177,12 @@ def common_validation_saved_stale(page, base, root):
     expect(page.locator('#resultTitle')).to_contain_text(analysis['batter']['name'])
     expect(page.locator('#headline')).to_contain_text('37타석')
     expect(page.locator('#setup')).to_be_hidden()
+    reproduced=run(page,'#reproduce')['analysis']
+    assert reproduced['run_id']==analysis['run_id']
+    assert reproduced['simulation']['events']==analysis['simulation']['events']
+    fresh=run(page,'#rerun')['analysis']
+    assert fresh['simulation']['seed']!=analysis['simulation']['seed']
+    assert fresh['model']['probabilities']==analysis['model']['probabilities']
     no_overflow(page)
 
 
@@ -201,6 +214,15 @@ def learning_recovery_and_disposable_deletion(page, base, root):
     target = root / 'outputs/workbench/MOCK_TEST_ONLY'
     target.mkdir(parents=True, exist_ok=False)
     (target / 'mock.log').write_text('MOCK_TEST_ONLY disposable deletion fixture', encoding='utf-8')
+    (target/'task.json').write_text(json.dumps({'id':'MOCK_TEST_ONLY','kind':'run','status':'completed',
+        'started_at':'2026-01-01','report':'/reports/MOCK_TEST_ONLY/result/report.html'}),encoding='utf-8')
+    with page.expect_response(lambda response:'compact=1' in response.url):page.reload()
+    result_link=page.locator('#runs a')
+    expect(result_link).to_be_visible()
+    result_link.focus()
+    with page.expect_response(lambda response:'compact=1' in response.url):
+        expect(result_link).to_be_focused()
+    expect(result_link).to_be_focused()
     page.goto(base + '/lab/data')
     page.get_by_text('사용 가능한 학습 기록과 출처', exact=True).click()
     expect(page.locator('#sourceCoverage')).to_contain_text('KBO 2016~2026', timeout=TIMEOUT)

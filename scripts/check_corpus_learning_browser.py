@@ -41,7 +41,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
         assert response.value.ok,response.value.text()
         deadline=time.monotonic()+240;last_done=0
         while time.monotonic()<deadline:
-            job=page.request.get(base+'/api/state?project=match').json()['job']
+            job=page.request.get(base+'/api/state?project=match&compact=1').json()['job']
             if job.get('progress_scope')=='all_runs':
                 assert job['completed_episodes']>=last_done
                 last_done=job['completed_episodes'];assert job['target_episodes']==153
@@ -75,6 +75,7 @@ with local_server(ROOT) as (base,wb),sync_playwright() as pw:
     page.goto(base+job['report']);expect(page.locator('#teamCards')).to_contain_text('공격')
     view=page.locator('#data').text_content();view=json.loads(view)
     assert view['schema']=='strategy-report-view-v3'
+    assert not {'growth','contexts','runs'} & view.keys()
     choices=page.locator('[data-choice-record]')
     expect(choices).to_have_count(2)
     choices.nth(0).locator('summary').focus();page.keyboard.press('Enter')

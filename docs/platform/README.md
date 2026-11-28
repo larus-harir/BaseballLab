@@ -1,29 +1,21 @@
-# BaseballLab 프로그램과 공통 기반
+# 공통 기반과 재사용 안내
 
-2026-11-09 [역할 개정](../specs/BaseballLab_Three_Project_Redefinition_Codex.md)을 적용합니다. BaseballLab은 **통계 타자·투수 대결을 직접 실행하는 프로그램**입니다. 공통 엔진도 제공하지만 공통 기반만 제공하는 부모가 아닙니다.
-
-| 웹 경로 | 실행 기능 | 소유 |
+| 용도 | 코드 진입점 | 입력과 결과 |
 |---|---|---|
-| `/`, `/lab` | 세 프로젝트 선택 | 공통 홈 |
-| `/baseball` | MLB 실제 선수·시즌, 다항 Log5, 반복 타석, 계산 설명 | BaseballLab |
-| `/eramatch` | KBO 과제 검색·시대 보정·원본/개선 후보·25타석 | EraMatch |
-| `/match` | AI 경쟁 학습 연구 선택 | Match |
-| `/match/team` | 기존 한 점 득점 AI 학습·선택/성과 변화 | Match R1 |
-| `/match/at-bat` | 기존 투구 연구 연결·준비 상태 | Match, 연구 검증 미완성 |
-| `/simulation` | 기존 실제/가상 한 점 장면 관찰 | R1 관찰 호환 경로 |
-| `/lab/data` | 원본·선수 카탈로그·결과 용량, 무결성 검사, 확인 후 삭제 | 공통 자료 관리 |
+| 선수 기록 조회와 타석 대결 | `matchup/service.py`의 `overview`, `analyze` | 선수 ID·시즌·자료 모드·타석 수·재현 번호를 받습니다. `model.probabilities`는 예상 확률, `simulation.events`는 추첨된 타석 순서입니다. |
+| 리그·시즌을 섞어서 비교 | `matchup/shared.py`의 `analyze` | 타자·투수 자료와 비교 기준 리그·시즌을 받습니다. 공통 사건 정의를 적용하고 사용 가능한 장타·사구는 따로 계산합니다. |
+| 투구와 카운트 진행 | `core/engine.py`의 `transition`, `Engine` | 볼·스트라이크·타석 종료 규칙을 처리합니다. `core/contracts.py`의 `Policy`, `OutcomeModel`로 선택과 결과 모델을 연결합니다. |
+| 이닝·주자·점수 진행 | `core/game.py`의 `GameEngine` | 규칙과 결과 모델을 주입하는 단순 경기 엔진입니다. `advance`의 진루는 명시된 단순화이며 새 게임에 필요한 주루 규칙을 검토해야 합니다. |
+| 관측 기록 기반 경기와 AI 학습 | `experiments/match/pitch_game/modern_world.py`의 `ModernWorld`, `research.py`의 `play`, `train` | 리그·시즌별 환경에서 합법 행동을 열고 경기 승패로 정책을 갱신합니다. 관측 항목·행동·가중치 버전을 함께 맞춰야 합니다. |
 
-## 모듈 책임
+**선수 육성**에서 선수 시즌 기록과 타석 분포를 출발점으로 사용할 수 있습니다. 성장에 따른 능력치 변화와 선수의 성장 곡선은 게임에서 정의해야 합니다. `PA` 또는 `TBF`를 분모로 쓰고 관측되지 않은 사건은 결측으로 관리합니다. `simulation/contracts.py`와 `matchup/event_schema.py`에 프로필 조건과 사건 분류가 있습니다. 타석 사건 `other`에는 아웃과 실책 출루 등이 함께 들어갈 수 있으므로 주자 이동에 바로 넣기 전에 사건을 구분할 모델이 필요합니다.
 
-- `matchup/catalog.py`: 고유 선수 ID+역할+리그+시즌, 팀 분할/중복, 결측, 과제 원본 검증. 원본 코드는 실행하지 않고 기록만 파싱한다.
-- `matchup/mlb.py`: 기존 공식 공급원을 재사용한 MLB 실제 타석 집계·공식 이름·기간 분리 예측 검사.
-- `matchup/models.py`: 공유 이항/다항 Log5, 평균 회귀, 과제 원본 방식, 몬테카를로. EraMatch 전용 계산식의 복제 없음.
-- `matchup/service.py`, `matchup/web.py`, `web/matchup.html`: 선택 프로필→계산→저장→재열기, 결과와 맥락형 설명.
-- `experiments/match/`: 목표·보상·신경망 정책·경쟁 학습·상대별 평가·해석. 인간 야구의 역사/현대 비교도 이 영역이며 미완성 상태를 밝힌다.
-- `experiments/eramatch/`: 시대 대결 프로그램의 책임 선언. 엔진과 자료를 복제하지 않는다.
-- `r1.data/provider`, `data.retrosheet_releases`, `simulation.scoring`: 기존 실제 자료 어댑터와 독립 장면 관찰을 보존한다.
-- `web/server.py`, `web/storage.py`: 로컬 서버·토큰·고정 요청·경로 제한·비공개 보관·명시적 삭제 확인을 공통 제공한다.
+**감독 시뮬**에서는 투구에서 카운트·아웃·주자·점수를 이어 가는 흐름을 재사용할 수 있습니다. 현재 Match는 대칭적인 실험 명단과 공통 경기 규칙을 쓰므로 로스터 구성, 라인업, 부상, 시즌 일정은 새 게임에서 정의해야 합니다. 구종·코스나 주루 선택은 관측 기록이 지원하는 범위에서 열립니다. 선택 확률의 변화와 고정 상대에 대한 성능 평가는 서로 다른 측정입니다.
 
-의존성은 UI/연구 → 공통 자료·모델 방향이다. 통계 모델은 Match 학습기를 import하지 않는다. 보류 기간의 예측 성능이 좋아도 행동 변경의 반사실 결과가 검증됐다는 뜻은 아니다. 따라서 새 Log5 모델을 기존 Match 환경에 자동 삽입하지 않았다.
+| 보관 파일 | 용도 |
+|---|---|
+| `analysis.json` | 대결의 선수·자료·계산 조건, 확률과 타석 순서. `run_id`는 재현 조건, `execution_id`는 개별 실행을 식별합니다. |
+| `research.json`, `world.json`, `checkpoints/` | 학습 기록, 환경 계수와 근거, 정책·행동 순서. 분석과 재현의 원본입니다. |
+| `report.html`, `overview.html`, `report-data.json` | 완료 결과를 읽는 화면과 표시용 데이터. 게임과 분석에서는 원본 JSON을 사용하세요. |
 
-[실행·검증·제한](../three-project-validation.md) · [보안](../security-audit.md)
+웹 진입점은 `/eramatch`, `/match`, `/match/team`입니다. `/baseball`은 MLB 대결의 호환 경로입니다. 기본 대결·통합 학습은 앱에 포함된 집계를 사용합니다. 개별 출처의 검증 범위와 사용 조건은 [데이터 규칙](../league-data-contract.md), 학습 실행과 결과는 [Match 안내](../match/README.md)에서 확인합니다.

@@ -77,3 +77,27 @@ def test_summary_route_reads_saved_evidence_and_refuses_escape(web,tmp_path):
     outside=tmp_path/'outside.json';outside.write_text(json.dumps(sample()));source.symlink_to(outside)
     with pytest.raises(HTTPError) as error:urlopen(base+'/reports/MOCK_TEST_ONLY/result/overview.html')
     assert error.value.code==403
+
+
+def test_completed_reports_share_small_projection_and_reload_changed_source(tmp_path,monkeypatch):
+    from baseball_lab.experiments.match.pitch_game import report_data
+
+    source=tmp_path/'research.json'
+    d=sample()
+    source.write_text(json.dumps(d),encoding='utf-8')
+    report(tmp_path,d)
+    original=Path.read_text
+
+    def no_raw_read(path,*args,**kwargs):
+        assert path!=source,'Completed reports should use the saved projection'
+        return original(path,*args,**kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path,'read_text',no_raw_read)
+        view=report_data.load(source)
+        assert report_data.load(source) is view
+        assert view['overview']==detailed(d)['overview']
+        assert not {'contexts','growth','runs'} & view.keys()
+    changed=sample((.9,.9))
+    source.write_text(json.dumps(changed),encoding='utf-8')
+    assert report_data.load(source)['overview']==detailed(changed)['overview']

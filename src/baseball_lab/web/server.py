@@ -75,7 +75,7 @@ class Workbench:
         result['scoring']['collected_periods']=periods(self.root)
         return result
 
-    def state(self,project=None):
+    def state(self,project=None,*,compact=False):
         if project not in (None,'match','baseball','eramatch'):raise ValueError('프로젝트를 확인하세요.')
         with self.lock:
             current=dict(self.job) if self.job else None
@@ -93,7 +93,7 @@ class Workbench:
                 self._execution_view(run)
                 run.pop('logs',None);runs.append(run)
                 evidence=p.parent/'result/research.json'
-                if evidence.exists() and run['status'] not in ('failed','interrupted','cancelled'):
+                if not compact and evidence.exists() and run['status'] not in ('failed','interrupted','cancelled'):
                     data=json.loads(evidence.read_text(encoding='utf-8'))
                     if data.get('schema')=='E01-R1-research-v1':
                         from baseball_lab.experiments.match.reporting.summary import build_summary
@@ -110,7 +110,9 @@ class Workbench:
                         run['reading']={k:reading[k] for k in ('headline','growth_headline','complete')}
                 if len(runs)>=30:break
             except (OSError,ValueError,KeyError):continue
-        return public_view({'readiness':self.readiness(),'job':current,'operation':operation,'runs':runs})
+        state={'job':current,'operation':operation,'runs':runs}
+        if not compact:state['readiness']=self.readiness()
+        return public_view(state)
 
     @staticmethod
     def _execution_view(job):
@@ -398,7 +400,8 @@ class Workbench:
                             done,total=map(int,progress.groups()[:2]);unit=progress.group(3)
                             display_unit='경기' if 'whole_game' in command or 'pitch_game' in command else '이닝' if 'inning' in command else '득점 기회' if 'scoring' in command else unit
                             self.job.update(completed_episodes=done,target_episodes=total,message=f'학습 {done:,}/{total:,}{display_unit}')
-                        if (output/'result/report.html').exists() and not (output/'result/failure.json').exists():
+                        has_report=(output/'result/report.html').is_file() or (event and (output/'result/research.json').is_file())
+                        if has_report and not (output/'result/failure.json').exists():
                             self.job['report']=f'/reports/{job_id}/result/report.html'
                         self.job['logs']=self.job['logs'][-120:]
                         self._persist()
@@ -490,7 +493,8 @@ def make_handler(workbench):
                 body=Path(__file__).with_name(pages[path]).read_text(encoding='utf-8').replace('__SESSION_TOKEN__',workbench.token)
                 self._html(body)
             elif path=='/api/state':
-                try:self._json(workbench.state(parse_qs(urlparse(self.path).query).get('project',[None])[0]))
+                query=parse_qs(urlparse(self.path).query)
+                try:self._json(workbench.state(query.get('project',[None])[0],compact=query.get('compact')==['1']))
                 except ValueError as exc:self._json({'error':str(exc)},400)
             elif path=='/api/storage':self._json(workbench.storage.inventory())
             elif path=='/api/pitch-corpus':
@@ -553,7 +557,10 @@ def make_handler(workbench):
                     if not source.is_file():return self._json({'error':'요약할 학습 기록이 없습니다.'},404)
                     try:
                         from baseball_lab.experiments.match.pitch_game.glance import render
-                        return self._html(render(json.loads(source.read_text(encoding='utf-8'))))
+                        from baseball_lab.experiments.match.pitch_game.report_data import load
+                        view=load(source)
+                        if not view.get('learning_review'):return self._json({'error':'이 기록은 한눈에 보기를 지원하지 않습니다.'},409)
+                        return self._html(render(view))
                     except (OSError,ValueError,KeyError,TypeError) as exc:return self._json({'error':public_text(exc)},409)
                 if resolved.name=='report.html' and (resolved.parent/'analysis.json').is_file():
                     try:
@@ -562,8 +569,14 @@ def make_handler(workbench):
                         return self._html(render(data['project'],token=workbench.token,analysis=data))
                     except (OSError,ValueError,KeyError,TypeError) as exc:return self._json({'error':public_text(exc)},409)
                 if resolved.name=='report.html' and (resolved.parent/'research.json').is_file():
+                    source=resolved.parent/'research.json'
+                    if not source.resolve().is_relative_to(workbench.outputs.resolve()):return self._json({'error':'허용하지 않는 경로'},403)
                     try:
-                        evidence=json.loads((resolved.parent/'research.json').read_text(encoding='utf-8'))
+                        from baseball_lab.experiments.match.pitch_game.report_data import load
+                        evidence=load(source)
+                        if evidence.get('learning_review'):
+                            from baseball_lab.experiments.match.pitch_game.research import render
+                            return self._html(render(evidence))
                         if evidence.get('schema')=='E01-R1-research-v1':
                             external=[json.loads(p.read_text(encoding='utf-8')) for p in sorted(resolved.parent.glob('external-*.json'))]
                             evidence['external_evaluation']=[r for r in external if r.get('run_id')==evidence['run_id']]
